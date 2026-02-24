@@ -208,13 +208,13 @@ const VoucherEntryPage = () => {
     }
   }, [currentOrg]);
 
-  // Refetch vouchers when search/filter changes
+  // Refetch vouchers when search/filter/FY changes
   useEffect(() => {
     if (currentOrg) {
       setCurrentPage(0);
       fetchVouchers(true);
     }
-  }, [searchTerm, filterType, filterStatus]);
+  }, [searchTerm, filterType, filterStatus, selectedFY]);
 
   const fetchData = async () => {
     setLoading(true);
