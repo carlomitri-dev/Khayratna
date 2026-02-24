@@ -23,16 +23,19 @@
 }
 
 .data-table th {
-  @apply px-3 py-2 text-left font-medium text-muted-foreground bg-muted/50 border-b border-border;
+  @apply px-3 py-2.5 text-left font-medium text-muted-foreground bg-slate-100/80 border-b-2 border-border;
   font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .data-table td {
-  @apply px-3 py-2 border-b border-border;
+  @apply px-3 py-2.5 border-b border-border;
 }
 
 .data-table tr:hover {
-  @apply bg-muted/30;
+  @apply bg-blue-50/60;
 }
 
 /* Financial number cells */
