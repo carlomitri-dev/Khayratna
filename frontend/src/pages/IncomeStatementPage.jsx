@@ -7,6 +7,7 @@ import { TrendingUp, TrendingDown, Download, Printer } from 'lucide-react';
 import axios from 'axios';
 import { formatLBP, formatUSD } from '../lib/utils';
 import { printReport, exportIncomeStatementToCSV } from '../lib/reportUtils';
+import CompanyHeader from '../components/shared/CompanyHeader';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
