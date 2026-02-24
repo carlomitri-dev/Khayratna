@@ -303,6 +303,12 @@ const VoucherEntryPage = () => {
       if (filterType !== 'all') params.append('voucher_type', filterType);
       if (filterStatus !== 'all') params.append('status', filterStatus);
       
+      // Filter by fiscal year date range
+      if (selectedFY) {
+        params.append('date_from', selectedFY.start_date);
+        params.append('date_to', selectedFY.end_date);
+      }
+      
       const [vouchersRes, countRes] = await Promise.all([
         axios.get(`${API}/vouchers?${params.toString()}`),
         axios.get(`${API}/vouchers/count?${params.toString()}`)
