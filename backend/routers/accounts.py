@@ -281,7 +281,7 @@ async def delete_account(account_id: str, current_user: dict = Depends(get_curre
 # ================== CUSTOMER/SUPPLIER SHORTCUTS ==================
 
 @router.get("/customers", response_model=List[AccountResponse])
-async def get_customers(organization_id: str, current_user: dict = Depends(get_current_user)):
+async def get_customers(organization_id: str, fy_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Get customer accounts (code starts with 41 and length > 4)"""
     accounts = await db.accounts.find(
         {
@@ -299,12 +299,33 @@ async def get_customers(organization_id: str, current_user: dict = Depends(get_c
         acc.setdefault('is_active', True)
         acc.setdefault('name_ar', '')
         acc.setdefault('account_type', 'detail')
+        acc['balance_lbp'] = acc.get('balance_lbp', 0) or 0
+        acc['balance_usd'] = acc.get('balance_usd', 0) or 0
+    
+    # FY balance filter
+    if fy_id:
+        fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+        if fy:
+            acc_lookup = {a['code']: a for a in accounts}
+            for a in accounts:
+                a['balance_lbp'] = 0
+                a['balance_usd'] = 0
+            pipeline = [
+                {'$match': {'organization_id': organization_id, 'is_posted': True, 'date': {'$gte': fy['start_date'], '$lte': fy['end_date']}}},
+                {'$unwind': '$lines'},
+                {'$match': {'lines.account_code': {'$regex': '^41'}}},
+                {'$group': {'_id': '$lines.account_code', 'dr_lbp': {'$sum': {'$ifNull': ['$lines.debit_lbp', 0]}}, 'cr_lbp': {'$sum': {'$ifNull': ['$lines.credit_lbp', 0]}}, 'dr_usd': {'$sum': {'$ifNull': ['$lines.debit_usd', 0]}}, 'cr_usd': {'$sum': {'$ifNull': ['$lines.credit_usd', 0]}}}}
+            ]
+            async for r in db.vouchers.aggregate(pipeline):
+                if r['_id'] in acc_lookup:
+                    acc_lookup[r['_id']]['balance_lbp'] = r['dr_lbp'] - r['cr_lbp']
+                    acc_lookup[r['_id']]['balance_usd'] = r['dr_usd'] - r['cr_usd']
     
     return [AccountResponse(**acc) for acc in accounts]
 
 
 @router.get("/suppliers", response_model=List[AccountResponse])
-async def get_suppliers(organization_id: str, current_user: dict = Depends(get_current_user)):
+async def get_suppliers(organization_id: str, fy_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Get supplier accounts (code starts with 40 and length > 4)"""
     accounts = await db.accounts.find(
         {
@@ -322,6 +343,27 @@ async def get_suppliers(organization_id: str, current_user: dict = Depends(get_c
         acc.setdefault('is_active', True)
         acc.setdefault('name_ar', '')
         acc.setdefault('account_type', 'detail')
+        acc['balance_lbp'] = acc.get('balance_lbp', 0) or 0
+        acc['balance_usd'] = acc.get('balance_usd', 0) or 0
+    
+    # FY balance filter
+    if fy_id:
+        fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+        if fy:
+            acc_lookup = {a['code']: a for a in accounts}
+            for a in accounts:
+                a['balance_lbp'] = 0
+                a['balance_usd'] = 0
+            pipeline = [
+                {'$match': {'organization_id': organization_id, 'is_posted': True, 'date': {'$gte': fy['start_date'], '$lte': fy['end_date']}}},
+                {'$unwind': '$lines'},
+                {'$match': {'lines.account_code': {'$regex': '^40'}}},
+                {'$group': {'_id': '$lines.account_code', 'dr_lbp': {'$sum': {'$ifNull': ['$lines.debit_lbp', 0]}}, 'cr_lbp': {'$sum': {'$ifNull': ['$lines.credit_lbp', 0]}}, 'dr_usd': {'$sum': {'$ifNull': ['$lines.debit_usd', 0]}}, 'cr_usd': {'$sum': {'$ifNull': ['$lines.credit_usd', 0]}}}}
+            ]
+            async for r in db.vouchers.aggregate(pipeline):
+                if r['_id'] in acc_lookup:
+                    acc_lookup[r['_id']]['balance_lbp'] = r['dr_lbp'] - r['cr_lbp']
+                    acc_lookup[r['_id']]['balance_usd'] = r['dr_usd'] - r['cr_usd']
     
     return [AccountResponse(**acc) for acc in accounts]
 
