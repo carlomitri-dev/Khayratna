@@ -8,6 +8,7 @@ import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
 import { FileText, Download, Printer, Filter, RefreshCw } from 'lucide-react';
 import axios from 'axios';
+import CompanyHeader from '../components/shared/CompanyHeader';
 import { formatLBP, formatUSD, getNumberClass } from '../lib/utils';
 import { printReport, exportTrialBalanceToCSV } from '../lib/reportUtils';
 
