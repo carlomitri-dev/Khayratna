@@ -328,9 +328,10 @@ async def get_income_statement(
 async def get_general_ledger(
     account_code: str, 
     organization_id: str, 
+    fy_id: Optional[str] = None,  # Optional fiscal year filter
     current_user: dict = Depends(get_current_user)
 ):
-    """Get general ledger for a specific account"""
+    """Get general ledger for a specific account. If fy_id is provided, filters by FY date range."""
     account = await db.accounts.find_one(
         {'code': account_code, 'organization_id': organization_id},
         {'_id': 0}
@@ -338,13 +339,22 @@ async def get_general_ledger(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
     
+    # Build voucher query
+    voucher_query = {
+        'organization_id': organization_id,
+        'is_posted': True,
+        'lines.account_code': account_code
+    }
+    
+    # Add FY date filter if specified
+    if fy_id:
+        fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+        if fy:
+            voucher_query['date'] = {'$gte': fy['start_date'], '$lte': fy['end_date']}
+    
     # Get all voucher lines for this account
     vouchers = await db.vouchers.find(
-        {
-            'organization_id': organization_id,
-            'is_posted': True,
-            'lines.account_code': account_code
-        },
+        voucher_query,
         {'_id': 0}
     ).sort('date', 1).to_list(None)
     
