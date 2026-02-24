@@ -1272,6 +1272,7 @@ const ChartOfAccountsPage = () => {
         open={!!ledgerAccount}
         onClose={() => setLedgerAccount(null)}
         userRole={user?.role}
+        fyId={selectedFY?.id}
       />
     </div>
   );
