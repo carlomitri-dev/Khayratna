@@ -658,7 +658,7 @@ class CurrencyResponse(BaseModel):
 
 class VoucherLine(BaseModel):
     account_code: str
-    account_name: str
+    account_name: Optional[str] = None
     description: Optional[str] = None
     currency: str = 'USD'
     exchange_rate: float = 1.0
