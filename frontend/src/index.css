@@ -114,20 +114,20 @@
 
 /* Currency colors */
 .currency-lbp {
-  @apply text-emerald-400;
+  @apply text-emerald-600;
 }
 
 .currency-usd {
-  @apply text-blue-400;
+  @apply text-blue-600;
 }
 
 /* Profit/Loss indicators */
 .profit {
-  @apply text-emerald-500;
+  @apply text-emerald-600;
 }
 
 .loss {
-  @apply text-red-500;
+  @apply text-red-600;
 }
 
 /* Glassmorphism effect */
