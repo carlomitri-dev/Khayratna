@@ -300,6 +300,20 @@ const SettingsPage = () => {
   });
   const [seriesSaving, setSeriesSaving] = useState(false);
 
+  // Fiscal Year state
+  const [isFYDialogOpen, setIsFYDialogOpen] = useState(false);
+  const [editingFY, setEditingFY] = useState(null);
+  const [fyLoading, setFyLoading] = useState(false);
+  const [closeConfirmFY, setCloseConfirmFY] = useState(null);
+  const [closingFY, setClosingFY] = useState(false);
+  const [closeResult, setCloseResult] = useState(null);
+  const [deleteFYConfirm, setDeleteFYConfirm] = useState(null);
+  const [newFY, setNewFY] = useState({
+    name: '',
+    start_date: '',
+    end_date: ''
+  });
+
   const [newUser, setNewUser] = useState({
     email: '',
     password: '',
