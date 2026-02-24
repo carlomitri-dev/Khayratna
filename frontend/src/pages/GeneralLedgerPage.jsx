@@ -13,6 +13,7 @@ import { List, Download, Printer, Search, ChevronsUpDown, Check } from 'lucide-r
 import axios from 'axios';
 import { formatLBP, formatUSD, formatDate, getNumberClass } from '../lib/utils';
 import { printReport, exportGeneralLedgerToCSV } from '../lib/reportUtils';
+import CompanyHeader from '../components/shared/CompanyHeader';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
