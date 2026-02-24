@@ -820,3 +820,42 @@ class CSVImportResult(BaseModel):
     imported_count: int
     error_count: int
     errors: List[str]
+
+
+# ================== FISCAL YEAR MODELS ==================
+
+class FiscalYearCreate(BaseModel):
+    name: str  # e.g., "FY 2024", "FY 2024-2025"
+    start_date: str  # YYYY-MM-DD
+    end_date: str  # YYYY-MM-DD
+    organization_id: str
+
+class FiscalYearUpdate(BaseModel):
+    name: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+class FiscalYearResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    name: str
+    start_date: str
+    end_date: str
+    status: str  # 'open', 'closed'
+    organization_id: str
+    closed_at: Optional[str] = None
+    closed_by: Optional[str] = None
+    closing_voucher_id: Optional[str] = None
+    created_at: str
+
+class FiscalYearCloseResponse(BaseModel):
+    message: str
+    fiscal_year_id: str
+    closing_voucher_id: Optional[str] = None
+    net_income_lbp: float = 0
+    net_income_usd: float = 0
+    revenue_total_lbp: float = 0
+    revenue_total_usd: float = 0
+    expense_total_lbp: float = 0
+    expense_total_usd: float = 0
+
