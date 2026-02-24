@@ -406,6 +406,7 @@ async def import_vouchers(
     return {
         "message": "Voucher history imported successfully",
         "vouchers_created": vouchers_created,
+        "vouchers_skipped": vouchers_skipped,
         "vouchers_failed": vouchers_failed,
         "lines_processed": lines_processed,
         "accounts_balance_updated": accounts_updated,
