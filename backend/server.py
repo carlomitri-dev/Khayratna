@@ -811,24 +811,26 @@ async def get_accounts(organization_id: str, current_user: dict = Depends(get_cu
         acc['balance_lbp'] = acc.get('balance_lbp', 0) or 0
         acc['balance_usd'] = acc.get('balance_usd', 0) or 0
     
-    # Calculate parent account balances from children
-    # Parent accounts have shorter codes (1-4 digits), children have longer codes starting with parent code
+    # Calculate parent account balances from children efficiently using a single pass
+    # Build lookup of leaf account balances first, then aggregate up
+    code_balances = {}
     for acc in accounts:
         code = acc.get('code', '')
-        # If this is a summary/parent account (1-4 digits)
+        code_balances[code] = {'lbp': acc.get('balance_lbp', 0) or 0, 'usd': acc.get('balance_usd', 0) or 0}
+    
+    # For parent accounts (1-4 digits), sum children
+    for acc in accounts:
+        code = acc.get('code', '')
         if code and len(code) <= 4:
-            # Find all child accounts that start with this code
-            child_balance_lbp = 0
-            child_balance_usd = 0
-            for child_acc in accounts:
-                child_code = child_acc.get('code', '')
-                # Child account starts with parent code and is longer
-                if child_code and child_code.startswith(code) and len(child_code) > len(code):
-                    child_balance_lbp += child_acc.get('balance_lbp', 0) or 0
-                    child_balance_usd += child_acc.get('balance_usd', 0) or 0
-            # Update the aggregated balance
-            acc['balance_lbp'] = child_balance_lbp
-            acc['balance_usd'] = child_balance_usd
+            child_lbp = 0
+            child_usd = 0
+            prefix = code
+            for other_code, bal in code_balances.items():
+                if other_code.startswith(prefix) and len(other_code) > len(prefix):
+                    child_lbp += bal['lbp']
+                    child_usd += bal['usd']
+            acc['balance_lbp'] = child_lbp
+            acc['balance_usd'] = child_usd
     
     return [AccountResponse(**acc) for acc in accounts]
 
