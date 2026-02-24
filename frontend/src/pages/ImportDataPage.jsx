@@ -12,81 +12,89 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { 
-  Upload, 
-  FileSpreadsheet, 
-  CheckCircle, 
-  AlertCircle,
-  Users,
-  Truck,
-  BookOpen,
-  Receipt,
-  Loader2,
-  Info,
-  Package,
-  FolderOpen,
-  MapPin
+  Upload, FileSpreadsheet, CheckCircle, AlertCircle,
+  BookOpen, Receipt, Loader2, Info, Package, FolderOpen, MapPin, Columns
 } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
+} from '../components/ui/dialog';
 import axios from 'axios';
+import FieldMapper from '../components/shared/FieldMapper';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// Reusable Import Card Component
-const ImportCard = ({ title, icon: Icon, color, description, infoText, onImport, importing, result, children }) => (
-  <Card className={`border-${color}-500/20`}>
-    <CardHeader className="pb-3">
-      <CardTitle className="flex items-center gap-2 text-sm lg:text-base" style={{ fontFamily: 'Manrope, sans-serif' }}>
-        <Icon className={`w-5 h-5 text-${color}-500`} />
-        {title}
-      </CardTitle>
-      <p className="text-xs text-muted-foreground">{description}</p>
-    </CardHeader>
-    <CardContent className="space-y-3">
-      {infoText && (
-        <div className={`p-2 bg-${color}-500/10 border border-${color}-500/20 rounded-lg`}>
-          <div className="flex items-start gap-2">
-            <Info className={`w-3 h-3 text-${color}-500 mt-0.5 flex-shrink-0`} />
-            <p className="text-xs text-muted-foreground">{infoText}</p>
+// System field definitions per import type
+const COA_FIELDS = [
+  { key: 'account_code', label: 'Account Code', required: true, defaultCol: 0, keywords: ['كود الحساب', 'code', 'كود'] },
+  { key: 'account_name', label: 'Account Name', required: true, defaultCol: 2, keywords: ['اسم الحساب', 'name', 'اسم'] },
+  { key: 'account_type', label: 'Type', required: false, defaultCol: 3, keywords: ['النوع', 'type'] },
+  { key: 'contact_name', label: 'Contact Name', required: false, defaultCol: 13, keywords: ['NAME', 'contact'] },
+  { key: 'address', label: 'Address', required: false, defaultCol: 14, keywords: ['ADDRESS', 'عنوان'] },
+  { key: 'phone', label: 'Phone', required: false, defaultCol: 15, keywords: ['PHONE', 'تلفون', 'هاتف'] },
+  { key: 'reg_id', label: 'Region ID', required: false, defaultCol: 18, keywords: ['REG_ID', 'region'] },
+  { key: 'regno', label: 'Registration No', required: false, defaultCol: 27, keywords: ['REGNO', 'registration', 'ض.ق.م'] },
+];
+
+const VOUCHER_FIELDS = [
+  { key: 'tran', label: 'Transaction ID', required: true, defaultCol: 0, keywords: ['TRAN', 'transaction'] },
+  { key: 'account_code', label: 'Account Code', required: true, defaultCol: 3, keywords: ['كود', 'code', 'account'] },
+  { key: 'date', label: 'Date', required: true, defaultCol: 5, keywords: ['DATE', 'تاريخ'] },
+  { key: 'cr_lbp', label: 'Credit LBP', required: true, defaultCol: 8, keywords: ['TOTCL', 'credit.*lbp'] },
+  { key: 'dr_lbp', label: 'Debit LBP', required: true, defaultCol: 10, keywords: ['TOTDL', 'debit.*lbp'] },
+  { key: 'cr_usd', label: 'Credit USD', required: false, defaultCol: 11, keywords: ['TOTCU', 'credit.*usd'] },
+  { key: 'dr_usd', label: 'Debit USD', required: false, defaultCol: 12, keywords: ['TOTDU', 'debit.*usd'] },
+  { key: 'description', label: 'Description', required: false, defaultCol: 14, keywords: ['الوصف', 'desc'] },
+  { key: 'currency', label: 'Currency (1=LBP,2=USD)', required: false, defaultCol: 17, keywords: ['CUR', 'currency'] },
+];
+
+const INVENTORY_FIELDS = [
+  { key: 'item_code', label: 'Item Code', required: true, defaultCol: 0, keywords: ['كود', 'code', 'item'] },
+  { key: 'name', label: 'Item Name (Arabic)', required: true, defaultCol: 2, keywords: ['ADESC', 'اسم', 'name', 'arabic'] },
+  { key: 'description', label: 'Description', required: false, defaultCol: 1, keywords: ['الوصف', 'desc'] },
+  { key: 'category_id', label: 'Category ID', required: false, defaultCol: 3, keywords: ['CAT_ID', 'category'] },
+  { key: 'supplier_id', label: 'Supplier Code', required: false, defaultCol: 4, keywords: ['SUP_ID', 'supplier'] },
+  { key: 'package', label: 'Package (numeric)', required: false, defaultCol: 5, keywords: ['PAK', 'package', 'pack'] },
+  { key: 'pack_desc', label: 'Pack Description', required: false, defaultCol: 6, keywords: ['PACK'] },
+  { key: 'price', label: 'Selling Price', required: false, defaultCol: 7, keywords: ['PRICE', 'سعر', 'sell'] },
+  { key: 'cost', label: 'Cost Price', required: false, defaultCol: 8, keywords: ['COST', 'تكلفة'] },
+];
+
+// Result Display
+const ResultDisplay = ({ result }) => {
+  if (!result) return null;
+  return (
+    <div className={`p-3 rounded-lg border text-xs ${result.error ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+      {result.error ? (
+        <div className="flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+          <p className="text-red-600">{result.message}</p>
+        </div>
+      ) : (
+        <div className="flex items-start gap-2">
+          <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+          <div className="text-muted-foreground">
+            {Object.entries(result).filter(([k]) => k !== 'message' && k !== 'errors' && k !== 'error_count').map(([k, v]) => (
+              <div key={k} className="flex justify-between gap-4">
+                <span>{k.replace(/_/g, ' ')}:</span>
+                <span className="font-mono font-medium">{typeof v === 'number' ? v.toLocaleString() : String(v)}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
-      {children}
-      {result && (
-        <div className={`p-3 rounded-lg border text-xs ${
-          result.error ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'
-        }`}>
-          {result.error ? (
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-              <p className="text-red-600">{result.message}</p>
-            </div>
-          ) : (
-            <div className="flex items-start gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-              <div className="text-muted-foreground">
-                {Object.entries(result).filter(([k]) => k !== 'message' && k !== 'errors' && k !== 'error_count').map(([k, v]) => (
-                  <div key={k} className="flex justify-between gap-4">
-                    <span>{k.replace(/_/g, ' ')}:</span>
-                    <span className="font-mono font-medium">{typeof v === 'number' ? v.toLocaleString() : String(v)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </CardContent>
-  </Card>
-);
+    </div>
+  );
+};
 
-// File Upload component
-const FileUploader = ({ file, setFile, color, accept = ".xlsx,.xls", onClear }) => (
+// File Upload
+const FileUploader = ({ file, setFile, color, onClear }) => (
   <label className={`flex items-center justify-center gap-2 p-4 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-    file ? `border-${color}-500/50 bg-${color}-50/50` : `border-gray-300 hover:border-${color}-400 hover:bg-${color}-50/30`
+    file ? 'border-blue-400 bg-blue-50/50' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/30'
   }`}>
-    <input type="file" accept={accept} className="hidden" onChange={(e) => { setFile(e.target.files[0]); if(onClear) onClear(); }} />
+    <input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { setFile(e.target.files[0]); if(onClear) onClear(); }} />
     {file ? (
       <div className="text-center">
-        <FileSpreadsheet className={`w-6 h-6 mx-auto text-${color}-500 mb-1`} />
+        <FileSpreadsheet className="w-6 h-6 mx-auto text-blue-500 mb-1" />
         <p className="text-xs font-medium truncate max-w-[200px]">{file.name}</p>
         <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</p>
       </div>
@@ -103,7 +111,7 @@ const ImportDataPage = () => {
   const { currentOrg } = useAuth();
   const { fiscalYears, selectedFY } = useFiscalYear();
   
-  // State for each import type
+  // Import states
   const [coaFile, setCoaFile] = useState(null);
   const [coaResult, setCoaResult] = useState(null);
   const [coaImporting, setCoaImporting] = useState(false);
@@ -125,7 +133,16 @@ const ImportDataPage = () => {
   const [itemsResult, setItemsResult] = useState(null);
   const [itemsImporting, setItemsImporting] = useState(false);
 
-  const doImport = async (endpoint, file, setImporting, setResult, extraData = {}) => {
+  // Field mapping state
+  const [mapperOpen, setMapperOpen] = useState(false);
+  const [mapperType, setMapperType] = useState(null); // 'coa', 'voucher', 'inventory'
+  const [mapperHeaders, setMapperHeaders] = useState([]);
+  const [mapperSamples, setMapperSamples] = useState([]);
+  const [mapperFile, setMapperFile] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Simple import (no mapping needed)
+  const doSimpleImport = async (endpoint, file, setImporting, setResult, extraData = {}) => {
     if (!file || !currentOrg) return;
     setImporting(true);
     setResult(null);
@@ -134,10 +151,8 @@ const ImportDataPage = () => {
       formData.append('file', file);
       formData.append('organization_id', currentOrg.id);
       Object.entries(extraData).forEach(([k, v]) => { if(v) formData.append(k, v); });
-      
       const response = await axios.post(`${API}${endpoint}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 600000
+        headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000
       });
       setResult(response.data);
     } catch (err) {
@@ -147,126 +162,202 @@ const ImportDataPage = () => {
     }
   };
 
+  // Start field mapping flow: preview headers then show mapper
+  const startMapping = async (type, file) => {
+    if (!file) return;
+    setPreviewLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await axios.post(`${API}/import/preview-headers`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setMapperHeaders(response.data.headers);
+      setMapperSamples(response.data.sample_rows);
+      setMapperType(type);
+      setMapperFile(file);
+      setMapperOpen(true);
+    } catch (err) {
+      alert('Failed to read file headers: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  // Execute import with mapping
+  const doMappedImport = async (mapping) => {
+    setMapperOpen(false);
+    const mappingJson = JSON.stringify(mapping);
+    
+    if (mapperType === 'coa') {
+      setCoaImporting(true);
+      setCoaResult(null);
+      try {
+        const formData = new FormData();
+        formData.append('file', mapperFile);
+        formData.append('organization_id', currentOrg.id);
+        formData.append('field_mapping', mappingJson);
+        const r = await axios.post(`${API}/import/chart-of-accounts`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000
+        });
+        setCoaResult(r.data);
+      } catch (err) {
+        setCoaResult({ error: true, message: err.response?.data?.detail || 'Import failed' });
+      } finally {
+        setCoaImporting(false);
+      }
+    } else if (mapperType === 'voucher') {
+      setVoucherImporting(true);
+      setVoucherResult(null);
+      try {
+        const formData = new FormData();
+        formData.append('file', mapperFile);
+        formData.append('organization_id', currentOrg.id);
+        formData.append('field_mapping', mappingJson);
+        if (voucherFYId) formData.append('fiscal_year_id', voucherFYId);
+        const r = await axios.post(`${API}/import/vouchers`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000
+        });
+        setVoucherResult(r.data);
+      } catch (err) {
+        setVoucherResult({ error: true, message: err.response?.data?.detail || 'Import failed' });
+      } finally {
+        setVoucherImporting(false);
+      }
+    } else if (mapperType === 'inventory') {
+      setItemsImporting(true);
+      setItemsResult(null);
+      try {
+        const formData = new FormData();
+        formData.append('file', mapperFile);
+        formData.append('organization_id', currentOrg.id);
+        formData.append('field_mapping', mappingJson);
+        const r = await axios.post(`${API}/import/inventory`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000
+        });
+        setItemsResult(r.data);
+      } catch (err) {
+        setItemsResult({ error: true, message: err.response?.data?.detail || 'Import failed' });
+      } finally {
+        setItemsImporting(false);
+      }
+    }
+  };
+
+  const getSystemFields = () => {
+    if (mapperType === 'coa') return COA_FIELDS;
+    if (mapperType === 'voucher') return VOUCHER_FIELDS;
+    if (mapperType === 'inventory') return INVENTORY_FIELDS;
+    return [];
+  };
+
   if (!currentOrg) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Please select an organization</p>
-      </div>
-    );
+    return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Please select an organization</p></div>;
   }
 
   return (
     <div className="space-y-6" data-testid="import-data-page">
       <div>
-        <h1 className="text-xl lg:text-2xl font-bold" style={{ fontFamily: 'Manrope, sans-serif' }}>
-          Import Data
-        </h1>
+        <h1 className="text-xl lg:text-2xl font-bold" style={{ fontFamily: 'Manrope, sans-serif' }}>Import Data</h1>
         <p className="text-muted-foreground text-xs lg:text-sm mt-1">
-          Import data from Excel files for <strong>{currentOrg?.name}</strong>
+          Import from Excel for <strong>{currentOrg?.name}</strong> — Use "Match Fields" to map custom column layouts.
         </p>
         <p className="text-xs text-muted-foreground mt-1">
-          Import order: 1) Categories &amp; Regions → 2) Chart of Accounts → 3) Inventory Items → 4) Vouchers
+          Order: 1) Categories &amp; Regions → 2) Chart of Accounts → 3) Inventory → 4) Vouchers
         </p>
       </div>
 
-      {/* Row 1: Reference Data */}
+      {/* Step 1 */}
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Step 1 — Reference Data</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Categories */}
-          <ImportCard
-            title="Categories"
-            icon={FolderOpen}
-            color="purple"
-            description="Import product categories (CAT_ID, NAME)"
-            infoText="25 categories: حبوب, كبيس, بهارات, زيوت, etc."
-            result={catResult}
-          >
-            <FileUploader file={catFile} setFile={setCatFile} color="purple" onClear={() => setCatResult(null)} />
-            <Button onClick={() => doImport('/import/categories', catFile, setCatImporting, setCatResult)} 
-              disabled={!catFile || catImporting} className="w-full" size="sm">
-              {catImporting ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Importing...</> : <><Upload className="w-3 h-3 mr-1" />Import Categories</>}
-            </Button>
-          </ImportCard>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm"><FolderOpen className="w-4 h-4 text-purple-500" />Categories</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <FileUploader file={catFile} setFile={setCatFile} onClear={() => setCatResult(null)} />
+              <Button onClick={() => doSimpleImport('/import/categories', catFile, setCatImporting, setCatResult)} disabled={!catFile || catImporting} className="w-full" size="sm">
+                {catImporting ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Upload className="w-3 h-3 mr-1" />}{catImporting ? 'Importing...' : 'Import Categories'}
+              </Button>
+              <ResultDisplay result={catResult} />
+            </CardContent>
+          </Card>
 
-          {/* Regions */}
-          <ImportCard
-            title="Regions"
-            icon={MapPin}
-            color="teal"
-            description="Import customer regions (REG_ID, NAME)"
-            infoText="16 regions: الكورة, زغرتا, البترون, عكار, etc."
-            result={regionResult}
-          >
-            <FileUploader file={regionFile} setFile={setRegionFile} color="teal" onClear={() => setRegionResult(null)} />
-            <Button onClick={() => doImport('/import/regions', regionFile, setRegionImporting, setRegionResult)} 
-              disabled={!regionFile || regionImporting} className="w-full" size="sm">
-              {regionImporting ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Importing...</> : <><Upload className="w-3 h-3 mr-1" />Import Regions</>}
-            </Button>
-          </ImportCard>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm"><MapPin className="w-4 h-4 text-teal-500" />Regions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <FileUploader file={regionFile} setFile={setRegionFile} onClear={() => setRegionResult(null)} />
+              <Button onClick={() => doSimpleImport('/import/regions', regionFile, setRegionImporting, setRegionResult)} disabled={!regionFile || regionImporting} className="w-full" size="sm">
+                {regionImporting ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Upload className="w-3 h-3 mr-1" />}{regionImporting ? 'Importing...' : 'Import Regions'}
+              </Button>
+              <ResultDisplay result={regionResult} />
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      {/* Row 2: Chart of Accounts */}
+      {/* Step 2 */}
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Step 2 — Chart of Accounts</h2>
-        <div className="grid grid-cols-1 gap-4">
-          <ImportCard
-            title="Chart of Accounts"
-            icon={BookOpen}
-            color="blue"
-            description="Import accounts with suppliers (40*), customers (41* with region), and all LCOA classes"
-            infoText="Auto-detects: Suppliers (code 40*), Customers (code 41* + REG_ID region link), all account classes 1-7"
-            result={coaResult}
-          >
-            <FileUploader file={coaFile} setFile={setCoaFile} color="blue" onClear={() => setCoaResult(null)} />
-            <Button onClick={() => doImport('/import/chart-of-accounts', coaFile, setCoaImporting, setCoaResult)} 
-              disabled={!coaFile || coaImporting} className="w-full" size="sm">
-              {coaImporting ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Importing accounts...</> : <><Upload className="w-3 h-3 mr-1" />Import Chart of Accounts</>}
-            </Button>
-          </ImportCard>
-        </div>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm"><BookOpen className="w-4 h-4 text-blue-500" />Chart of Accounts</CardTitle>
+            <p className="text-xs text-muted-foreground">Auto-detects suppliers (40*), customers (41* + region), registration numbers</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <FileUploader file={coaFile} setFile={setCoaFile} onClear={() => setCoaResult(null)} />
+            <div className="flex gap-2">
+              <Button onClick={() => doSimpleImport('/import/chart-of-accounts', coaFile, setCoaImporting, setCoaResult)} disabled={!coaFile || coaImporting} className="flex-1" size="sm">
+                {coaImporting ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Upload className="w-3 h-3 mr-1" />}{coaImporting ? 'Importing...' : 'Quick Import (Default Mapping)'}
+              </Button>
+              <Button variant="outline" onClick={() => startMapping('coa', coaFile)} disabled={!coaFile || coaImporting || previewLoading} size="sm">
+                <Columns className="w-3 h-3 mr-1" />Match Fields
+              </Button>
+            </div>
+            <ResultDisplay result={coaResult} />
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Row 3: Inventory */}
+      {/* Step 3 */}
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Step 3 — Inventory Items</h2>
-        <div className="grid grid-cols-1 gap-4">
-          <ImportCard
-            title="Inventory Items"
-            icon={Package}
-            color="amber"
-            description="Import items with code, name, category, supplier link, price, cost, and pack info"
-            infoText="Links to: Category (CAT_ID), Supplier (SUP_ID = account code like 40110001). No barcode, no qty on hand."
-            result={itemsResult}
-          >
-            <FileUploader file={itemsFile} setFile={setItemsFile} color="amber" onClear={() => setItemsResult(null)} />
-            <Button onClick={() => doImport('/import/inventory', itemsFile, setItemsImporting, setItemsResult)} 
-              disabled={!itemsFile || itemsImporting} className="w-full bg-amber-600 hover:bg-amber-700" size="sm">
-              {itemsImporting ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Importing items...</> : <><Upload className="w-3 h-3 mr-1" />Import Inventory Items</>}
-            </Button>
-          </ImportCard>
-        </div>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm"><Package className="w-4 h-4 text-amber-500" />Inventory Items</CardTitle>
+            <p className="text-xs text-muted-foreground">Links to category (CAT_ID) and supplier (SUP_ID). No barcode, no qty on hand.</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <FileUploader file={itemsFile} setFile={setItemsFile} onClear={() => setItemsResult(null)} />
+            <div className="flex gap-2">
+              <Button onClick={() => doSimpleImport('/import/inventory', itemsFile, setItemsImporting, setItemsResult)} disabled={!itemsFile || itemsImporting} className="flex-1 bg-amber-600 hover:bg-amber-700" size="sm">
+                {itemsImporting ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Upload className="w-3 h-3 mr-1" />}{itemsImporting ? 'Importing...' : 'Quick Import (Default Mapping)'}
+              </Button>
+              <Button variant="outline" onClick={() => startMapping('inventory', itemsFile)} disabled={!itemsFile || itemsImporting || previewLoading} size="sm">
+                <Columns className="w-3 h-3 mr-1" />Match Fields
+              </Button>
+            </div>
+            <ResultDisplay result={itemsResult} />
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Row 4: Vouchers */}
+      {/* Step 4 */}
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Step 4 — Voucher History</h2>
-        <div className="grid grid-cols-1 gap-4">
-          <ImportCard
-            title="Voucher History"
-            icon={Receipt}
-            color="emerald"
-            description="Import journal vouchers grouped by TRAN ID, auto-posted with new sequence. Rate: 1 USD = 1,507.5 LBP"
-            infoText="Select a Fiscal Year to only import vouchers within that period. Vouchers outside the FY date range will be skipped."
-            result={voucherResult}
-          >
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm"><Receipt className="w-4 h-4 text-emerald-500" />Voucher History</CardTitle>
+            <p className="text-xs text-muted-foreground">Auto-posted. Skips vouchers outside selected FY. Rate: 89,500 LBP (2023+) / 1,507.5 LBP (before 2023)</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
             <div>
-              <Label className="text-xs font-medium">Fiscal Year (required — skips vouchers outside this period)</Label>
+              <Label className="text-xs font-medium">Fiscal Year (required — skips outside FY)</Label>
               <Select value={voucherFYId} onValueChange={setVoucherFYId}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select fiscal year..." />
-                </SelectTrigger>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select fiscal year..." /></SelectTrigger>
                 <SelectContent>
                   {fiscalYears.map(fy => (
                     <SelectItem key={fy.id} value={fy.id}>{fy.name} ({fy.start_date} to {fy.end_date})</SelectItem>
@@ -274,14 +365,44 @@ const ImportDataPage = () => {
                 </SelectContent>
               </Select>
             </div>
-            <FileUploader file={voucherFile} setFile={setVoucherFile} color="emerald" onClear={() => setVoucherResult(null)} />
-            <Button onClick={() => doImport('/import/vouchers', voucherFile, setVoucherImporting, setVoucherResult, { fiscal_year_id: voucherFYId })} 
-              disabled={!voucherFile || voucherImporting || !voucherFYId} className="w-full bg-emerald-600 hover:bg-emerald-700" size="sm">
-              {voucherImporting ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Importing vouchers (may take minutes)...</> : <><Upload className="w-3 h-3 mr-1" />Import Voucher History</>}
-            </Button>
-          </ImportCard>
-        </div>
+            <FileUploader file={voucherFile} setFile={setVoucherFile} onClear={() => setVoucherResult(null)} />
+            <div className="flex gap-2">
+              <Button onClick={() => doSimpleImport('/import/vouchers', voucherFile, setVoucherImporting, setVoucherResult, { fiscal_year_id: voucherFYId })} 
+                disabled={!voucherFile || voucherImporting || !voucherFYId} className="flex-1 bg-emerald-600 hover:bg-emerald-700" size="sm">
+                {voucherImporting ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Upload className="w-3 h-3 mr-1" />}{voucherImporting ? 'Importing...' : 'Quick Import (Default Mapping)'}
+              </Button>
+              <Button variant="outline" onClick={() => startMapping('voucher', voucherFile)} disabled={!voucherFile || voucherImporting || !voucherFYId || previewLoading} size="sm">
+                <Columns className="w-3 h-3 mr-1" />Match Fields
+              </Button>
+            </div>
+            <ResultDisplay result={voucherResult} />
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Field Mapping Dialog */}
+      <Dialog open={mapperOpen} onOpenChange={setMapperOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Columns className="w-5 h-5 text-blue-500" />
+              Field Mapping — {mapperType === 'coa' ? 'Chart of Accounts' : mapperType === 'voucher' ? 'Vouchers' : 'Inventory'}
+            </DialogTitle>
+            <DialogDescription>
+              Match each system field to the correct Excel column. Sample data shown for reference.
+            </DialogDescription>
+          </DialogHeader>
+          {mapperHeaders.length > 0 && (
+            <FieldMapper
+              headers={mapperHeaders}
+              sampleRows={mapperSamples}
+              systemFields={getSystemFields()}
+              onConfirm={doMappedImport}
+              onCancel={() => setMapperOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
