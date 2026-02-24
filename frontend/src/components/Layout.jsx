@@ -149,8 +149,8 @@ const Sidebar = ({ isOpen, onClose, collapsed, onToggleCollapse }) => {
                     collapsed ? 'justify-center' : ''
                   } ${
                     isActive 
-                      ? 'bg-primary/10 text-primary border-l-2 border-primary -ml-0.5 pl-3.5' 
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                      ? 'bg-white/15 text-white border-l-2 border-blue-300 -ml-0.5 pl-3.5 font-medium' 
+                      : 'text-blue-200/70 hover:text-white hover:bg-white/10'
                   }`}
                   data-testid={`nav-${item.path.replace('/', '')}`}
                 >
