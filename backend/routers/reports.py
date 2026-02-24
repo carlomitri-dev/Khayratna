@@ -18,22 +18,23 @@ router = APIRouter(tags=["Reports"])
 async def get_trial_balance(
     organization_id: str, 
     include_zero_balance: bool = False,
-    level: str = None,  # 'all', 'gt_4' (>4 digits), 'eq_4', 'eq_3', 'eq_2', 'leaf' (only leaf accounts)
+    level: str = None,
+    fy_id: str = None,  # Optional fiscal year filter
     current_user: dict = Depends(get_current_user)
 ):
     """
     Get trial balance report with optional filtering.
-    
-    Args:
-        level: Filter by account code length
-            - 'all' or None: Show all accounts
-            - 'leaf': Only leaf accounts (no children) - avoids double counting
-            - 'gt_4': Codes > 4 digits
-            - 'eq_4': Codes = 4 digits
-            - 'eq_3': Codes = 3 digits  
-            - 'eq_2': Codes = 2 digits
-            - 'eq_1': Codes = 1 digit
+    If fy_id is provided, calculates balances from vouchers within that FY's date range.
     """
+    # If FY filter is specified, compute balances from vouchers in the FY date range
+    fy_start = None
+    fy_end = None
+    if fy_id:
+        fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+        if fy:
+            fy_start = fy['start_date']
+            fy_end = fy['end_date']
+    
     # Get active accounts
     accounts = await db.accounts.find(
         {
@@ -46,6 +47,30 @@ async def get_trial_balance(
         },
         {'_id': 0}
     ).sort('code', 1).to_list(None)
+    
+    # If FY filter, recalculate balances from vouchers in that period
+    if fy_start and fy_end:
+        # Reset all balances to 0, then compute from vouchers
+        for acc in accounts:
+            acc['balance_lbp'] = 0
+            acc['balance_usd'] = 0
+        
+        # Build account lookup
+        acc_lookup = {acc.get('code', ''): acc for acc in accounts}
+        
+        # Get all posted vouchers in FY range
+        vouchers = await db.vouchers.find({
+            'organization_id': organization_id,
+            'is_posted': True,
+            'date': {'$gte': fy_start, '$lte': fy_end}
+        }, {'_id': 0}).to_list(None)
+        
+        for voucher in vouchers:
+            for line in voucher.get('lines', []):
+                code = line.get('account_code', '')
+                if code in acc_lookup:
+                    acc_lookup[code]['balance_lbp'] += (line.get('debit_lbp', 0) or 0) - (line.get('credit_lbp', 0) or 0)
+                    acc_lookup[code]['balance_usd'] += (line.get('debit_usd', 0) or 0) - (line.get('credit_usd', 0) or 0)
     
     # Build set of all codes for finding parent-child relationships
     all_codes = {acc.get('code', '') for acc in accounts}
