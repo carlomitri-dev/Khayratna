@@ -27,6 +27,7 @@ import POSPage from './pages/POSPage';
 import CashierLoginPage from './pages/CashierLoginPage';
 import CashierPOSPage from './pages/CashierPOSPage';
 import CashierSessionsPage from './pages/CashierSessionsPage';
+import ImportDataPage from './pages/ImportDataPage';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
