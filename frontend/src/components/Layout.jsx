@@ -121,10 +121,10 @@ const Sidebar = ({ isOpen, onClose, collapsed, onToggleCollapse }) => {
             <KairosLogo size={collapsed ? 'sm' : 'md'} />
             {!collapsed && (
               <div>
-                <h1 className="font-bold text-sm" style={{ fontFamily: 'Manrope, sans-serif' }}>
+                <h1 className="font-bold text-sm text-white" style={{ fontFamily: 'Manrope, sans-serif' }}>
                   KAIROS
                 </h1>
-                <p className="text-xs text-muted-foreground">Digital Invoicing</p>
+                <p className="text-xs text-blue-300/70">Digital Invoicing</p>
               </div>
             )}
           </div>
