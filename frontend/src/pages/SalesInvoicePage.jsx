@@ -409,6 +409,10 @@ const SalesInvoicePage = () => {
       
       if (searchTerm) params.append('search', searchTerm);
       if (filterStatus !== 'all') params.append('status', filterStatus);
+      if (selectedFY) {
+        params.append('date_from', selectedFY.start_date);
+        params.append('date_to', selectedFY.end_date);
+      }
       
       const [invoicesRes, countRes] = await Promise.all([
         axios.get(`${API}/sales-invoices?${params.toString()}`),
