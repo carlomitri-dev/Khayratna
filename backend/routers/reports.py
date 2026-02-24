@@ -347,7 +347,9 @@ async def get_income_statement(
 async def get_general_ledger(
     account_code: str, 
     organization_id: str, 
-    fy_id: Optional[str] = None,  # Optional fiscal year filter
+    fy_id: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 200,  # Default 200 entries per page
     current_user: dict = Depends(get_current_user)
 ):
     """Get general ledger for a specific account. If fy_id is provided, filters by FY date range."""
