@@ -75,18 +75,11 @@ const LoginPage = () => {
       if (response.data.admin_email) {
         setEmail(response.data.admin_email);
         setPassword(response.data.admin_password || 'Carinemi@28');
-        setSuccess('Demo data created! Credentials filled automatically.');
+        setSuccess('Admin account ready! Credentials filled automatically.');
         fetchOrganizations();
       }
     } catch (err) {
-      if (err.response?.data?.message?.includes('already exists') || err.response?.data?.admin_email) {
-        setEmail('carlo.mitri@gmail.com');
-        setPassword('Carinemi@28');
-        setSuccess('Demo data exists. Credentials filled automatically.');
-        fetchOrganizations();
-      } else {
-        setError('Failed to seed demo data');
-      }
+      setError('Failed to initialize. Please try again.');
     } finally {
       setSeeding(false);
     }
