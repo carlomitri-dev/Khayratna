@@ -189,6 +189,7 @@ const Sidebar = ({ isOpen, onClose, collapsed, onToggleCollapse }) => {
 
 const Header = ({ onMenuClick }) => {
   const { user, organizations, currentOrg, switchOrganization, logout } = useAuth();
+  const { fiscalYears, selectedFY, switchFiscalYear, clearSelection, hasFiscalYears } = useFiscalYear();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -233,6 +234,69 @@ const Header = ({ onMenuClick }) => {
                       <span className="text-sm">{org.name}</span>
                       <span className="text-xs text-muted-foreground">
                         {org.currency} | Rate: {org.base_exchange_rate.toLocaleString()}
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {/* Fiscal Year Selector */}
+          {hasFiscalYears && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className={`gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 ${
+                    selectedFY?.status === 'closed' ? 'border-amber-500/50 text-amber-400' : 'border-emerald-500/50 text-emerald-400'
+                  }`}
+                  data-testid="fy-selector"
+                >
+                  <Calendar className="w-4 h-4 hidden sm:block" />
+                  <span className="max-w-[120px] sm:max-w-[180px] truncate">
+                    {selectedFY ? selectedFY.name : 'All Periods'}
+                  </span>
+                  {selectedFY?.status === 'closed' ? (
+                    <Lock className="w-3 h-3" />
+                  ) : selectedFY ? (
+                    <Unlock className="w-3 h-3" />
+                  ) : null}
+                  <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-[280px]">
+                <DropdownMenuItem
+                  onClick={() => clearSelection()}
+                  className={!selectedFY ? 'bg-primary/10' : ''}
+                  data-testid="fy-option-all"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">All Periods</span>
+                    <span className="text-xs text-muted-foreground">No fiscal year filter</span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {fiscalYears.map((fy) => (
+                  <DropdownMenuItem
+                    key={fy.id}
+                    onClick={() => switchFiscalYear(fy)}
+                    className={selectedFY?.id === fy.id ? 'bg-primary/10' : ''}
+                    data-testid={`fy-option-${fy.id}`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex flex-col">
+                        <span className="text-sm">{fy.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {fy.start_date} to {fy.end_date}
+                        </span>
+                      </div>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${
+                        fy.status === 'open' 
+                          ? 'bg-emerald-500/20 text-emerald-400' 
+                          : 'bg-amber-500/20 text-amber-400'
+                      }`}>
+                        {fy.status === 'open' ? 'Open' : 'Closed'}
                       </span>
                     </div>
                   </DropdownMenuItem>
