@@ -99,7 +99,7 @@ const Sidebar = ({ isOpen, onClose, collapsed, onToggleCollapse }) => {
       
       {/* Sidebar */}
       <aside 
-        className={`fixed left-0 top-0 h-full bg-background border-r border-border z-50 transform transition-all duration-300 ease-in-out lg:translate-x-0 flex flex-col ${
+        className={`fixed left-0 top-0 h-full bg-[#1a2744] text-white border-r border-[#1e3a5f] z-50 transform transition-all duration-300 ease-in-out lg:translate-x-0 flex flex-col ${
           collapsed ? 'w-16' : 'w-64'
         } ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
         data-testid="sidebar"
