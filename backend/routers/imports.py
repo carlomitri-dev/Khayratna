@@ -321,8 +321,12 @@ async def import_vouchers(
                 line_desc = str(line_row[14]).strip() if line_row[14] else ''
                 cur = str(line_row[17]) if line_row[17] else '1'
                 
-                # Exchange rate - use 1507.5 for USD
-                exchange_rate = 1507.5 if cur == '2' else 1.0
+                # Exchange rate - 89500 for USD since 2023, 1507.5 before
+                if cur == '2':
+                    year = int(date_str[:4]) if len(date_str) >= 4 else 2016
+                    exchange_rate = 89500.0 if year >= 2023 else 1507.5
+                else:
+                    exchange_rate = 1.0
                 
                 voucher_line = {
                     'account_code': account_code,
