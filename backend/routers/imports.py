@@ -95,6 +95,22 @@ async def import_chart_of_accounts(
     wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
     ws = wb.active
     
+    # Parse field mapping
+    mapping = None
+    if field_mapping:
+        try:
+            mapping = json.loads(field_mapping)
+        except json.JSONDecodeError:
+            pass
+    
+    # Helper to get value from row using mapping or default index
+    def get_col(row, field_name, default_idx):
+        idx = mapping.get(field_name, default_idx) if mapping else default_idx
+        if idx is None or idx < 0 or idx == '':
+            return ''
+        idx = int(idx)
+        return row[idx] if len(row) > idx and row[idx] is not None else ''
+    
     accounts_created = 0
     accounts_updated = 0
     suppliers_created = 0
@@ -110,7 +126,7 @@ async def import_chart_of_accounts(
     for row in ws.iter_rows(min_row=2, values_only=True):
         row_num += 1
         try:
-            code = str(row[0]).strip() if row[0] else ''
+            code = str(get_col(row, 'account_code', 0)).strip()
             if not code or not code[0].isdigit():
                 continue
             
@@ -119,8 +135,8 @@ async def import_chart_of_accounts(
                 continue
             seen_codes.add(code)
             
-            account_name = str(row[2]).strip() if row[2] else ''
-            account_type_ar = str(row[3]).strip() if row[3] else ''
+            account_name = str(get_col(row, 'account_name', 2)).strip()
+            account_type_ar = str(get_col(row, 'account_type', 3)).strip()
             
             # Determine account class from first digit
             account_class = int(code[0]) if code[0].isdigit() else None
@@ -128,19 +144,19 @@ async def import_chart_of_accounts(
             
             # Special handling for class 4 sub-types
             if code.startswith('40'):
-                account_type = 'liability'  # Suppliers/payables
+                account_type = 'liability'
             elif code.startswith('41'):
-                account_type = 'asset'  # Customers/receivables
+                account_type = 'asset'
             elif code.startswith('44'):
-                account_type = 'liability'  # Tax accounts
+                account_type = 'liability'
             elif code.startswith('45'):
-                account_type = 'liability'  # Other payables
+                account_type = 'liability'
             
             # Contact info for suppliers/customers
-            name_field = str(row[13]).strip() if len(row) > 13 and row[13] else ''
-            address_field = str(row[14]).strip() if len(row) > 14 and row[14] else ''
-            phone_field = str(row[15]).strip() if len(row) > 15 and row[15] else ''
-            regno_field = str(row[27]).strip() if len(row) > 27 and row[27] else ''
+            name_field = str(get_col(row, 'contact_name', 13)).strip()
+            address_field = str(get_col(row, 'address', 14)).strip()
+            phone_field = str(get_col(row, 'phone', 15)).strip()
+            regno_field = str(get_col(row, 'regno', 27)).strip()
             
             account_doc = {
                 'id': str(uuid.uuid4()),
