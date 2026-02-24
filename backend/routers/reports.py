@@ -246,6 +246,28 @@ async def get_income_statement(
                 return False
         return True
     
+    # If FY filter, recalculate balances from vouchers in that period
+    if fy_start and fy_end:
+        acc_lookup = {acc.get('code', ''): acc for acc in accounts}
+        # Reset balances
+        for acc in accounts:
+            acc['balance_lbp'] = 0
+            acc['balance_usd'] = 0
+        
+        # Get posted vouchers in FY range
+        vouchers = await db.vouchers.find({
+            'organization_id': organization_id,
+            'is_posted': True,
+            'date': {'$gte': fy_start, '$lte': fy_end}
+        }, {'_id': 0}).to_list(None)
+        
+        for voucher in vouchers:
+            for line in voucher.get('lines', []):
+                code = line.get('account_code', '')
+                if code in acc_lookup:
+                    acc_lookup[code]['balance_lbp'] += (line.get('debit_lbp', 0) or 0) - (line.get('credit_lbp', 0) or 0)
+                    acc_lookup[code]['balance_usd'] += (line.get('debit_usd', 0) or 0) - (line.get('credit_usd', 0) or 0)
+    
     revenue_accounts = []
     expense_accounts = []
     total_revenue_lbp = 0
