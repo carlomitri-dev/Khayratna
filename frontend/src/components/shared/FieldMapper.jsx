@@ -7,7 +7,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from './ui/select';
+} from '../ui/select';
 import { ArrowRight, Check, Columns } from 'lucide-react';
 
 /**
