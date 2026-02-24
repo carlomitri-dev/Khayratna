@@ -1134,9 +1134,9 @@ const ChartOfAccountsPage = () => {
               </CardHeader>
               <CardContent className="p-0">
                 {/* Mobile view */}
-                <div className="lg:hidden divide-y divide-border">
-                  {classAccounts.map((account) => (
-                    <div key={account.id} className="p-3" data-testid={`account-row-${account.code}`}>
+                <div className="lg:hidden">
+                  {classAccounts.map((account, idx) => (
+                    <div key={account.id} className={`p-3 border-b border-border ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/80'}`} data-testid={`account-row-${account.code}`}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
