@@ -1,34 +1,180 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* Lebanese Accounting System - App Styles */
+
+/* Login page background */
+.login-bg {
+  background-image: linear-gradient(to bottom, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.97)),
+    url('https://images.unsplash.com/photo-1655309460233-2c32634be897?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHw0fHxhYnN0cmFjdCUyMGZpbmFuY2lhbCUyMGRhdGElMjBkYXJrJTIwYmFja2dyb3VuZCUyMGdlb21ldHJpY3xlbnwwfHx8fDE3NjY0MDgwNjV8MA&ixlib=rb-4.1.0&q=85');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Dashboard metric card */
+.metric-card {
+  @apply bg-card border border-border rounded-sm p-4 transition-all duration-200;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+.metric-card:hover {
+  @apply border-primary/50;
 }
 
-.App-link {
-    color: #61dafb;
+/* Data table styles */
+.data-table {
+  @apply w-full text-sm;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+.data-table th {
+  @apply px-3 py-2 text-left font-medium text-muted-foreground bg-muted/50 border-b border-border;
+  font-family: 'Inter', sans-serif;
+}
+
+.data-table td {
+  @apply px-3 py-2 border-b border-border;
+}
+
+.data-table tr:hover {
+  @apply bg-muted/30;
+}
+
+/* Financial number cells */
+.data-table td.number {
+  @apply text-right tabular-nums;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Voucher entry form */
+.voucher-form {
+  @apply space-y-4;
+}
+
+.voucher-line {
+  @apply grid grid-cols-12 gap-2 items-center p-2 bg-muted/20 rounded-sm;
+}
+
+.voucher-totals {
+  @apply border-t-2 border-primary/50 pt-4 mt-4;
+}
+
+/* Exchange rate display */
+.exchange-rate-display {
+  @apply font-mono text-lg;
+}
+
+/* Report headers */
+.report-header {
+  @apply text-center mb-6 pb-4 border-b border-border;
+}
+
+.report-title {
+  @apply text-2xl font-bold mb-1;
+  font-family: 'Manrope', sans-serif;
+}
+
+.report-subtitle {
+  @apply text-muted-foreground text-sm;
+}
+
+/* Account tree view */
+.account-tree {
+  @apply space-y-1;
+}
+
+.account-tree-item {
+  @apply flex items-center gap-2 p-2 rounded-sm hover:bg-muted/50 cursor-pointer transition-colors;
+}
+
+.account-tree-item.active {
+  @apply bg-primary/10 border-l-2 border-primary;
+}
+
+/* Status badges */
+.status-posted {
+  @apply bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-sm text-xs;
+}
+
+.status-draft {
+  @apply bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-sm text-xs;
+}
+
+/* Role badges */
+.role-super_admin {
+  @apply bg-violet-500/20 text-violet-400;
+}
+
+.role-admin {
+  @apply bg-blue-500/20 text-blue-400;
+}
+
+.role-accountant {
+  @apply bg-emerald-500/20 text-emerald-400;
+}
+
+.role-viewer {
+  @apply bg-zinc-500/20 text-zinc-400;
+}
+
+/* Currency selector */
+.currency-tab {
+  @apply px-4 py-2 rounded-sm text-sm font-medium transition-colors;
+}
+
+.currency-tab.active-lbp {
+  @apply bg-emerald-500/20 text-emerald-400 border border-emerald-500/30;
+}
+
+.currency-tab.active-usd {
+  @apply bg-blue-500/20 text-blue-400 border border-blue-500/30;
+}
+
+/* Sidebar navigation */
+.nav-item {
+  @apply flex items-center gap-3 px-3 py-2 rounded-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors;
+}
+
+.nav-item.active {
+  @apply bg-primary/10 text-primary border-l-2 border-primary -ml-0.5 pl-3.5;
+}
+
+/* Form sections */
+.form-section {
+  @apply bg-card border border-border rounded-sm p-4;
+}
+
+.form-section-title {
+  @apply text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider;
+}
+
+/* Balance indicator */
+.balance-indicator {
+  @apply flex items-center gap-2 text-sm;
+}
+
+.balance-indicator.balanced {
+  @apply text-emerald-400;
+}
+
+.balance-indicator.unbalanced {
+  @apply text-red-400;
+}
+
+/* Loading spinner */
+.spinner {
+  @apply animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full;
+}
+
+/* Empty state */
+.empty-state {
+  @apply flex flex-col items-center justify-center py-12 text-center;
+}
+
+.empty-state-icon {
+  @apply w-12 h-12 text-muted-foreground mb-4;
+}
+
+.empty-state-title {
+  @apply text-lg font-medium mb-1;
+}
+
+.empty-state-description {
+  @apply text-sm text-muted-foreground;
 }

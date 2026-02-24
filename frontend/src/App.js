@@ -1,51 +1,244 @@
-import { useEffect } from "react";
-import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { SyncProvider } from './context/SyncContext';
+import { Toaster } from './components/ui/sonner';
+import OfflineToast from './components/OfflineToast';
+import Layout from './components/Layout';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
+import ChartOfAccountsPage from './pages/ChartOfAccountsPage';
+import VoucherEntryPage from './pages/VoucherEntryPage';
+import ExchangeRatesPage from './pages/ExchangeRatesPage';
+import TrialBalancePage from './pages/TrialBalancePage';
+import IncomeStatementPage from './pages/IncomeStatementPage';
+import GeneralLedgerPage from './pages/GeneralLedgerPage';
+import SettingsPage from './pages/SettingsPage';
+import CrDbNotesPage from './pages/CrDbNotesPage';
+import ImageArchivePage from './pages/ImageArchivePage';
+import CustomersPage from './pages/CustomersPage';
+import SuppliersPage from './pages/SuppliersPage';
+import InventoryPage from './pages/InventoryPage';
+import SalesInvoicePage from './pages/SalesInvoicePage';
+import SalesQuotationsPage from './pages/SalesQuotationsPage';
+import PurchaseInvoicePage from './pages/PurchaseInvoicePage';
+import POSPage from './pages/POSPage';
+import CashierLoginPage from './pages/CashierLoginPage';
+import CashierPOSPage from './pages/CashierPOSPage';
+import CashierSessionsPage from './pages/CashierSessionsPage';
+import './App.css';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+const ProtectedRoute = ({ children }) => {
+  const { token, loading } = useAuth();
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="spinner" />
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
 
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
+  return <Layout>{children}</Layout>;
 };
+
+const PublicRoute = ({ children }) => {
+  const { token, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="spinner" />
+      </div>
+    );
+  }
+
+  if (token) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+};
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          <PublicRoute>
+            <LoginPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/chart-of-accounts"
+        element={
+          <ProtectedRoute>
+            <ChartOfAccountsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vouchers"
+        element={
+          <ProtectedRoute>
+            <VoucherEntryPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/exchange-rates"
+        element={
+          <ProtectedRoute>
+            <ExchangeRatesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/trial-balance"
+        element={
+          <ProtectedRoute>
+            <TrialBalancePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/income-statement"
+        element={
+          <ProtectedRoute>
+            <IncomeStatementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/general-ledger"
+        element={
+          <ProtectedRoute>
+            <GeneralLedgerPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cr-db-notes"
+        element={
+          <ProtectedRoute>
+            <CrDbNotesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/image-archive"
+        element={
+          <ProtectedRoute>
+            <ImageArchivePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/customers"
+        element={
+          <ProtectedRoute>
+            <CustomersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/suppliers"
+        element={
+          <ProtectedRoute>
+            <SuppliersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/inventory"
+        element={
+          <ProtectedRoute>
+            <InventoryPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/sales-invoices"
+        element={
+          <ProtectedRoute>
+            <SalesInvoicePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/sales-quotations"
+        element={
+          <ProtectedRoute>
+            <SalesQuotationsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/purchase-invoices"
+        element={
+          <ProtectedRoute>
+            <PurchaseInvoicePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pos"
+        element={
+          <ProtectedRoute>
+            <POSPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cashier-sessions"
+        element={
+          <ProtectedRoute>
+            <CashierSessionsPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Cashier Routes (No Layout) */}
+      <Route path="/cashier-login" element={<CashierLoginPage />} />
+      <Route path="/cashier-pos" element={<CashierPOSPage />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
+  );
+}
 
 function App() {
   return (
-    <div className="App">
+    <div className="App dark">
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
+        <AuthProvider>
+          <SyncProvider>
+            <AppRoutes />
+            <Toaster />
+            <OfflineToast />
+          </SyncProvider>
+        </AuthProvider>
       </BrowserRouter>
     </div>
   );

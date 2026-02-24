@@ -1,115 +1,224 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-    margin: 0;
-    font-family:
-        -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-        "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-        sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-}
-
-code {
-    font-family:
-        source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+/* KAIROS Brand Colors */
+:root {
+  --kairos-red: #e65540;
+  --kairos-orange: #f5963a;
+  --kairos-green: #33a550;
+  --kairos-blue: #4285f4;
 }
 
 @layer base {
-    :root {
-        --background: 0 0% 100%;
-        --foreground: 0 0% 3.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 0 0% 3.9%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 0 0% 3.9%;
-        --primary: 0 0% 9%;
-        --primary-foreground: 0 0% 98%;
-        --secondary: 0 0% 96.1%;
-        --secondary-foreground: 0 0% 9%;
-        --muted: 0 0% 96.1%;
-        --muted-foreground: 0 0% 45.1%;
-        --accent: 0 0% 96.1%;
-        --accent-foreground: 0 0% 9%;
-        --destructive: 0 84.2% 60.2%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 0 0% 89.8%;
-        --input: 0 0% 89.8%;
-        --ring: 0 0% 3.9%;
-        --chart-1: 12 76% 61%;
-        --chart-2: 173 58% 39%;
-        --chart-3: 197 37% 24%;
-        --chart-4: 43 74% 66%;
-        --chart-5: 27 87% 67%;
-        --radius: 0.5rem;
-    }
-    .dark {
-        --background: 0 0% 3.9%;
-        --foreground: 0 0% 98%;
-        --card: 0 0% 3.9%;
-        --card-foreground: 0 0% 98%;
-        --popover: 0 0% 3.9%;
-        --popover-foreground: 0 0% 98%;
-        --primary: 0 0% 98%;
-        --primary-foreground: 0 0% 9%;
-        --secondary: 0 0% 14.9%;
-        --secondary-foreground: 0 0% 98%;
-        --muted: 0 0% 14.9%;
-        --muted-foreground: 0 0% 63.9%;
-        --accent: 0 0% 14.9%;
-        --accent-foreground: 0 0% 98%;
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 0 0% 14.9%;
-        --input: 0 0% 14.9%;
-        --ring: 0 0% 83.1%;
-        --chart-1: 220 70% 50%;
-        --chart-2: 160 60% 45%;
-        --chart-3: 30 80% 55%;
-        --chart-4: 280 65% 60%;
-        --chart-5: 340 75% 55%;
-    }
+  :root {
+    --background: 220 25% 10%;
+    --foreground: 210 40% 98%;
+    --card: 220 25% 13%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 25% 13%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 28 91% 59%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 220 20% 18%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 220 20% 18%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 10 78% 58%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 20% 22%;
+    --input: 220 20% 18%;
+    --ring: 217 91% 60%;
+    --chart-1: 217 91% 60%;
+    --chart-2: 28 91% 59%;
+    --chart-3: 10 78% 58%;
+    --chart-4: 145 63% 42%;
+    --chart-5: 43 74% 66%;
+    --radius: 0.25rem;
+  }
+
+  .dark {
+    --background: 220 25% 10%;
+    --foreground: 210 40% 98%;
+    --card: 220 25% 13%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 25% 13%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 28 91% 59%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 220 20% 18%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 220 20% 18%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 10 78% 58%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 20% 22%;
+    --input: 220 20% 18%;
+    --ring: 217 91% 60%;
+  }
 }
 
 @layer base {
-    * {
-        @apply border-border;
-    }
-    body {
-        @apply bg-background text-foreground;
-    }
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    @apply dark;
+  }
+  
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Manrope', sans-serif;
+  }
+  
+  .font-mono, .tabular-nums, [data-currency], input[type="number"] {
+    font-family: 'JetBrains Mono', monospace;
+  }
 }
 
-@layer base {
-    [data-debug-wrapper="true"] {
-        display: contents !important;
-    }
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
 
-    [data-debug-wrapper="true"] > * {
-        margin-left: inherit;
-        margin-right: inherit;
-        margin-top: inherit;
-        margin-bottom: inherit;
-        padding-left: inherit;
-        padding-right: inherit;
-        padding-top: inherit;
-        padding-bottom: inherit;
-        column-gap: inherit;
-        row-gap: inherit;
-        gap: inherit;
-        border-left-width: inherit;
-        border-right-width: inherit;
-        border-top-width: inherit;
-        border-bottom-width: inherit;
-        border-left-style: inherit;
-        border-right-style: inherit;
-        border-top-style: inherit;
-        border-bottom-style: inherit;
-        border-left-color: inherit;
-        border-right-color: inherit;
-        border-top-color: inherit;
-        border-bottom-color: inherit;
-    }
+::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Table number alignment */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Currency colors */
+.currency-lbp {
+  @apply text-emerald-400;
+}
+
+.currency-usd {
+  @apply text-blue-400;
+}
+
+/* Profit/Loss indicators */
+.profit {
+  @apply text-emerald-500;
+}
+
+.loss {
+  @apply text-red-500;
+}
+
+/* Glassmorphism effect */
+.glass {
+  @apply backdrop-blur-xl bg-black/40 border border-white/10;
+}
+
+/* Card hover effect */
+.card-hover {
+  @apply transition-all duration-200 hover:border-primary/50;
+}
+
+/* Input focus glow */
+.input-glow:focus {
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+/* Button glow */
+.btn-glow {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+}
+
+/* Sidebar styles */
+.sidebar {
+  @apply fixed left-0 top-0 h-full w-64 bg-background border-r border-border z-40;
+}
+
+/* Main content area */
+.main-content {
+  @apply ml-64 min-h-screen bg-background;
+}
+
+/* Header glassmorphism */
+.header-glass {
+  @apply sticky top-0 z-30 backdrop-blur-md bg-background/80 border-b border-border;
+}
+
+/* Account class colors */
+.class-1 { @apply border-l-4 border-l-violet-500; }
+.class-2 { @apply border-l-4 border-l-blue-500; }
+.class-3 { @apply border-l-4 border-l-cyan-500; }
+.class-4 { @apply border-l-4 border-l-amber-500; }
+.class-5 { @apply border-l-4 border-l-emerald-500; }
+.class-6 { @apply border-l-4 border-l-red-500; }
+.class-7 { @apply border-l-4 border-l-green-500; }
+
+/* Voucher type badges */
+.voucher-jv { @apply bg-violet-500/20 text-violet-400 border-violet-500/30; }
+.voucher-rv { @apply bg-emerald-500/20 text-emerald-400 border-emerald-500/30; }
+.voucher-pv { @apply bg-red-500/20 text-red-400 border-red-500/30; }
+.voucher-sv { @apply bg-blue-500/20 text-blue-400 border-blue-500/30; }
+.voucher-payv { @apply bg-amber-500/20 text-amber-400 border-amber-500/30; }
+
+/* Animation for page transitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Number formatting */
+.number-positive {
+  @apply text-emerald-400;
+}
+
+.number-negative {
+  @apply text-red-400;
+}
+
+.number-zero {
+  @apply text-zinc-500;
+}
+
+/* Data grid wrapper */
+[data-debug-wrapper="true"] {
+  display: contents !important;
+}
+
+[data-debug-wrapper="true"] > * {
+  margin-left: inherit;
+  margin-right: inherit;
+  margin-top: inherit;
+  margin-bottom: inherit;
+  padding-left: inherit;
+  padding-right: inherit;
+  padding-top: inherit;
+  padding-bottom: inherit;
+  column-gap: inherit;
+  row-gap: inherit;
+  gap: inherit;
 }

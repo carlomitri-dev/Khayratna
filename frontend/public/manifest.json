@@ -1,0 +1,26 @@
+{
+  "short_name": "KAIROS",
+  "name": "KAIROS - Lebanese Accounting System",
+  "description": "Digital Invoicing & Accounting System",
+  "icons": [
+    {
+      "src": "kairos-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "kairos-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#1a1a2e",
+  "background_color": "#0f0f1a",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "prefer_related_applications": false
+}
