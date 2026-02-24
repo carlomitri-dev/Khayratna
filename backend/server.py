@@ -1669,24 +1669,17 @@ async def get_vouchers_count(
             query['date'] = {'$lte': date_to}
     
     if search:
-        # Need to fetch and filter for search
-        vouchers = await db.vouchers.find(query, {'_id': 0}).to_list(10000)
-        search_lower = search.lower()
-        vouchers = [
-            v for v in vouchers
-            if search_lower in v.get('voucher_number', '').lower()
-            or search_lower in v.get('reference', '').lower()
-            or search_lower in v.get('description', '').lower()
-            or any(
-                search_lower in line.get('account_code', '').lower()
-                or search_lower in line.get('account_name', '').lower()
-                for line in v.get('lines', [])
-            )
+        search_regex = {'$regex': search, '$options': 'i'}
+        query['$or'] = [
+            {'voucher_number': search_regex},
+            {'reference': search_regex},
+            {'description': search_regex},
+            {'lines.account_code': search_regex},
+            {'lines.description': search_regex}
         ]
-        return {"count": len(vouchers)}
-    else:
-        count = await db.vouchers.count_documents(query)
-        return {"count": count}
+    
+    count = await db.vouchers.count_documents(query)
+    return {"count": count}
 
 @api_router.get("/vouchers/{voucher_id}", response_model=VoucherResponse)
 async def get_voucher(voucher_id: str, current_user: dict = Depends(get_current_user)):
