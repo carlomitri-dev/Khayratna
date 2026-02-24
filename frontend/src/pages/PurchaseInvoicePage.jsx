@@ -45,6 +45,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const PurchaseInvoicePage = () => {
   const { currentOrg, user } = useAuth();
+  const { selectedFY } = useFiscalYear();
   const { isOnline, updatePendingCount } = useSync();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
