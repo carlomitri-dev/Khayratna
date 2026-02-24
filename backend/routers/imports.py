@@ -5,6 +5,7 @@ Supports Lebanese LCOA format with supplier/client detection
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from typing import Optional
 import uuid
+import json
 from datetime import datetime, timezone
 from collections import defaultdict
 import io
@@ -15,6 +16,44 @@ from core.auth import get_current_user
 
 router = APIRouter(tags=["Import"])
 logger = logging.getLogger(__name__)
+
+
+# ================== PREVIEW HEADERS ==================
+
+@router.post("/import/preview-headers")
+async def preview_excel_headers(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Read Excel file headers and first few rows for field mapping preview"""
+    try:
+        import openpyxl
+    except ImportError:
+        raise HTTPException(status_code=500, detail="openpyxl not available")
+    
+    contents = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
+    ws = wb.active
+    
+    rows = list(ws.iter_rows(min_row=1, max_row=4, values_only=True))
+    wb.close()
+    
+    if not rows:
+        raise HTTPException(status_code=400, detail="Empty file")
+    
+    headers = [str(h) if h else f'Column {i}' for i, h in enumerate(rows[0])]
+    
+    # Get sample data from first 3 rows
+    sample_rows = []
+    for row in rows[1:4]:
+        sample_rows.append([str(v) if v is not None else '' for v in row])
+    
+    return {
+        "headers": headers,
+        "header_count": len(headers),
+        "sample_rows": sample_rows,
+        "filename": file.filename
+    }
 
 # Account type mapping based on LCOA class
 ACCOUNT_CLASS_TYPES = {
