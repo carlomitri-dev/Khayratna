@@ -193,15 +193,15 @@
 
 /* Number formatting */
 .number-positive {
-  @apply text-emerald-400;
+  @apply text-emerald-600;
 }
 
 .number-negative {
-  @apply text-red-400;
+  @apply text-red-600;
 }
 
 .number-zero {
-  @apply text-zinc-500;
+  @apply text-gray-400;
 }
 
 /* Data grid wrapper */
