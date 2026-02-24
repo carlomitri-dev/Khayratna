@@ -37,6 +37,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const ChartOfAccountsPage = () => {
   const { currentOrg, canEdit, canAdmin, user } = useAuth();
+  const { selectedFY } = useFiscalYear();
   const { isOnline } = useSync();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
