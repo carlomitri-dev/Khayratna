@@ -184,6 +184,11 @@ const GeneralLedgerPage = () => {
 
   return (
     <div className="space-y-4 lg:space-y-6" data-testid="general-ledger-page">
+      <CompanyHeader 
+        title="General Ledger" 
+        titleAr="دفتر الأستاذ العام"
+        subtitle={selectedFY ? `Fiscal Year: ${selectedFY.name}` : 'All Periods'}
+      />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 no-print">
         <div>
           <h1 className="text-xl lg:text-2xl font-bold" style={{ fontFamily: 'Manrope, sans-serif' }}>
