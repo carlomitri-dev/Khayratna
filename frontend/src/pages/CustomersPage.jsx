@@ -42,13 +42,15 @@ const CustomersPage = () => {
     if (currentOrg) {
       fetchCustomers();
     }
-  }, [currentOrg, isOnline]);
+  }, [currentOrg, isOnline, selectedFY]);
 
   const fetchCustomers = async () => {
     setLoading(true);
     try {
       if (isOnline) {
-        const response = await axios.get(`${API}/customers?organization_id=${currentOrg.id}`);
+        const params = new URLSearchParams({ organization_id: currentOrg.id });
+        if (selectedFY?.id) params.append('fy_id', selectedFY.id);
+        const response = await axios.get(`${API}/customers?${params.toString()}`);
         setCustomers(response.data);
         
         // Cache in IndexedDB
