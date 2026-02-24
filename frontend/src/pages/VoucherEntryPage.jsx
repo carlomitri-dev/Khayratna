@@ -157,6 +157,7 @@ const CurrencySelector = ({ currencies, value, onChange }) => {
 
 const VoucherEntryPage = () => {
   const { currentOrg, user } = useAuth();
+  const { selectedFY } = useFiscalYear();
   const { isOnline, updatePendingCount } = useSync();
   const [accounts, setAccounts] = useState([]);
   const [currencies, setCurrencies] = useState([]);
