@@ -31,7 +31,8 @@ import {
   PanelLeft,
   Calendar,
   Lock,
-  Unlock
+  Unlock,
+  Upload
 } from 'lucide-react';
 import {
   DropdownMenu,
