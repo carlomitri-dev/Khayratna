@@ -8422,6 +8422,51 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ================== DATABASE INDEXES (Performance Optimization) ==================
+@app.on_event("startup")
+async def create_indexes():
+    """Create MongoDB indexes for optimal query performance with large datasets"""
+    try:
+        # Accounts indexes
+        await db.accounts.create_index([("organization_id", 1), ("code", 1)], unique=True)
+        await db.accounts.create_index([("organization_id", 1), ("account_class", 1)])
+        await db.accounts.create_index([("organization_id", 1), ("is_active", 1)])
+        await db.accounts.create_index([("organization_id", 1), ("account_type", 1)])
+        await db.accounts.create_index("code")
+        
+        # Vouchers indexes
+        await db.vouchers.create_index([("organization_id", 1), ("date", -1)])
+        await db.vouchers.create_index([("organization_id", 1), ("is_posted", 1), ("date", -1)])
+        await db.vouchers.create_index([("organization_id", 1), ("voucher_type", 1), ("date", -1)])
+        await db.vouchers.create_index([("organization_id", 1), ("status", 1)])
+        await db.vouchers.create_index("voucher_number")
+        await db.vouchers.create_index([("organization_id", 1), ("is_posted", 1), ("lines.account_code", 1)])
+        await db.vouchers.create_index("source_id")
+        
+        # Fiscal Years indexes
+        await db.fiscal_years.create_index([("organization_id", 1), ("start_date", 1), ("end_date", 1)])
+        await db.fiscal_years.create_index([("organization_id", 1), ("status", 1)])
+        
+        # Users indexes
+        await db.users.create_index("email", unique=True)
+        await db.users.create_index("organization_id")
+        
+        # Organizations indexes
+        await db.organizations.create_index("id", unique=True)
+        
+        # Sales/Purchase invoices indexes
+        await db.sales_invoices.create_index([("organization_id", 1), ("date", -1)])
+        await db.purchase_invoices.create_index([("organization_id", 1), ("date", -1)])
+        
+        # Exchange rates
+        await db.exchange_rates.create_index([("organization_id", 1), ("date", -1)])
+        
+        logger.info("Database indexes created successfully")
+    except Exception as e:
+        logger.warning(f"Index creation warning (may already exist): {e}")
+
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
