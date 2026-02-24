@@ -1,0 +1,34 @@
+[
+  {
+    "content": "Phase 1: Backend FY model, CRUD endpoints, closing logic, posting validation",
+    "status": "in_progress"
+  },
+  {
+    "content": "Phase 1: POC test script - validate FY creation, posting validation, closing, reports",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: Frontend - Settings FY management UI",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: Frontend - Global FY selector in header",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: Update reports (TB/IS/GL) to filter by selected FY",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: Enforce FY validation on vouchers/invoices creation",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: End-to-end testing with testing agent",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 3: Hardening - overlap prevention, org switching, backward compatibility",
+    "status": "pending"
+  }
+]
