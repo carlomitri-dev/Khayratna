@@ -49,7 +49,11 @@ import {
   Eye,
   Package,
   WifiOff,
-  Hash
+  Hash,
+  Calendar,
+  Lock,
+  Unlock,
+  AlertCircle
 } from 'lucide-react';
 import axios from 'axios';
 import { getRoleDisplayName, formatDate } from '../lib/utils';
