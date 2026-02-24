@@ -1,18 +1,18 @@
 [
   {
     "content": "Backend: Import COA from Excel endpoint (accounts + suppliers/customers detection)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Backend: Import Vouchers from Excel endpoint (group by TRAN, auto-post)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Frontend: Import page UI with file upload, org/FY selectors, progress",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Testing: End-to-end test with provided Excel files",
-    "status": "pending"
+    "status": "completed"
   }
 ]
