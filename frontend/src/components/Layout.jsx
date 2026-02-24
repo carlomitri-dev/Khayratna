@@ -248,7 +248,7 @@ const Header = ({ onMenuClick }) => {
                 <Button 
                   variant="outline" 
                   className={`gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 ${
-                    selectedFY?.status === 'closed' ? 'border-amber-500/50 text-amber-400' : 'border-emerald-500/50 text-emerald-400'
+                    selectedFY?.status === 'closed' ? 'border-amber-500/50 text-amber-600' : 'border-emerald-500/50 text-emerald-600'
                   }`}
                   data-testid="fy-selector"
                 >
