@@ -8399,6 +8399,12 @@ files_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(files_module)
 api_router.include_router(files_module.router)
 
+# Import router (Excel COA + Voucher import) - ENABLED
+spec = importlib.util.spec_from_file_location("imports_router", "/app/backend/routers/imports.py")
+imports_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(imports_module)
+api_router.include_router(imports_module.router)
+
 # Quotations router - ENABLED
 spec = importlib.util.spec_from_file_location("quotations_router", "/app/backend/routers/quotations.py")
 quotations_module = importlib.util.module_from_spec(spec)
