@@ -2349,36 +2349,42 @@ async def close_fiscal_year(fy_id: str, current_user: dict = Depends(get_current
     
     org_id = fy['organization_id']
     
-    # Get all posted vouchers in this FY date range
-    vouchers_in_fy = await db.vouchers.find({
-        'organization_id': org_id,
-        'is_posted': True,
-        'date': {'$gte': fy['start_date'], '$lte': fy['end_date']}
-    }, {'_id': 0}).to_list(None)
+    # Use MongoDB aggregation to compute P&L account movements efficiently
+    pipeline = [
+        {'$match': {
+            'organization_id': org_id,
+            'is_posted': True,
+            'date': {'$gte': fy['start_date'], '$lte': fy['end_date']}
+        }},
+        {'$unwind': '$lines'},
+        {'$match': {'lines.account_code': {'$regex': '^[67]'}}},
+        {'$group': {
+            '_id': '$lines.account_code',
+            'total_debit_lbp': {'$sum': {'$ifNull': ['$lines.debit_lbp', 0]}},
+            'total_credit_lbp': {'$sum': {'$ifNull': ['$lines.credit_lbp', 0]}},
+            'total_debit_usd': {'$sum': {'$ifNull': ['$lines.debit_usd', 0]}},
+            'total_credit_usd': {'$sum': {'$ifNull': ['$lines.credit_usd', 0]}}
+        }}
+    ]
     
-    # Calculate P&L from voucher lines for revenue (class 7) and expense (class 6) accounts
-    # We need to sum up movements in these accounts during the FY
+    account_movements = {}
     revenue_totals_lbp = 0
     revenue_totals_usd = 0
     expense_totals_lbp = 0
     expense_totals_usd = 0
     
-    for voucher in vouchers_in_fy:
-        for line in voucher.get('lines', []):
-            code = line.get('account_code', '')
-            if not code:
-                continue
-            debit_lbp = line.get('debit_lbp', 0) or 0
-            credit_lbp = line.get('credit_lbp', 0) or 0
-            debit_usd = line.get('debit_usd', 0) or 0
-            credit_usd = line.get('credit_usd', 0) or 0
-            
-            if code.startswith('7'):  # Revenue accounts (normally credit balance)
-                revenue_totals_lbp += credit_lbp - debit_lbp
-                revenue_totals_usd += credit_usd - debit_usd
-            elif code.startswith('6'):  # Expense accounts (normally debit balance)
-                expense_totals_lbp += debit_lbp - credit_lbp
-                expense_totals_usd += debit_usd - credit_usd
+    async for result in db.vouchers.aggregate(pipeline):
+        code = result['_id']
+        net_lbp = result['total_debit_lbp'] - result['total_credit_lbp']
+        net_usd = result['total_debit_usd'] - result['total_credit_usd']
+        account_movements[code] = {'lbp': net_lbp, 'usd': net_usd}
+        
+        if code.startswith('7'):
+            revenue_totals_lbp += result['total_credit_lbp'] - result['total_debit_lbp']
+            revenue_totals_usd += result['total_credit_usd'] - result['total_debit_usd']
+        elif code.startswith('6'):
+            expense_totals_lbp += result['total_debit_lbp'] - result['total_credit_lbp']
+            expense_totals_usd += result['total_debit_usd'] - result['total_credit_usd']
     
     net_income_lbp = revenue_totals_lbp - expense_totals_lbp
     net_income_usd = revenue_totals_usd - expense_totals_usd
