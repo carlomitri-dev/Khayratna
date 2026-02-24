@@ -1185,9 +1185,9 @@ const ChartOfAccountsPage = () => {
                       <th className="w-28">Actions</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {classAccounts.map((account) => (
-                      <tr key={account.id} data-testid={`account-row-${account.code}`}>
+                  <tbody className="divide-y divide-border">
+                    {classAccounts.map((account, idx) => (
+                      <tr key={account.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/80'} hover:bg-blue-50/50 transition-colors`} data-testid={`account-row-${account.code}`}>
                         <td className="font-mono font-medium">{account.code}</td>
                         <td>{account.name}</td>
                         <td className="text-muted-foreground" dir="rtl">{account.name_ar || '-'}</td>
