@@ -1558,6 +1558,9 @@ async def create_voucher(voucher_data: VoucherCreate, current_user: dict = Depen
     if current_user['role'] not in ['super_admin', 'admin', 'accountant']:
         raise HTTPException(status_code=403, detail="Permission denied")
     
+    # Validate fiscal year (if FYs are defined for this org)
+    await get_open_fy_for_date(voucher_data.organization_id, voucher_data.date)
+    
     # Calculate totals from lines (each line has its own currency conversion)
     total_debit_lbp = sum(line.debit_lbp for line in voucher_data.lines)
     total_credit_lbp = sum(line.credit_lbp for line in voucher_data.lines)
