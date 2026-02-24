@@ -70,8 +70,6 @@ const Sidebar = ({ isOpen, onClose, collapsed, onToggleCollapse }) => {
 
   const navItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/pos', icon: Store, label: 'POS', requiresEdit: true, highlight: true },
-    { path: '/cashier-sessions', icon: Users, label: 'Cashier Sessions', requiresAdmin: true },
     { path: '/chart-of-accounts', icon: BookOpen, label: 'Chart of Accounts' },
     { path: '/vouchers', icon: Receipt, label: 'Voucher Entry', requiresEdit: true },
     { path: '/cr-db-notes', icon: FileText, label: 'Cr/Db Notes', requiresEdit: true },
