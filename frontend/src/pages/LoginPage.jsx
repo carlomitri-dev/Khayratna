@@ -74,14 +74,14 @@ const LoginPage = () => {
       const response = await axios.post(`${API}/seed`);
       if (response.data.admin_email) {
         setEmail(response.data.admin_email);
-        setPassword('admin123');
+        setPassword(response.data.admin_password || 'Carinemi@28');
         setSuccess('Demo data created! Credentials filled automatically.');
         fetchOrganizations();
       }
     } catch (err) {
       if (err.response?.data?.message?.includes('already exists') || err.response?.data?.admin_email) {
-        setEmail('admin@lebfinance.com');
-        setPassword('admin123');
+        setEmail('carlo.mitri@gmail.com');
+        setPassword('Carinemi@28');
         setSuccess('Demo data exists. Credentials filled automatically.');
         fetchOrganizations();
       } else {
