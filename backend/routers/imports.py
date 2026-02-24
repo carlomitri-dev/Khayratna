@@ -273,17 +273,10 @@ async def import_vouchers(
     file: UploadFile = File(...),
     organization_id: str = Form(...),
     fiscal_year_id: str = Form(None),
+    field_mapping: str = Form(None),  # JSON: {"tran": 0, "account_code": 3, "date": 5, "cr_lbp": 8, "dr_lbp": 10, "cr_usd": 11, "dr_usd": 12, "description": 14, "currency": 17}
     current_user: dict = Depends(get_current_user)
 ):
-    """
-    Import voucher transactions from Excel file.
-    Groups rows by TRAN column to form complete vouchers.
-    Auto-posts all imported vouchers with new sequence numbers.
-    
-    Columns: TRAN, TRAN1, TRAN2, كود(Account Code), TP, DATE, VDATE,
-             TOTCD, TOTCL(Cr LBP), TOTDD, TOTDL(Dr LBP), TOTCU(Cr USD), TOTDU(Dr USD),
-             النوع(Type), الوصف(Desc), VALUEL, اسم الحساب, CUR, VALUED
-    """
+    """Import voucher transactions with optional field mapping."""
     if current_user['role'] not in ['super_admin', 'admin']:
         raise HTTPException(status_code=403, detail="Only admins can import data")
     
@@ -291,6 +284,21 @@ async def import_vouchers(
         import openpyxl
     except ImportError:
         raise HTTPException(status_code=500, detail="openpyxl library not available")
+    
+    # Parse field mapping
+    mapping = None
+    if field_mapping:
+        try:
+            mapping = json.loads(field_mapping)
+        except json.JSONDecodeError:
+            pass
+    
+    def get_col(row, field_name, default_idx):
+        idx = mapping.get(field_name, default_idx) if mapping else default_idx
+        if idx is None or idx < 0 or idx == '':
+            return None
+        idx = int(idx)
+        return row[idx] if len(row) > idx else None
     
     # Read the file
     contents = await file.read()
