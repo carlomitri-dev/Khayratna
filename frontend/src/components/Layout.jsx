@@ -163,12 +163,12 @@ const Sidebar = ({ isOpen, onClose, collapsed, onToggleCollapse }) => {
         </div>
 
         {/* Collapse toggle (desktop only) */}
-        <div className="hidden lg:flex p-3 border-t border-border flex-shrink-0">
+        <div className="hidden lg:flex p-3 border-t border-white/10 flex-shrink-0">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={onToggleCollapse}
-            className={`w-full ${collapsed ? 'justify-center' : 'justify-start'}`}
+            className={`w-full text-blue-200/70 hover:text-white hover:bg-white/10 ${collapsed ? 'justify-center' : 'justify-start'}`}
             data-testid="sidebar-collapse-btn"
           >
             {collapsed ? (
