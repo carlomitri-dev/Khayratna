@@ -235,9 +235,11 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <SyncProvider>
-            <AppRoutes />
-            <Toaster />
-            <OfflineToast />
+            <FiscalYearProvider>
+              <AppRoutes />
+              <Toaster />
+              <OfflineToast />
+            </FiscalYearProvider>
           </SyncProvider>
         </AuthProvider>
       </BrowserRouter>
