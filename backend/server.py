@@ -1621,28 +1621,19 @@ async def get_vouchers(
         else:
             query['date'] = {'$lte': date_to}
     
-    # Get all vouchers first for search filtering
-    vouchers = await db.vouchers.find(query, {'_id': 0}).sort('created_at', -1).to_list(None)  # Get ALL vouchers
-    
-    # Apply search filter
+    # Apply search filter at DB level using regex for performance
     if search:
-        search_lower = search.lower()
-        vouchers = [
-            v for v in vouchers
-            if search_lower in v.get('voucher_number', '').lower()
-            or search_lower in v.get('reference', '').lower()
-            or search_lower in v.get('description', '').lower()
-            or any(
-                search_lower in line.get('account_code', '').lower()
-                or search_lower in line.get('account_name', '').lower()
-                or search_lower in line.get('description', '').lower()
-                for line in v.get('lines', [])
-            )
+        search_regex = {'$regex': search, '$options': 'i'}
+        query['$or'] = [
+            {'voucher_number': search_regex},
+            {'reference': search_regex},
+            {'description': search_regex},
+            {'lines.account_code': search_regex},
+            {'lines.description': search_regex}
         ]
     
-    # Apply pagination
-    total = len(vouchers)
-    vouchers = vouchers[skip:skip + limit]
+    # Use DB-level skip/limit for efficiency (no loading all into memory)
+    vouchers = await db.vouchers.find(query, {'_id': 0}).sort('date', -1).skip(skip).limit(limit).to_list(limit)
     
     return [VoucherResponse(**v) for v in vouchers]
 
