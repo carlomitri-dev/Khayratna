@@ -661,7 +661,7 @@ async def import_inventory(
                         'supplier_code': item['supplier_code'],
                         'sell_price': item['sell_price'],
                         'cost_price': item['cost_price'],
-                        'pack_size': item['pack_size'],
+                        'package': item['package'],
                         'pack_description': item['pack_description']
                     }}
                 )
