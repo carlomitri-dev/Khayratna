@@ -29,6 +29,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const CustomersPage = () => {
   const { currentOrg, user } = useAuth();
+  const { selectedFY } = useFiscalYear();
   const { isOnline } = useSync();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
