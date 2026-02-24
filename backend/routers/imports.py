@@ -645,14 +645,10 @@ async def import_regions(
 async def import_inventory(
     file: UploadFile = File(...),
     organization_id: str = Form(...),
+    field_mapping: str = Form(None),  # JSON: {"item_code": 0, "name": 2, "category_id": 3, "supplier_id": 4, "package": 5, "pack_desc": 6, "price": 7, "cost": 8}
     current_user: dict = Depends(get_current_user)
 ):
-    """
-    Import inventory items from Excel.
-    Columns: كود(code), الوصف, ADESC(Arabic name), CAT_ID, SUP_ID(supplier account code),
-             PAK, PACK, PRICE, COST, ...
-    Links items to supplier (SUP_ID = account code like 40110001) and category (CAT_ID).
-    """
+    """Import inventory items with optional field mapping."""
     if current_user['role'] not in ['super_admin', 'admin']:
         raise HTTPException(status_code=403, detail="Only admins can import data")
     
@@ -661,11 +657,26 @@ async def import_inventory(
     except ImportError:
         raise HTTPException(status_code=500, detail="openpyxl not available")
     
+    # Parse field mapping
+    mapping = None
+    if field_mapping:
+        try:
+            mapping = json.loads(field_mapping)
+        except json.JSONDecodeError:
+            pass
+    
+    def get_col(row, field_name, default_idx):
+        idx = mapping.get(field_name, default_idx) if mapping else default_idx
+        if idx is None or idx < 0 or idx == '':
+            return None
+        idx = int(idx)
+        return row[idx] if len(row) > idx and row[idx] is not None else None
+    
     contents = await file.read()
     wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
     ws = wb.active
     
-    # Pre-load categories and suppliers for lookup
+    # Pre-load categories for lookup
     categories = {}
     async for cat in db.inventory_categories.find({'organization_id': organization_id}, {'_id': 0}):
         categories[cat.get('cat_id', '')] = cat
@@ -677,7 +688,8 @@ async def import_inventory(
     
     for row in ws.iter_rows(min_row=2, values_only=True):
         try:
-            item_code = str(row[0]).strip() if row[0] else ''
+            ic = get_col(row, 'item_code', 0)
+            item_code = str(ic).strip() if ic else ''
             if not item_code:
                 continue
             
