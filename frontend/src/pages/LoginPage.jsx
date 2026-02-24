@@ -106,11 +106,11 @@ const LoginPage = () => {
               />
             </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight" style={{ fontFamily: 'Manrope, sans-serif' }}>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white" style={{ fontFamily: 'Manrope, sans-serif' }}>
             KAIROS
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm sm:text-base">Digital Invoicing</p>
-          <p className="text-muted-foreground/70 text-xs mt-0.5" dir="rtl">الفواتير الرقمية</p>
+          <p className="text-blue-200 mt-1 text-sm sm:text-base">Digital Invoicing</p>
+          <p className="text-blue-300/70 text-xs mt-0.5" dir="rtl">الفواتير الرقمية</p>
         </div>
 
         <Card className="bg-card/80 backdrop-blur-xl border-border">
