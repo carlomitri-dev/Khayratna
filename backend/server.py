@@ -1714,6 +1714,9 @@ async def post_voucher(voucher_id: str, current_user: dict = Depends(get_current
     if voucher['is_posted']:
         raise HTTPException(status_code=400, detail="Voucher already posted")
     
+    # Validate fiscal year before posting
+    await get_open_fy_for_date(voucher['organization_id'], voucher['date'])
+    
     # Validate balanced - check both USD and LBP totals must balance
     if abs(voucher['total_debit_usd'] - voucher['total_credit_usd']) > 0.01:
         raise HTTPException(status_code=400, detail="Voucher is not balanced (USD totals must match)")
