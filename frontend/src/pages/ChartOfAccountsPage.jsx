@@ -82,13 +82,15 @@ const ChartOfAccountsPage = () => {
     if (currentOrg) {
       fetchAccounts();
     }
-  }, [currentOrg]);
+  }, [currentOrg, selectedFY]);
 
   const fetchAccounts = async () => {
     setLoading(true);
     try {
       if (isOnline) {
-        const response = await axios.get(`${API}/accounts?organization_id=${currentOrg.id}`);
+        const params = new URLSearchParams({ organization_id: currentOrg.id });
+        if (selectedFY?.id) params.append('fy_id', selectedFY.id);
+        const response = await axios.get(`${API}/accounts?${params.toString()}`);
         setAccounts(response.data);
         
         // Cache in IndexedDB for offline use
