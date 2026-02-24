@@ -258,12 +258,25 @@ const ImportDataPage = () => {
             icon={Receipt}
             color="emerald"
             description="Import journal vouchers grouped by TRAN ID, auto-posted with new sequence. Rate: 1 USD = 1,507.5 LBP"
-            infoText="Groups by TRAN column. Columns: TRAN, Account Code, DATE, Debit/Credit (LBP & USD), Description, Currency (1=LBP, 2=USD)"
+            infoText="Select a Fiscal Year to only import vouchers within that period. Vouchers outside the FY date range will be skipped."
             result={voucherResult}
           >
+            <div>
+              <Label className="text-xs font-medium">Fiscal Year (required — skips vouchers outside this period)</Label>
+              <Select value={voucherFYId} onValueChange={setVoucherFYId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select fiscal year..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {fiscalYears.map(fy => (
+                    <SelectItem key={fy.id} value={fy.id}>{fy.name} ({fy.start_date} to {fy.end_date})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <FileUploader file={voucherFile} setFile={setVoucherFile} color="emerald" onClear={() => setVoucherResult(null)} />
-            <Button onClick={() => doImport('/import/vouchers', voucherFile, setVoucherImporting, setVoucherResult)} 
-              disabled={!voucherFile || voucherImporting} className="w-full bg-emerald-600 hover:bg-emerald-700" size="sm">
+            <Button onClick={() => doImport('/import/vouchers', voucherFile, setVoucherImporting, setVoucherResult, { fiscal_year_id: voucherFYId })} 
+              disabled={!voucherFile || voucherImporting || !voucherFYId} className="w-full bg-emerald-600 hover:bg-emerald-700" size="sm">
               {voucherImporting ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Importing vouchers (may take minutes)...</> : <><Upload className="w-3 h-3 mr-1" />Import Voucher History</>}
             </Button>
           </ImportCard>
