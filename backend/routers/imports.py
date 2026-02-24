@@ -311,7 +311,7 @@ async def import_vouchers(
     
     for row in ws.iter_rows(min_row=2, values_only=True):
         row_count += 1
-        tran_id = row[0]
+        tran_id = get_col(row, 'tran', 0)
         if tran_id is None:
             continue
         voucher_groups[tran_id].append(row)
