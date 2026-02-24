@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useFiscalYear } from '../context/FiscalYearContext';
 import SyncStatusIndicator from './SyncStatusIndicator';
 import {
   LayoutDashboard,
@@ -27,7 +28,10 @@ import {
   ShoppingCart,
   Store,
   PanelLeftClose,
-  PanelLeft
+  PanelLeft,
+  Calendar,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import {
   DropdownMenu,
