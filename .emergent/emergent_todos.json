@@ -25,10 +25,14 @@
   },
   {
     "content": "Phase 2: End-to-end testing with testing agent",
-    "status": "in_progress"
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: All user stories covered in Development and testing",
+    "status": "completed"
   },
   {
     "content": "Phase 3: Hardening - overlap prevention, org switching, backward compatibility",
-    "status": "pending"
+    "status": "completed"
   }
 ]
