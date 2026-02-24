@@ -23,10 +23,6 @@ import InventoryPage from './pages/InventoryPage';
 import SalesInvoicePage from './pages/SalesInvoicePage';
 import SalesQuotationsPage from './pages/SalesQuotationsPage';
 import PurchaseInvoicePage from './pages/PurchaseInvoicePage';
-import POSPage from './pages/POSPage';
-import CashierLoginPage from './pages/CashierLoginPage';
-import CashierPOSPage from './pages/CashierPOSPage';
-import CashierSessionsPage from './pages/CashierSessionsPage';
 import ImportDataPage from './pages/ImportDataPage';
 import './App.css';
 
