@@ -73,13 +73,14 @@ async def import_chart_of_accounts(
     file: UploadFile = File(...),
     organization_id: str = Form(...),
     fiscal_year_id: str = Form(None),
+    field_mapping: str = Form(None),  # JSON: {"account_code": 0, "account_name": 2, "address": 14, "phone": 15, "reg_id": 18, "regno": 27}
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Import Chart of Accounts from Excel file.
-    Columns expected: كود الحساب, كود, اسم الحساب, النوع, ...
-    Accounts starting with 40 (len>4) are also added as suppliers.
-    Accounts starting with 41 (len>4) are also added as customers.
+    Import Chart of Accounts from Excel file with optional field mapping.
+    If field_mapping is provided, uses custom column indexes.
+    Otherwise uses default LCOA format.
+    """
     """
     if current_user['role'] not in ['super_admin', 'admin']:
         raise HTTPException(status_code=403, detail="Only admins can import data")
