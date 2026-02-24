@@ -132,7 +132,7 @@
 
 /* Glassmorphism effect */
 .glass {
-  @apply backdrop-blur-xl bg-black/40 border border-white/10;
+  @apply backdrop-blur-xl bg-white/80 border border-gray-200;
 }
 
 /* Card hover effect */
