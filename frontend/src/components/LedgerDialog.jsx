@@ -15,7 +15,7 @@ import { formatLBP, formatUSD, getNumberClass, formatDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-const LedgerDialog = ({ account, organizationId, open, onClose, userRole }) => {
+const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [ledgerData, setLedgerData] = useState(null);
@@ -32,14 +32,16 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole }) => {
     if (open && account && organizationId) {
       fetchLedger();
     }
-  }, [open, account, organizationId]);
+  }, [open, account, organizationId, fyId]);
 
   const fetchLedger = async () => {
     setLoading(true);
     setError(null);
     try {
+      const params = new URLSearchParams({ organization_id: organizationId });
+      if (fyId) params.append('fy_id', fyId);
       const response = await axios.get(
-        `${API}/reports/general-ledger/${account.code}?organization_id=${organizationId}`
+        `${API}/reports/general-ledger/${account.code}?${params.toString()}`
       );
       setLedgerData(response.data);
     } catch (err) {
