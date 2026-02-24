@@ -214,6 +214,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/import-data"
+        element={
+          <ProtectedRoute>
+            <ImportDataPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/cashier-sessions"
         element={
           <ProtectedRoute>
