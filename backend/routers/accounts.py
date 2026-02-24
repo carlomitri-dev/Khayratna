@@ -76,14 +76,14 @@ async def create_account(account_data: AccountCreate, current_user: dict = Depen
 
 
 @router.get("/accounts", response_model=List[AccountResponse])
-async def get_accounts(organization_id: str, current_user: dict = Depends(get_current_user)):
-    """Get all accounts for an organization"""
+async def get_accounts(organization_id: str, fy_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Get all accounts for an organization, optionally filtered by fiscal year"""
     accounts = await db.accounts.find(
         {'organization_id': organization_id},
         {'_id': 0}
     ).sort('code', 1).to_list(None)
     
-    # Normalize accounts - ensure all required fields exist with defaults
+    # Normalize accounts
     for acc in accounts:
         code = acc.get('code', '')
         if not acc.get('account_class') and code:
@@ -104,6 +104,59 @@ async def get_accounts(organization_id: str, current_user: dict = Depends(get_cu
             acc['account_type'] = 'detail'
         if 'parent_code' not in acc:
             acc['parent_code'] = None
+        acc['balance_lbp'] = acc.get('balance_lbp', 0) or 0
+        acc['balance_usd'] = acc.get('balance_usd', 0) or 0
+    
+    # If FY filter, recompute balances from vouchers in that FY range
+    if fy_id:
+        from core.database import db as _db
+        fy = await _db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+        if fy:
+            # Reset all balances to 0
+            for acc in accounts:
+                acc['balance_lbp'] = 0
+                acc['balance_usd'] = 0
+            
+            # Use aggregation to compute from vouchers in FY range
+            acc_lookup = {acc.get('code', ''): acc for acc in accounts}
+            pipeline = [
+                {'$match': {
+                    'organization_id': organization_id,
+                    'is_posted': True,
+                    'date': {'$gte': fy['start_date'], '$lte': fy['end_date']}
+                }},
+                {'$unwind': '$lines'},
+                {'$group': {
+                    '_id': '$lines.account_code',
+                    'total_debit_lbp': {'$sum': {'$ifNull': ['$lines.debit_lbp', 0]}},
+                    'total_credit_lbp': {'$sum': {'$ifNull': ['$lines.credit_lbp', 0]}},
+                    'total_debit_usd': {'$sum': {'$ifNull': ['$lines.debit_usd', 0]}},
+                    'total_credit_usd': {'$sum': {'$ifNull': ['$lines.credit_usd', 0]}}
+                }}
+            ]
+            async for result in _db.vouchers.aggregate(pipeline):
+                code = result['_id']
+                if code in acc_lookup:
+                    acc_lookup[code]['balance_lbp'] = result['total_debit_lbp'] - result['total_credit_lbp']
+                    acc_lookup[code]['balance_usd'] = result['total_debit_usd'] - result['total_credit_usd']
+    
+    # Calculate parent account balances from children
+    code_balances = {}
+    for acc in accounts:
+        code = acc.get('code', '')
+        code_balances[code] = {'lbp': acc.get('balance_lbp', 0) or 0, 'usd': acc.get('balance_usd', 0) or 0}
+    
+    for acc in accounts:
+        code = acc.get('code', '')
+        if code and len(code) <= 4:
+            child_lbp = 0
+            child_usd = 0
+            for other_code, bal in code_balances.items():
+                if other_code.startswith(code) and len(other_code) > len(code):
+                    child_lbp += bal['lbp']
+                    child_usd += bal['usd']
+            acc['balance_lbp'] = child_lbp
+            acc['balance_usd'] = child_usd
     
     return [AccountResponse(**acc) for acc in accounts]
 
