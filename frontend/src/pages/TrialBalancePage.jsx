@@ -25,6 +25,7 @@ const LEVEL_OPTIONS = [
 
 const TrialBalancePage = () => {
   const { currentOrg } = useAuth();
+  const { selectedFY } = useFiscalYear();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [level, setLevel] = useState('leaf');
@@ -35,7 +36,7 @@ const TrialBalancePage = () => {
     if (currentOrg) {
       fetchTrialBalance();
     }
-  }, [currentOrg, level, includeZeroBalance]);
+  }, [currentOrg, level, includeZeroBalance, selectedFY]);
 
   const fetchTrialBalance = async () => {
     setLoading(true);
@@ -46,6 +47,9 @@ const TrialBalancePage = () => {
       });
       if (level && level !== 'all') {
         params.append('level', level);
+      }
+      if (selectedFY?.id) {
+        params.append('fy_id', selectedFY.id);
       }
       const response = await axios.get(`${API}/reports/trial-balance?${params.toString()}`);
       setData(response.data);
