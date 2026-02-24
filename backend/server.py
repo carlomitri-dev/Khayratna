@@ -773,52 +773,78 @@ async def create_account(account_data: AccountCreate, current_user: dict = Depen
     return AccountResponse(**account_doc)
 
 @api_router.get("/accounts", response_model=List[AccountResponse])
-async def get_accounts(organization_id: str, current_user: dict = Depends(get_current_user)):
+async def get_accounts(organization_id: str, fy_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     accounts = await db.accounts.find(
         {'organization_id': organization_id},
         {'_id': 0}
-    ).sort('code', 1).to_list(None)  # Get ALL accounts
+    ).sort('code', 1).to_list(None)
     
     # Normalize accounts - ensure all required fields exist with defaults
     for acc in accounts:
         code = acc.get('code', '')
-        # Auto-detect account_class from first digit of code if missing
         if not acc.get('account_class') and code:
             try:
                 acc['account_class'] = int(code[0]) if code[0].isdigit() else None
             except (ValueError, IndexError):
                 acc['account_class'] = None
         
-        # Auto-detect account_type from account_class if missing
         if not acc.get('account_type') and acc.get('account_class'):
             account_class = acc['account_class']
             if account_class in [1, 2, 3]:
                 acc['account_type'] = 'equity' if account_class == 1 else ('liability' if account_class == 2 else 'expense')
             elif account_class == 4:
-                acc['account_type'] = 'asset'  # Receivables
+                acc['account_type'] = 'asset'
             elif account_class == 5:
-                acc['account_type'] = 'asset'  # Cash/Bank
+                acc['account_type'] = 'asset'
             elif account_class == 6:
                 acc['account_type'] = 'expense'
             elif account_class == 7:
                 acc['account_type'] = 'revenue'
         
-        # Ensure is_active has a default
         if 'is_active' not in acc:
             acc['is_active'] = True
         
-        # Ensure balance fields have defaults
         acc['balance_lbp'] = acc.get('balance_lbp', 0) or 0
         acc['balance_usd'] = acc.get('balance_usd', 0) or 0
     
-    # Calculate parent account balances from children efficiently using a single pass
-    # Build lookup of leaf account balances first, then aggregate up
+    # If FY filter, recompute balances from vouchers in that FY range
+    if fy_id:
+        fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+        if fy:
+            # Reset all balances to 0
+            for acc in accounts:
+                acc['balance_lbp'] = 0
+                acc['balance_usd'] = 0
+            
+            # Use aggregation to compute balances from vouchers in FY range
+            acc_lookup = {acc.get('code', ''): acc for acc in accounts}
+            pipeline = [
+                {'$match': {
+                    'organization_id': organization_id,
+                    'is_posted': True,
+                    'date': {'$gte': fy['start_date'], '$lte': fy['end_date']}
+                }},
+                {'$unwind': '$lines'},
+                {'$group': {
+                    '_id': '$lines.account_code',
+                    'total_debit_lbp': {'$sum': {'$ifNull': ['$lines.debit_lbp', 0]}},
+                    'total_credit_lbp': {'$sum': {'$ifNull': ['$lines.credit_lbp', 0]}},
+                    'total_debit_usd': {'$sum': {'$ifNull': ['$lines.debit_usd', 0]}},
+                    'total_credit_usd': {'$sum': {'$ifNull': ['$lines.credit_usd', 0]}}
+                }}
+            ]
+            async for result in db.vouchers.aggregate(pipeline):
+                code = result['_id']
+                if code in acc_lookup:
+                    acc_lookup[code]['balance_lbp'] = result['total_debit_lbp'] - result['total_credit_lbp']
+                    acc_lookup[code]['balance_usd'] = result['total_debit_usd'] - result['total_credit_usd']
+    
+    # Calculate parent account balances from children
     code_balances = {}
     for acc in accounts:
         code = acc.get('code', '')
         code_balances[code] = {'lbp': acc.get('balance_lbp', 0) or 0, 'usd': acc.get('balance_usd', 0) or 0}
     
-    # For parent accounts (1-4 digits), sum children
     for acc in accounts:
         code = acc.get('code', '')
         if code and len(code) <= 4:
