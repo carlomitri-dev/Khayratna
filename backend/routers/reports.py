@@ -50,7 +50,7 @@ async def get_trial_balance(
     
     # If FY filter, recalculate balances from vouchers in that period
     if fy_start and fy_end:
-        # Reset all balances to 0, then compute from vouchers
+        # Reset all balances to 0
         for acc in accounts:
             acc['balance_lbp'] = 0
             acc['balance_usd'] = 0
@@ -58,19 +58,28 @@ async def get_trial_balance(
         # Build account lookup
         acc_lookup = {acc.get('code', ''): acc for acc in accounts}
         
-        # Get all posted vouchers in FY range
-        vouchers = await db.vouchers.find({
-            'organization_id': organization_id,
-            'is_posted': True,
-            'date': {'$gte': fy_start, '$lte': fy_end}
-        }, {'_id': 0}).to_list(None)
+        # Use MongoDB aggregation for efficient balance computation
+        pipeline = [
+            {'$match': {
+                'organization_id': organization_id,
+                'is_posted': True,
+                'date': {'$gte': fy_start, '$lte': fy_end}
+            }},
+            {'$unwind': '$lines'},
+            {'$group': {
+                '_id': '$lines.account_code',
+                'total_debit_lbp': {'$sum': {'$ifNull': ['$lines.debit_lbp', 0]}},
+                'total_credit_lbp': {'$sum': {'$ifNull': ['$lines.credit_lbp', 0]}},
+                'total_debit_usd': {'$sum': {'$ifNull': ['$lines.debit_usd', 0]}},
+                'total_credit_usd': {'$sum': {'$ifNull': ['$lines.credit_usd', 0]}}
+            }}
+        ]
         
-        for voucher in vouchers:
-            for line in voucher.get('lines', []):
-                code = line.get('account_code', '')
-                if code in acc_lookup:
-                    acc_lookup[code]['balance_lbp'] += (line.get('debit_lbp', 0) or 0) - (line.get('credit_lbp', 0) or 0)
-                    acc_lookup[code]['balance_usd'] += (line.get('debit_usd', 0) or 0) - (line.get('credit_usd', 0) or 0)
+        async for result in db.vouchers.aggregate(pipeline):
+            code = result['_id']
+            if code in acc_lookup:
+                acc_lookup[code]['balance_lbp'] = result['total_debit_lbp'] - result['total_credit_lbp']
+                acc_lookup[code]['balance_usd'] = result['total_debit_usd'] - result['total_credit_usd']
     
     # Build set of all codes for finding parent-child relationships
     all_codes = {acc.get('code', '') for acc in accounts}
