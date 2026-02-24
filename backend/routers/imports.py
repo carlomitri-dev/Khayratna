@@ -601,7 +601,7 @@ async def import_inventory(
             name_ar = str(row[2]).strip() if row[2] else ''
             cat_id = str(row[3]).strip() if row[3] else ''
             sup_id = str(row[4]).strip() if row[4] else ''  # Supplier account code (e.g., 40110001)
-            pak = row[5] if row[5] else 0
+            pak = int(row[5]) if row[5] else 0
             pack_desc = str(row[6]).strip() if row[6] else ''
             price = float(row[7] or 0)
             cost = float(row[8] or 0)
