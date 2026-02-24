@@ -111,6 +111,7 @@ const ImportDataPage = () => {
   const [voucherFile, setVoucherFile] = useState(null);
   const [voucherResult, setVoucherResult] = useState(null);
   const [voucherImporting, setVoucherImporting] = useState(false);
+  const [voucherFYId, setVoucherFYId] = useState(selectedFY?.id || '');
   
   const [catFile, setCatFile] = useState(null);
   const [catResult, setCatResult] = useState(null);
