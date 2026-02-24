@@ -358,7 +358,7 @@ async def import_vouchers(
     for tran_id, rows in voucher_groups.items():
         try:
             # Parse date from first row
-            date_raw = str(rows[0][5]) if rows[0][5] else ''
+            date_raw = str(get_col(rows[0], 'date', 5) or '')
             if len(date_raw) == 8:  # YYYYMMDD
                 date_str = f"{date_raw[:4]}-{date_raw[4:6]}-{date_raw[6:8]}"
             elif len(date_raw) == 10:  # YYYY-MM-DD already
@@ -373,7 +373,8 @@ async def import_vouchers(
                     continue
             
             # Get description from first line
-            description = str(rows[0][14]).strip() if rows[0][14] else f'Import TRAN-{tran_id}'
+            desc_val = get_col(rows[0], 'description', 14)
+            description = str(desc_val).strip() if desc_val else f'Import TRAN-{tran_id}'
             
             voucher_lines = []
             total_debit_lbp = 0
@@ -382,18 +383,21 @@ async def import_vouchers(
             total_credit_usd = 0
             
             for line_row in rows:
-                account_code = str(line_row[3]).strip() if line_row[3] else ''
+                acct_val = get_col(line_row, 'account_code', 3)
+                account_code = str(acct_val).strip() if acct_val else ''
                 if not account_code:
                     continue
                 
                 # Extract amounts
-                cr_lbp = float(line_row[8] or 0)
-                dr_lbp = float(line_row[10] or 0)
-                cr_usd = float(line_row[11] or 0)
-                dr_usd = float(line_row[12] or 0)
+                cr_lbp = float(get_col(line_row, 'cr_lbp', 8) or 0)
+                dr_lbp = float(get_col(line_row, 'dr_lbp', 10) or 0)
+                cr_usd = float(get_col(line_row, 'cr_usd', 11) or 0)
+                dr_usd = float(get_col(line_row, 'dr_usd', 12) or 0)
                 
-                line_desc = str(line_row[14]).strip() if line_row[14] else ''
-                cur = str(line_row[17]) if line_row[17] else '1'
+                desc_v = get_col(line_row, 'description', 14)
+                line_desc = str(desc_v).strip() if desc_v else ''
+                cur_v = get_col(line_row, 'currency', 17)
+                cur = str(cur_v) if cur_v else '1'
                 
                 # Exchange rate - 89500 for USD since 2023, 1507.5 before
                 if cur == '2':
