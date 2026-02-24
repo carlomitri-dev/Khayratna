@@ -680,10 +680,11 @@ async def import_inventory(
                         'name': item['name'],
                         'name_ar': item['name_ar'],
                         'category_id': item['category_id'],
+                        'category': item['category'],
                         'category_name': item['category_name'],
-                        'supplier_code': item['supplier_code'],
-                        'sell_price': item['sell_price'],
-                        'cost_price': item['cost_price'],
+                        'supplier_id': item['supplier_id'],
+                        'price': item['price'],
+                        'cost': item['cost'],
                         'package': item['package'],
                         'pack_description': item['pack_description']
                     }}
