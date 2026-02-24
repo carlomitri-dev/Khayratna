@@ -174,6 +174,10 @@ async def import_chart_of_accounts(
                 }
                 if acc.get('contact_info'):
                     update_data['contact_info'] = acc['contact_info']
+                # Also update top-level contact fields
+                for field in ['mobile', 'address', 'contact_person', 'registration_number', 'region_id']:
+                    if field in acc:
+                        update_data[field] = acc[field]
                 await db.accounts.update_one(
                     {'code': acc['code'], 'organization_id': organization_id},
                     {'$set': update_data}
