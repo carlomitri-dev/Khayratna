@@ -42,13 +42,15 @@ const SuppliersPage = () => {
     if (currentOrg) {
       fetchSuppliers();
     }
-  }, [currentOrg, isOnline]);
+  }, [currentOrg, isOnline, selectedFY]);
 
   const fetchSuppliers = async () => {
     setLoading(true);
     try {
       if (isOnline) {
-        const response = await axios.get(`${API}/suppliers?organization_id=${currentOrg.id}`);
+        const params = new URLSearchParams({ organization_id: currentOrg.id });
+        if (selectedFY?.id) params.append('fy_id', selectedFY.id);
+        const response = await axios.get(`${API}/suppliers?${params.toString()}`);
         setSuppliers(response.data);
         
         // Cache in IndexedDB
