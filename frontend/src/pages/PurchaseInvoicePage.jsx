@@ -128,7 +128,7 @@ const PurchaseInvoicePage = () => {
       setCurrentPage(0);
       fetchInvoices(true);
     }
-  }, [searchTerm, filterStatus]);
+  }, [searchTerm, filterStatus, selectedFY]);
 
   const fetchData = async () => {
     setLoading(true);
