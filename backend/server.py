@@ -2551,16 +2551,74 @@ async def reopen_fiscal_year(fy_id: str, current_user: dict = Depends(get_curren
 
 @api_router.post("/seed")
 async def seed_demo_data():
-    """Seed database with demo data"""
+    """Seed database with initial super admin user. Creates admin if no users exist."""
     
-    # Check if already seeded
-    existing_org = await db.organizations.find_one({'name': 'Beirut Trading Co.'})
-    if existing_org:
-        return {
-            "message": "Demo data already exists",
-            "admin_email": "carlo.mitri@gmail.com",
-            "admin_password": "Carinemi@28"
-        }
+    # Check if any users exist
+    user_count = await db.users.count_documents({})
+    
+    if user_count > 0:
+        # Users exist - try to find/update the super admin
+        admin = await db.users.find_one({'email': 'carlo.mitri@gmail.com'})
+        if admin:
+            # Update password to ensure it matches
+            await db.users.update_one(
+                {'email': 'carlo.mitri@gmail.com'},
+                {'$set': {'password': hash_password('Carinemi@28')}}
+            )
+            return {
+                "message": "Admin account updated",
+                "admin_email": "carlo.mitri@gmail.com",
+                "admin_password": "Carinemi@28"
+            }
+        
+        # Also check for old admin email and update it
+        old_admin = await db.users.find_one({'role': 'super_admin'})
+        if old_admin:
+            await db.users.update_one(
+                {'id': old_admin['id']},
+                {'$set': {
+                    'email': 'carlo.mitri@gmail.com',
+                    'password': hash_password('Carinemi@28'),
+                    'name': 'Super Admin'
+                }}
+            )
+            return {
+                "message": "Admin account updated",
+                "admin_email": "carlo.mitri@gmail.com",
+                "admin_password": "Carinemi@28"
+            }
+    
+    # No users exist - create fresh super admin + default org
+    org_id = str(uuid.uuid4())
+    org_doc = {
+        'id': org_id,
+        'name': 'My Organization',
+        'currency': 'USD',
+        'base_exchange_rate': 89500,
+        'tax_percent': 11,
+        'tax_name': 'VAT',
+        'created_at': datetime.now(timezone.utc).isoformat()
+    }
+    await db.organizations.insert_one(org_doc)
+    
+    admin_id = str(uuid.uuid4())
+    admin_user = {
+        'id': admin_id,
+        'email': 'carlo.mitri@gmail.com',
+        'password': hash_password('Carinemi@28'),
+        'name': 'Super Admin',
+        'role': 'super_admin',
+        'organization_id': org_id,
+        'is_active': True,
+        'created_at': datetime.now(timezone.utc).isoformat()
+    }
+    await db.users.insert_one(admin_user)
+    
+    return {
+        "message": "Super admin created successfully",
+        "admin_email": "carlo.mitri@gmail.com",
+        "admin_password": "Carinemi@28"
+    }
     
     # Create organizations
     org1_id = str(uuid.uuid4())
