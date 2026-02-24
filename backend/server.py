@@ -2408,8 +2408,8 @@ async def seed_demo_data():
     return {
         "message": "Demo data seeded successfully",
         "organizations": [org1_id, org2_id],
-        "admin_email": "admin@lebfinance.com",
-        "admin_password": "admin123"
+        "admin_email": "carlo.mitri@gmail.com",
+        "admin_password": "Carinemi@28"
     }
 
 # ================== IMAGE ARCHIVE ==================
