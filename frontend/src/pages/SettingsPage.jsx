@@ -1398,6 +1398,269 @@ const SettingsPage = () => {
           </Card>
         </TabsContent>
 
+        {/* Fiscal Years Tab */}
+        <TabsContent value="fiscal-years" className="space-y-4" data-testid="fiscal-years-tab">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base lg:text-lg" style={{ fontFamily: 'Manrope, sans-serif' }}>
+                    Fiscal Year Management
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Define and manage fiscal years for {currentOrg?.name || 'your organization'}
+                  </p>
+                </div>
+                <Button onClick={openCreateFY} size="sm" data-testid="create-fy-btn">
+                  <Plus className="w-4 h-4 mr-1" />
+                  New Fiscal Year
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {fiscalYears.length === 0 ? (
+                <div className="text-center py-12">
+                  <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-2">No fiscal years defined yet</p>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Create your first fiscal year to enable period-based reporting and posting controls.
+                  </p>
+                  <Button onClick={openCreateFY} size="sm" variant="outline">
+                    <Plus className="w-4 h-4 mr-1" />
+                    Create First Fiscal Year
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {fiscalYears.map((fy) => (
+                    <div 
+                      key={fy.id} 
+                      className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border ${
+                        fy.status === 'closed' ? 'border-amber-500/30 bg-amber-500/5' : 'border-emerald-500/30 bg-emerald-500/5'
+                      }`}
+                      data-testid={`fy-item-${fy.id}`}
+                    >
+                      <div className="flex items-center gap-3 mb-2 sm:mb-0">
+                        <div className={`p-2 rounded-lg ${
+                          fy.status === 'closed' ? 'bg-amber-500/20' : 'bg-emerald-500/20'
+                        }`}>
+                          {fy.status === 'closed' ? (
+                            <Lock className="w-5 h-5 text-amber-400" />
+                          ) : (
+                            <Unlock className="w-5 h-5 text-emerald-400" />
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-sm">{fy.name}</h3>
+                          <p className="text-xs text-muted-foreground">
+                            {fy.start_date} to {fy.end_date}
+                          </p>
+                          {fy.closed_at && (
+                            <p className="text-xs text-amber-400 mt-0.5">
+                              Closed on {new Date(fy.closed_at).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          fy.status === 'open' 
+                            ? 'bg-emerald-500/20 text-emerald-400' 
+                            : 'bg-amber-500/20 text-amber-400'
+                        }`}>
+                          {fy.status === 'open' ? 'Open' : 'Closed'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {fy.status === 'open' && (
+                          <>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => openEditFY(fy)}
+                              data-testid={`edit-fy-${fy.id}`}
+                            >
+                              <Pencil className="w-3 h-3 mr-1" />
+                              Edit
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                              onClick={() => { setCloseConfirmFY(fy); setCloseResult(null); }}
+                              data-testid={`close-fy-${fy.id}`}
+                            >
+                              <Lock className="w-3 h-3 mr-1" />
+                              Close FY
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                              onClick={() => setDeleteFYConfirm(fy)}
+                              data-testid={`delete-fy-${fy.id}`}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </>
+                        )}
+                        {fy.status === 'closed' && user?.role === 'super_admin' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+                            onClick={() => handleReopenFY(fy)}
+                            data-testid={`reopen-fy-${fy.id}`}
+                          >
+                            <Unlock className="w-3 h-3 mr-1" />
+                            Reopen
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Create/Edit FY Dialog */}
+          <Dialog open={isFYDialogOpen} onOpenChange={(open) => { setIsFYDialogOpen(open); if (!open) setEditingFY(null); }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingFY ? 'Edit Fiscal Year' : 'Create Fiscal Year'}</DialogTitle>
+                <DialogDescription>
+                  {editingFY ? 'Update the fiscal year details.' : 'Define a new fiscal year for this organization.'}
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={editingFY ? handleUpdateFY : handleCreateFY} className="space-y-4">
+                <div>
+                  <Label>Name</Label>
+                  <Input
+                    value={newFY.name}
+                    onChange={(e) => setNewFY({...newFY, name: e.target.value})}
+                    placeholder="e.g., FY 2024, FY 2024-2025"
+                    required
+                    data-testid="fy-name-input"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Start Date</Label>
+                    <Input
+                      type="date"
+                      value={newFY.start_date}
+                      onChange={(e) => setNewFY({...newFY, start_date: e.target.value})}
+                      required
+                      data-testid="fy-start-date"
+                    />
+                  </div>
+                  <div>
+                    <Label>End Date</Label>
+                    <Input
+                      type="date"
+                      value={newFY.end_date}
+                      onChange={(e) => setNewFY({...newFY, end_date: e.target.value})}
+                      required
+                      data-testid="fy-end-date"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setIsFYDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={fyLoading} data-testid="fy-submit-btn">
+                    {fyLoading ? 'Saving...' : (editingFY ? 'Update' : 'Create')}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Close FY Confirmation Dialog */}
+          <Dialog open={!!closeConfirmFY} onOpenChange={(open) => { if (!open) { setCloseConfirmFY(null); setCloseResult(null); } }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-amber-400" />
+                  Close Fiscal Year
+                </DialogTitle>
+                <DialogDescription>
+                  {closeResult ? 'Fiscal year has been closed successfully.' : `Are you sure you want to close "${closeConfirmFY?.name}"?`}
+                </DialogDescription>
+              </DialogHeader>
+              
+              {!closeResult ? (
+                <div className="space-y-3">
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-sm">
+                    <p className="font-medium text-amber-400 mb-1">This action will:</p>
+                    <ul className="list-disc pl-5 space-y-1 text-muted-foreground text-xs">
+                      <li>Lock the fiscal year - no new vouchers/invoices can be posted</li>
+                      <li>Generate closing entries (Revenue/Expenses to Retained Earnings)</li>
+                      <li>The closing can be reversed by a Super Admin via "Reopen"</li>
+                    </ul>
+                  </div>
+                  <div className="p-3 bg-card border rounded-lg text-xs text-muted-foreground">
+                    <p><strong>Period:</strong> {closeConfirmFY?.start_date} to {closeConfirmFY?.end_date}</p>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setCloseConfirmFY(null)}>Cancel</Button>
+                    <Button 
+                      className="bg-amber-500 hover:bg-amber-600 text-black"
+                      onClick={handleCloseFY}
+                      disabled={closingFY}
+                      data-testid="confirm-close-fy"
+                    >
+                      {closingFY ? 'Closing...' : 'Close Fiscal Year'}
+                    </Button>
+                  </DialogFooter>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-sm">
+                    <p className="font-medium text-emerald-400 mb-2">Closing Summary</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                      <p>Revenue (LBP):</p>
+                      <p className="text-right font-mono">{closeResult.revenue_total_lbp?.toLocaleString()}</p>
+                      <p>Revenue (USD):</p>
+                      <p className="text-right font-mono">${closeResult.revenue_total_usd?.toLocaleString()}</p>
+                      <p>Expenses (LBP):</p>
+                      <p className="text-right font-mono">{closeResult.expense_total_lbp?.toLocaleString()}</p>
+                      <p>Expenses (USD):</p>
+                      <p className="text-right font-mono">${closeResult.expense_total_usd?.toLocaleString()}</p>
+                      <div className="col-span-2 border-t pt-1 mt-1"></div>
+                      <p className="font-medium">Net Income (LBP):</p>
+                      <p className={`text-right font-mono font-medium ${closeResult.net_income_lbp >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {closeResult.net_income_lbp?.toLocaleString()}
+                      </p>
+                      <p className="font-medium">Net Income (USD):</p>
+                      <p className={`text-right font-mono font-medium ${closeResult.net_income_usd >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        ${closeResult.net_income_usd?.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={() => { setCloseConfirmFY(null); setCloseResult(null); }}>Done</Button>
+                  </DialogFooter>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete FY Confirmation Dialog */}
+          <Dialog open={!!deleteFYConfirm} onOpenChange={(open) => { if (!open) setDeleteFYConfirm(null); }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete Fiscal Year</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete "{deleteFYConfirm?.name}"? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteFYConfirm(null)}>Cancel</Button>
+                <Button variant="destructive" onClick={handleDeleteFY} data-testid="confirm-delete-fy">Delete</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
         {/* Service Items Tab */}
         <TabsContent value="services" className="space-y-4">
           <ServiceManagement />
