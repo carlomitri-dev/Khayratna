@@ -35,7 +35,8 @@ from models.schemas import (
     VoucherLine, VoucherCreate, VoucherResponse,
     ExchangeRateCreate, ExchangeRateResponse,
     ImageArchiveResponse, CrDbNoteCreate, CrDbNoteResponse,
-    BackupResponse, RestoreResponse, CSVPreviewRow, CSVPreviewResponse, CSVImportResult
+    BackupResponse, RestoreResponse, CSVPreviewRow, CSVPreviewResponse, CSVImportResult,
+    FiscalYearCreate, FiscalYearUpdate, FiscalYearResponse, FiscalYearCloseResponse
 )
 
 # Create uploads directory
