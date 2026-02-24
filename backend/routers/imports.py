@@ -243,6 +243,16 @@ async def import_vouchers(
     
     logger.info(f"Import: {row_count} rows, {len(voucher_groups)} vouchers to process")
     
+    # Step 1b: Load fiscal year date range if specified
+    fy_start = None
+    fy_end = None
+    if fiscal_year_id and fiscal_year_id != 'none':
+        fy = await db.fiscal_years.find_one({'id': fiscal_year_id}, {'_id': 0})
+        if fy:
+            fy_start = fy['start_date']
+            fy_end = fy['end_date']
+            logger.info(f"FY filter active: {fy['name']} ({fy_start} to {fy_end})")
+    
     # Step 2: Get current voucher sequence number
     last_voucher = await db.vouchers.find(
         {'organization_id': organization_id, 'voucher_type': 'JV'},
