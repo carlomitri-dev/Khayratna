@@ -124,18 +124,24 @@ async def import_chart_of_accounts(
             region_id = str(row[18]).strip() if len(row) > 18 and row[18] else ''
             
             if is_supplier or is_customer:
-                contact = {
+                # Store contact fields as TOP-LEVEL fields (matching existing app schema)
+                account_doc['mobile'] = phone_field
+                account_doc['address'] = address_field
+                account_doc['contact_person'] = name_field or account_name
+                if regno_field and regno_field != '0':
+                    account_doc['registration_number'] = regno_field
+                if is_customer and region_id and region_id != '0':
+                    account_doc['region_id'] = region_id
+                # Also keep contact_info for backward compat
+                account_doc['contact_info'] = {
                     'name': name_field or account_name,
                     'address': address_field,
                     'phone': phone_field,
                     'is_supplier': is_supplier,
-                    'is_customer': is_customer
+                    'is_customer': is_customer,
+                    'registration_number': regno_field if (regno_field and regno_field != '0') else '',
+                    'region_id': region_id if (is_customer and region_id and region_id != '0') else ''
                 }
-                if regno_field and regno_field != '0':
-                    contact['registration_number'] = regno_field
-                if is_customer and region_id and region_id != '0':
-                    contact['region_id'] = region_id
-                account_doc['contact_info'] = contact
             
             accounts_to_insert.append(account_doc)
             
