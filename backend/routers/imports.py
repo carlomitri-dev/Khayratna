@@ -177,7 +177,7 @@ async def import_chart_of_accounts(
             is_customer = code.startswith('41') and len(code) > 4
             
             # Region ID for customers (col 18 = REG_ID)
-            region_id = str(row[18]).strip() if len(row) > 18 and row[18] else ''
+            region_id = str(get_col(row, 'reg_id', 18)).strip()
             
             if is_supplier or is_customer:
                 # Store contact fields as TOP-LEVEL fields (matching existing app schema)
