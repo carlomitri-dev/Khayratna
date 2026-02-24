@@ -2171,6 +2171,392 @@ async def get_general_ledger(account_code: str, organization_id: str, current_us
     }
 
 '''
+
+# ================== FISCAL YEAR MANAGEMENT ==================
+
+async def validate_fy_no_overlap(org_id: str, start_date: str, end_date: str, exclude_fy_id: str = None):
+    """Check that no other FY for this org overlaps the given date range"""
+    query = {
+        'organization_id': org_id,
+        '$or': [
+            {'start_date': {'$lte': end_date}, 'end_date': {'$gte': start_date}},
+        ]
+    }
+    if exclude_fy_id:
+        query['id'] = {'$ne': exclude_fy_id}
+    overlap = await db.fiscal_years.find_one(query)
+    if overlap:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Date range overlaps with existing fiscal year '{overlap['name']}' ({overlap['start_date']} to {overlap['end_date']})"
+        )
+
+async def get_open_fy_for_date(org_id: str, date_str: str):
+    """Find an open FY that contains the given date. Returns None if no FY exists (backward compat) or raises if FY exists but date outside open FY."""
+    # Check if org has any fiscal years at all
+    fy_count = await db.fiscal_years.count_documents({'organization_id': org_id})
+    if fy_count == 0:
+        return None  # No FY defined yet - allow posting (backward compatibility)
+    
+    # Find FY containing this date
+    fy = await db.fiscal_years.find_one({
+        'organization_id': org_id,
+        'start_date': {'$lte': date_str},
+        'end_date': {'$gte': date_str}
+    })
+    
+    if not fy:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Date {date_str} does not fall within any defined fiscal year for this organization."
+        )
+    
+    if fy['status'] == 'closed':
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot post to closed fiscal year '{fy['name']}' ({fy['start_date']} to {fy['end_date']}). The fiscal year is locked."
+        )
+    
+    return fy
+
+@api_router.post("/fiscal-years", response_model=FiscalYearResponse)
+async def create_fiscal_year(fy_data: FiscalYearCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new fiscal year for an organization"""
+    if current_user['role'] not in ['super_admin', 'admin']:
+        raise HTTPException(status_code=403, detail="Only admins can manage fiscal years")
+    
+    # Validate dates
+    try:
+        start = datetime.strptime(fy_data.start_date, '%Y-%m-%d')
+        end = datetime.strptime(fy_data.end_date, '%Y-%m-%d')
+        if end <= start:
+            raise HTTPException(status_code=400, detail="End date must be after start date")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    
+    # Check for overlapping fiscal years
+    await validate_fy_no_overlap(fy_data.organization_id, fy_data.start_date, fy_data.end_date)
+    
+    fy_id = str(uuid.uuid4())
+    fy_doc = {
+        'id': fy_id,
+        'name': fy_data.name,
+        'start_date': fy_data.start_date,
+        'end_date': fy_data.end_date,
+        'status': 'open',
+        'organization_id': fy_data.organization_id,
+        'closed_at': None,
+        'closed_by': None,
+        'closing_voucher_id': None,
+        'created_at': datetime.now(timezone.utc).isoformat()
+    }
+    await db.fiscal_years.insert_one(fy_doc)
+    return FiscalYearResponse(**fy_doc)
+
+@api_router.get("/fiscal-years", response_model=List[FiscalYearResponse])
+async def get_fiscal_years(organization_id: str, current_user: dict = Depends(get_current_user)):
+    """Get all fiscal years for an organization"""
+    fiscal_years = await db.fiscal_years.find(
+        {'organization_id': organization_id},
+        {'_id': 0}
+    ).sort('start_date', -1).to_list(100)
+    return [FiscalYearResponse(**fy) for fy in fiscal_years]
+
+@api_router.get("/fiscal-years/{fy_id}", response_model=FiscalYearResponse)
+async def get_fiscal_year(fy_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a single fiscal year"""
+    fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+    if not fy:
+        raise HTTPException(status_code=404, detail="Fiscal year not found")
+    return FiscalYearResponse(**fy)
+
+@api_router.put("/fiscal-years/{fy_id}", response_model=FiscalYearResponse)
+async def update_fiscal_year(fy_id: str, fy_data: FiscalYearUpdate, current_user: dict = Depends(get_current_user)):
+    """Update a fiscal year (only if open)"""
+    if current_user['role'] not in ['super_admin', 'admin']:
+        raise HTTPException(status_code=403, detail="Only admins can manage fiscal years")
+    
+    fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+    if not fy:
+        raise HTTPException(status_code=404, detail="Fiscal year not found")
+    
+    if fy['status'] == 'closed':
+        raise HTTPException(status_code=400, detail="Cannot edit a closed fiscal year")
+    
+    update_data = {k: v for k, v in fy_data.model_dump().items() if v is not None}
+    
+    if update_data:
+        # If dates are changing, validate no overlap
+        new_start = update_data.get('start_date', fy['start_date'])
+        new_end = update_data.get('end_date', fy['end_date'])
+        
+        if 'start_date' in update_data or 'end_date' in update_data:
+            try:
+                s = datetime.strptime(new_start, '%Y-%m-%d')
+                e = datetime.strptime(new_end, '%Y-%m-%d')
+                if e <= s:
+                    raise HTTPException(status_code=400, detail="End date must be after start date")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+            
+            await validate_fy_no_overlap(fy['organization_id'], new_start, new_end, exclude_fy_id=fy_id)
+        
+        await db.fiscal_years.update_one({'id': fy_id}, {'$set': update_data})
+    
+    updated_fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+    return FiscalYearResponse(**updated_fy)
+
+@api_router.delete("/fiscal-years/{fy_id}")
+async def delete_fiscal_year(fy_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a fiscal year (only if open and no posted vouchers in range)"""
+    if current_user['role'] not in ['super_admin', 'admin']:
+        raise HTTPException(status_code=403, detail="Only admins can manage fiscal years")
+    
+    fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+    if not fy:
+        raise HTTPException(status_code=404, detail="Fiscal year not found")
+    
+    if fy['status'] == 'closed':
+        raise HTTPException(status_code=400, detail="Cannot delete a closed fiscal year")
+    
+    # Check if any posted vouchers exist in this FY range
+    voucher_count = await db.vouchers.count_documents({
+        'organization_id': fy['organization_id'],
+        'is_posted': True,
+        'date': {'$gte': fy['start_date'], '$lte': fy['end_date']}
+    })
+    
+    if voucher_count > 0:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot delete fiscal year with {voucher_count} posted voucher(s). Unpost or move vouchers first."
+        )
+    
+    await db.fiscal_years.delete_one({'id': fy_id})
+    return {"message": "Fiscal year deleted successfully"}
+
+@api_router.post("/fiscal-years/{fy_id}/close", response_model=FiscalYearCloseResponse)
+async def close_fiscal_year(fy_id: str, current_user: dict = Depends(get_current_user)):
+    """Close a fiscal year - generates closing entries and locks the FY"""
+    if current_user['role'] not in ['super_admin', 'admin']:
+        raise HTTPException(status_code=403, detail="Only admins can close fiscal years")
+    
+    fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+    if not fy:
+        raise HTTPException(status_code=404, detail="Fiscal year not found")
+    
+    if fy['status'] == 'closed':
+        raise HTTPException(status_code=400, detail="Fiscal year is already closed")
+    
+    org_id = fy['organization_id']
+    
+    # Get all posted vouchers in this FY date range
+    vouchers_in_fy = await db.vouchers.find({
+        'organization_id': org_id,
+        'is_posted': True,
+        'date': {'$gte': fy['start_date'], '$lte': fy['end_date']}
+    }, {'_id': 0}).to_list(None)
+    
+    # Calculate P&L from voucher lines for revenue (class 7) and expense (class 6) accounts
+    # We need to sum up movements in these accounts during the FY
+    revenue_totals_lbp = 0
+    revenue_totals_usd = 0
+    expense_totals_lbp = 0
+    expense_totals_usd = 0
+    
+    for voucher in vouchers_in_fy:
+        for line in voucher.get('lines', []):
+            code = line.get('account_code', '')
+            if not code:
+                continue
+            debit_lbp = line.get('debit_lbp', 0) or 0
+            credit_lbp = line.get('credit_lbp', 0) or 0
+            debit_usd = line.get('debit_usd', 0) or 0
+            credit_usd = line.get('credit_usd', 0) or 0
+            
+            if code.startswith('7'):  # Revenue accounts (normally credit balance)
+                revenue_totals_lbp += credit_lbp - debit_lbp
+                revenue_totals_usd += credit_usd - debit_usd
+            elif code.startswith('6'):  # Expense accounts (normally debit balance)
+                expense_totals_lbp += debit_lbp - credit_lbp
+                expense_totals_usd += debit_usd - credit_usd
+    
+    net_income_lbp = revenue_totals_lbp - expense_totals_lbp
+    net_income_usd = revenue_totals_usd - expense_totals_usd
+    
+    closing_voucher_id = None
+    
+    # Only create closing voucher if there are P&L amounts to close
+    if revenue_totals_lbp != 0 or revenue_totals_usd != 0 or expense_totals_lbp != 0 or expense_totals_usd != 0:
+        # Create closing voucher
+        closing_voucher_id = str(uuid.uuid4())
+        closing_voucher_number = await generate_voucher_number('JV', org_id)
+        
+        closing_lines = []
+        
+        # Get all revenue and expense accounts with movements
+        account_movements = {}
+        for voucher in vouchers_in_fy:
+            for line in voucher.get('lines', []):
+                code = line.get('account_code', '')
+                if code.startswith('6') or code.startswith('7'):
+                    if code not in account_movements:
+                        account_movements[code] = {'lbp': 0, 'usd': 0, 'name': line.get('description', code)}
+                    debit_lbp = line.get('debit_lbp', 0) or 0
+                    credit_lbp = line.get('credit_lbp', 0) or 0
+                    debit_usd = line.get('debit_usd', 0) or 0
+                    credit_usd = line.get('credit_usd', 0) or 0
+                    account_movements[code]['lbp'] += debit_lbp - credit_lbp
+                    account_movements[code]['usd'] += debit_usd - credit_usd
+        
+        # Create lines to zero out each P&L account
+        for code, movement in account_movements.items():
+            if movement['lbp'] != 0 or movement['usd'] != 0:
+                # Reverse the movement to zero it out
+                closing_lines.append({
+                    'account_code': code,
+                    'description': f'Year-end closing - {fy["name"]}',
+                    'debit_lbp': abs(movement['lbp']) if movement['lbp'] < 0 else 0,
+                    'credit_lbp': movement['lbp'] if movement['lbp'] > 0 else 0,
+                    'debit_usd': abs(movement['usd']) if movement['usd'] < 0 else 0,
+                    'credit_usd': movement['usd'] if movement['usd'] > 0 else 0,
+                    'exchange_rate': 89500
+                })
+        
+        # Add Retained Earnings (120) line to balance
+        re_debit_lbp = 0
+        re_credit_lbp = 0
+        re_debit_usd = 0
+        re_credit_usd = 0
+        
+        for line in closing_lines:
+            re_debit_lbp += line['credit_lbp']
+            re_credit_lbp += line['debit_lbp']
+            re_debit_usd += line['credit_usd']
+            re_credit_usd += line['debit_usd']
+        
+        net_re_lbp = re_debit_lbp - re_credit_lbp
+        net_re_usd = re_debit_usd - re_credit_usd
+        
+        if net_re_lbp != 0 or net_re_usd != 0:
+            closing_lines.append({
+                'account_code': '120',
+                'description': f'Year-end closing to Retained Earnings - {fy["name"]}',
+                'debit_lbp': net_re_lbp if net_re_lbp > 0 else 0,
+                'credit_lbp': abs(net_re_lbp) if net_re_lbp < 0 else 0,
+                'debit_usd': net_re_usd if net_re_usd > 0 else 0,
+                'credit_usd': abs(net_re_usd) if net_re_usd < 0 else 0,
+                'exchange_rate': 89500
+            })
+        
+        # Calculate totals
+        total_debit_lbp = sum(l['debit_lbp'] for l in closing_lines)
+        total_credit_lbp = sum(l['credit_lbp'] for l in closing_lines)
+        total_debit_usd = sum(l['debit_usd'] for l in closing_lines)
+        total_credit_usd = sum(l['credit_usd'] for l in closing_lines)
+        
+        closing_voucher_doc = {
+            'id': closing_voucher_id,
+            'voucher_number': closing_voucher_number,
+            'voucher_type': 'JV',
+            'date': fy['end_date'],
+            'reference': f'FY-CLOSE-{fy["name"]}',
+            'description': f'Year-end closing entries for {fy["name"]}',
+            'lines': closing_lines,
+            'total_debit_lbp': total_debit_lbp,
+            'total_credit_lbp': total_credit_lbp,
+            'total_debit_usd': total_debit_usd,
+            'total_credit_usd': total_credit_usd,
+            'is_posted': True,
+            'status': 'posted',
+            'organization_id': org_id,
+            'source_type': 'fy_closing',
+            'source_id': fy_id,
+            'created_by': current_user['id'],
+            'created_at': datetime.now(timezone.utc).isoformat()
+        }
+        await db.vouchers.insert_one(closing_voucher_doc)
+        
+        # Update account balances for closing entries
+        for line in closing_lines:
+            debit_lbp = line.get('debit_lbp', 0) or 0
+            credit_lbp = line.get('credit_lbp', 0) or 0
+            debit_usd = line.get('debit_usd', 0) or 0
+            credit_usd = line.get('credit_usd', 0) or 0
+            net_lbp = debit_lbp - credit_lbp
+            net_usd = debit_usd - credit_usd
+            
+            if net_lbp != 0 or net_usd != 0:
+                await db.accounts.update_one(
+                    {'code': line['account_code'], 'organization_id': org_id},
+                    {'$inc': {'balance_lbp': net_lbp, 'balance_usd': net_usd}}
+                )
+    
+    # Mark FY as closed
+    await db.fiscal_years.update_one({'id': fy_id}, {'$set': {
+        'status': 'closed',
+        'closed_at': datetime.now(timezone.utc).isoformat(),
+        'closed_by': current_user['id'],
+        'closing_voucher_id': closing_voucher_id
+    }})
+    
+    return FiscalYearCloseResponse(
+        message=f"Fiscal year '{fy['name']}' closed successfully",
+        fiscal_year_id=fy_id,
+        closing_voucher_id=closing_voucher_id,
+        net_income_lbp=net_income_lbp,
+        net_income_usd=net_income_usd,
+        revenue_total_lbp=revenue_totals_lbp,
+        revenue_total_usd=revenue_totals_usd,
+        expense_total_lbp=expense_totals_lbp,
+        expense_total_usd=expense_totals_usd
+    )
+
+@api_router.post("/fiscal-years/{fy_id}/reopen")
+async def reopen_fiscal_year(fy_id: str, current_user: dict = Depends(get_current_user)):
+    """Reopen a closed fiscal year (super_admin only) - reverses closing entries"""
+    if current_user['role'] != 'super_admin':
+        raise HTTPException(status_code=403, detail="Only super admin can reopen fiscal years")
+    
+    fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+    if not fy:
+        raise HTTPException(status_code=404, detail="Fiscal year not found")
+    
+    if fy['status'] != 'closed':
+        raise HTTPException(status_code=400, detail="Fiscal year is not closed")
+    
+    # Remove closing voucher and reverse account updates
+    if fy.get('closing_voucher_id'):
+        closing_voucher = await db.vouchers.find_one({'id': fy['closing_voucher_id']}, {'_id': 0})
+        if closing_voucher:
+            # Reverse account balance changes
+            for line in closing_voucher.get('lines', []):
+                debit_lbp = line.get('debit_lbp', 0) or 0
+                credit_lbp = line.get('credit_lbp', 0) or 0
+                debit_usd = line.get('debit_usd', 0) or 0
+                credit_usd = line.get('credit_usd', 0) or 0
+                net_lbp = -(debit_lbp - credit_lbp)
+                net_usd = -(debit_usd - credit_usd)
+                
+                if net_lbp != 0 or net_usd != 0:
+                    await db.accounts.update_one(
+                        {'code': line['account_code'], 'organization_id': fy['organization_id']},
+                        {'$inc': {'balance_lbp': net_lbp, 'balance_usd': net_usd}}
+                    )
+            
+            await db.vouchers.delete_one({'id': fy['closing_voucher_id']})
+    
+    # Mark FY as open
+    await db.fiscal_years.update_one({'id': fy_id}, {'$set': {
+        'status': 'open',
+        'closed_at': None,
+        'closed_by': None,
+        'closing_voucher_id': None
+    }})
+    
+    return {"message": f"Fiscal year '{fy['name']}' reopened successfully"}
+
+
 # ================== SEED DATA ==================
 
 @api_router.post("/seed")
