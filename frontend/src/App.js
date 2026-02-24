@@ -202,14 +202,6 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/pos"
-        element={
-          <ProtectedRoute>
-            <POSPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
         path="/import-data"
         element={
           <ProtectedRoute>
@@ -217,17 +209,6 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/cashier-sessions"
-        element={
-          <ProtectedRoute>
-            <CashierSessionsPage />
-          </ProtectedRoute>
-        }
-      />
-      {/* Cashier Routes (No Layout) */}
-      <Route path="/cashier-login" element={<CashierLoginPage />} />
-      <Route path="/cashier-pos" element={<CashierPOSPage />} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
