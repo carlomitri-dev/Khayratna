@@ -396,3 +396,292 @@ async def import_vouchers(
         "errors": errors[:20],
         "error_count": len(errors)
     }
+
+
+# ================== CATEGORIES IMPORT ==================
+
+@router.post("/import/categories")
+async def import_categories(
+    file: UploadFile = File(...),
+    organization_id: str = Form(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Import product categories from Excel.
+    Columns: CAT_ID, NAME
+    """
+    if current_user['role'] not in ['super_admin', 'admin']:
+        raise HTTPException(status_code=403, detail="Only admins can import data")
+    
+    try:
+        import openpyxl
+    except ImportError:
+        raise HTTPException(status_code=500, detail="openpyxl not available")
+    
+    contents = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
+    ws = wb.active
+    
+    created = 0
+    updated = 0
+    errors = []
+    
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        try:
+            cat_id = str(row[0]).strip() if row[0] else ''
+            name = str(row[1]).strip() if row[1] else ''
+            if not cat_id or not name:
+                continue
+            
+            existing = await db.inventory_categories.find_one({
+                'organization_id': organization_id,
+                'cat_id': cat_id
+            })
+            
+            if existing:
+                await db.inventory_categories.update_one(
+                    {'_id': existing['_id']},
+                    {'$set': {'name': name}}
+                )
+                updated += 1
+            else:
+                await db.inventory_categories.insert_one({
+                    'id': str(uuid.uuid4()),
+                    'cat_id': cat_id,
+                    'name': name,
+                    'organization_id': organization_id,
+                    'created_at': datetime.now(timezone.utc).isoformat()
+                })
+                created += 1
+        except Exception as e:
+            errors.append(str(e))
+    
+    wb.close()
+    
+    return {
+        "message": "Categories imported successfully",
+        "created": created,
+        "updated": updated,
+        "errors": errors[:20],
+        "error_count": len(errors)
+    }
+
+
+# ================== REGIONS IMPORT ==================
+
+@router.post("/import/regions")
+async def import_regions(
+    file: UploadFile = File(...),
+    organization_id: str = Form(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Import regions from Excel.
+    Columns: REG_ID, NAME
+    """
+    if current_user['role'] not in ['super_admin', 'admin']:
+        raise HTTPException(status_code=403, detail="Only admins can import data")
+    
+    try:
+        import openpyxl
+    except ImportError:
+        raise HTTPException(status_code=500, detail="openpyxl not available")
+    
+    contents = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
+    ws = wb.active
+    
+    created = 0
+    updated = 0
+    errors = []
+    
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        try:
+            reg_id = str(row[0]).strip() if row[0] else ''
+            name = str(row[1]).strip() if row[1] else ''
+            if not reg_id or not name:
+                continue
+            
+            existing = await db.regions.find_one({
+                'organization_id': organization_id,
+                'reg_id': reg_id
+            })
+            
+            if existing:
+                await db.regions.update_one(
+                    {'_id': existing['_id']},
+                    {'$set': {'name': name}}
+                )
+                updated += 1
+            else:
+                await db.regions.insert_one({
+                    'id': str(uuid.uuid4()),
+                    'reg_id': reg_id,
+                    'name': name,
+                    'organization_id': organization_id,
+                    'created_at': datetime.now(timezone.utc).isoformat()
+                })
+                created += 1
+        except Exception as e:
+            errors.append(str(e))
+    
+    wb.close()
+    
+    return {
+        "message": "Regions imported successfully",
+        "created": created,
+        "updated": updated,
+        "errors": errors[:20],
+        "error_count": len(errors)
+    }
+
+
+# ================== INVENTORY ITEMS IMPORT ==================
+
+@router.post("/import/inventory")
+async def import_inventory(
+    file: UploadFile = File(...),
+    organization_id: str = Form(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Import inventory items from Excel.
+    Columns: كود(code), الوصف, ADESC(Arabic name), CAT_ID, SUP_ID(supplier account code),
+             PAK, PACK, PRICE, COST, ...
+    Links items to supplier (SUP_ID = account code like 40110001) and category (CAT_ID).
+    """
+    if current_user['role'] not in ['super_admin', 'admin']:
+        raise HTTPException(status_code=403, detail="Only admins can import data")
+    
+    try:
+        import openpyxl
+    except ImportError:
+        raise HTTPException(status_code=500, detail="openpyxl not available")
+    
+    contents = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
+    ws = wb.active
+    
+    # Pre-load categories and suppliers for lookup
+    categories = {}
+    async for cat in db.inventory_categories.find({'organization_id': organization_id}, {'_id': 0}):
+        categories[cat.get('cat_id', '')] = cat
+    
+    created = 0
+    updated = 0
+    errors = []
+    items_batch = []
+    
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        try:
+            item_code = str(row[0]).strip() if row[0] else ''
+            if not item_code:
+                continue
+            
+            # Column mapping from ITEMS file
+            description = str(row[1]).strip() if row[1] else ''
+            name_ar = str(row[2]).strip() if row[2] else ''
+            cat_id = str(row[3]).strip() if row[3] else ''
+            sup_id = str(row[4]).strip() if row[4] else ''  # Supplier account code (e.g., 40110001)
+            pak = row[5] if row[5] else 0
+            pack_desc = str(row[6]).strip() if row[6] else ''
+            price = float(row[7] or 0)
+            cost = float(row[8] or 0)
+            
+            # Get category name
+            cat_name = categories.get(cat_id, {}).get('name', '')
+            
+            item_name = name_ar or description or f'Item {item_code}'
+            
+            item_doc = {
+                'id': str(uuid.uuid4()),
+                'item_code': item_code,
+                'name': item_name,
+                'name_ar': name_ar,
+                'description': description,
+                'category_id': cat_id,
+                'category_name': cat_name,
+                'supplier_code': sup_id,
+                'pack_size': pak,
+                'pack_description': pack_desc,
+                'sell_price': price,
+                'cost_price': cost,
+                'on_hand_qty': 0,  # No qty on hand for now
+                'organization_id': organization_id,
+                'is_active': True,
+                'created_at': datetime.now(timezone.utc).isoformat()
+            }
+            
+            items_batch.append(item_doc)
+            
+        except Exception as e:
+            errors.append(f"Item {row[0] if row else '?'}: {str(e)}")
+            if len(errors) > 50:
+                break
+    
+    wb.close()
+    
+    # Check for existing items and insert/update
+    if items_batch:
+        existing_codes = set()
+        existing = await db.inventory_items.find(
+            {'organization_id': organization_id, 'item_code': {'$in': [i['item_code'] for i in items_batch]}},
+            {'item_code': 1, '_id': 0}
+        ).to_list(None)
+        existing_codes = {e['item_code'] for e in existing}
+        
+        new_items = []
+        for item in items_batch:
+            if item['item_code'] in existing_codes:
+                await db.inventory_items.update_one(
+                    {'item_code': item['item_code'], 'organization_id': organization_id},
+                    {'$set': {
+                        'name': item['name'],
+                        'name_ar': item['name_ar'],
+                        'category_id': item['category_id'],
+                        'category_name': item['category_name'],
+                        'supplier_code': item['supplier_code'],
+                        'sell_price': item['sell_price'],
+                        'cost_price': item['cost_price'],
+                        'pack_size': item['pack_size'],
+                        'pack_description': item['pack_description']
+                    }}
+                )
+                updated += 1
+            else:
+                new_items.append(item)
+                created += 1
+        
+        if new_items:
+            for i in range(0, len(new_items), 500):
+                batch = new_items[i:i+500]
+                await db.inventory_items.insert_many(batch)
+    
+    return {
+        "message": "Inventory imported successfully",
+        "items_created": created,
+        "items_updated": updated,
+        "total_processed": len(items_batch),
+        "errors": errors[:20],
+        "error_count": len(errors)
+    }
+
+
+# ================== GET REGIONS & CATEGORIES ==================
+
+@router.get("/regions")
+async def get_regions(organization_id: str, current_user: dict = Depends(get_current_user)):
+    """Get all regions for an organization"""
+    regions = await db.regions.find(
+        {'organization_id': organization_id}, {'_id': 0}
+    ).sort('reg_id', 1).to_list(100)
+    return regions
+
+@router.get("/categories")
+async def get_categories(organization_id: str, current_user: dict = Depends(get_current_user)):
+    """Get all categories for an organization"""
+    categories = await db.inventory_categories.find(
+        {'organization_id': organization_id}, {'_id': 0}
+    ).sort('cat_id', 1).to_list(100)
+    return categories
+
