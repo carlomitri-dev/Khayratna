@@ -107,6 +107,7 @@ const AccountSearchSelector = ({ accounts, value, onChange, loading }) => {
 
 const GeneralLedgerPage = () => {
   const { currentOrg } = useAuth();
+  const { selectedFY } = useFiscalYear();
   const [accounts, setAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState('');
   const [ledgerData, setLedgerData] = useState(null);
@@ -118,6 +119,13 @@ const GeneralLedgerPage = () => {
       fetchAccounts();
     }
   }, [currentOrg]);
+
+  // Re-fetch ledger when FY changes
+  useEffect(() => {
+    if (selectedAccount && currentOrg) {
+      fetchLedger(selectedAccount);
+    }
+  }, [selectedFY]);
 
   const fetchAccounts = async () => {
     setAccountsLoading(true);
@@ -136,7 +144,11 @@ const GeneralLedgerPage = () => {
     
     setLoading(true);
     try {
-      const response = await axios.get(`${API}/reports/general-ledger/${accountCode}?organization_id=${currentOrg.id}`);
+      const params = new URLSearchParams({ organization_id: currentOrg.id });
+      if (selectedFY?.id) {
+        params.append('fy_id', selectedFY.id);
+      }
+      const response = await axios.get(`${API}/reports/general-ledger/${accountCode}?${params.toString()}`);
       setLedgerData(response.data);
     } catch (error) {
       console.error('Failed to fetch ledger:', error);
