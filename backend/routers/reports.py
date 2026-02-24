@@ -210,9 +210,19 @@ async def get_income_statement(
     organization_id: str,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    fy_id: Optional[str] = None,  # Optional fiscal year filter
     current_user: dict = Depends(get_current_user)
 ):
-    """Get income statement (Profit & Loss)"""
+    """Get income statement (Profit & Loss). If fy_id is provided, uses FY date range."""
+    # If FY filter, use FY dates
+    fy_start = None
+    fy_end = None
+    if fy_id:
+        fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+        if fy:
+            fy_start = fy['start_date']
+            fy_end = fy['end_date']
+    
     # Get revenue accounts (class 7) and expense accounts (class 6)
     accounts = await db.accounts.find(
         {
