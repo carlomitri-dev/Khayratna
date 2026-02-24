@@ -244,6 +244,7 @@ const DocumentTemplateManager = ({ currentOrg, fetchOrganizations }) => {
 
 const SettingsPage = () => {
   const { user, organizations, currentOrg, fetchOrganizations } = useAuth();
+  const { fiscalYears, fetchFiscalYears, selectedFY } = useFiscalYear();
   const [users, setUsers] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   const [loading, setLoading] = useState(true);
