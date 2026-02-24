@@ -26,7 +26,6 @@ import {
   Truck,
   Package,
   ShoppingCart,
-  Store,
   PanelLeftClose,
   PanelLeft,
   Calendar,
