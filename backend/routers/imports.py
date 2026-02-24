@@ -693,15 +693,23 @@ async def import_inventory(
             if not item_code:
                 continue
             
-            # Column mapping from ITEMS file
-            description = str(row[1]).strip() if row[1] else ''
-            name_ar = str(row[2]).strip() if row[2] else ''
-            cat_id = str(row[3]).strip() if row[3] else ''
-            sup_id = str(row[4]).strip() if row[4] else ''  # Supplier account code (e.g., 40110001)
-            pak = int(row[5]) if row[5] else 0
-            pack_desc = str(row[6]).strip() if row[6] else ''
-            price = float(row[7] or 0)
-            cost = float(row[8] or 0)
+            # Column mapping from ITEMS file using get_col
+            desc_v = get_col(row, 'description', 1)
+            description = str(desc_v).strip() if desc_v else ''
+            name_v = get_col(row, 'name', 2)
+            name_ar = str(name_v).strip() if name_v else ''
+            cat_v = get_col(row, 'category_id', 3)
+            cat_id = str(cat_v).strip() if cat_v else ''
+            sup_v = get_col(row, 'supplier_id', 4)
+            sup_id = str(sup_v).strip() if sup_v else ''
+            pak_v = get_col(row, 'package', 5)
+            pak = int(pak_v) if pak_v else 0
+            pack_v = get_col(row, 'pack_desc', 6)
+            pack_desc = str(pack_v).strip() if pack_v else ''
+            price_v = get_col(row, 'price', 7)
+            price = float(price_v or 0)
+            cost_v = get_col(row, 'cost', 8)
+            cost = float(cost_v or 0)
             
             # Get category name
             cat_name = categories.get(cat_id, {}).get('name', '')
