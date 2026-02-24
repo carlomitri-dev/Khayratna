@@ -100,12 +100,13 @@ async def import_chart_of_accounts(
             name_field = str(row[13]).strip() if len(row) > 13 and row[13] else ''
             address_field = str(row[14]).strip() if len(row) > 14 and row[14] else ''
             phone_field = str(row[15]).strip() if len(row) > 15 and row[15] else ''
+            regno_field = str(row[27]).strip() if len(row) > 27 and row[27] else ''
             
             account_doc = {
                 'id': str(uuid.uuid4()),
                 'code': code,
                 'name': account_name,
-                'name_ar': account_name,  # Arabic name is the primary name
+                'name_ar': account_name,
                 'account_class': account_class,
                 'account_type': account_type,
                 'organization_id': organization_id,
@@ -130,6 +131,8 @@ async def import_chart_of_accounts(
                     'is_supplier': is_supplier,
                     'is_customer': is_customer
                 }
+                if regno_field and regno_field != '0':
+                    contact['registration_number'] = regno_field
                 if is_customer and region_id and region_id != '0':
                     contact['region_id'] = region_id
                 account_doc['contact_info'] = contact
