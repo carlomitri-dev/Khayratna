@@ -108,7 +108,7 @@ const DashboardPage = () => {
     if (currentOrg) {
       fetchDashboardData();
     }
-  }, [currentOrg]);
+  }, [currentOrg, selectedFY]);
 
   useEffect(() => {
     filterVouchers();
