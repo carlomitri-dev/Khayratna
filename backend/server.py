@@ -810,6 +810,7 @@ async def get_accounts(organization_id: str, fy_id: Optional[str] = None, curren
     # If FY filter, recompute balances from vouchers in that FY range
     if fy_id:
         fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+        logger.info(f"FY filter: fy_id={fy_id}, found={fy is not None}, name={fy.get('name') if fy else 'N/A'}")
         if fy:
             # Reset all balances to 0
             for acc in accounts:
