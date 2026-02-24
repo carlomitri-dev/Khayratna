@@ -119,14 +119,20 @@ async def import_chart_of_accounts(
             is_supplier = code.startswith('40') and len(code) > 4
             is_customer = code.startswith('41') and len(code) > 4
             
+            # Region ID for customers (col 18 = REG_ID)
+            region_id = str(row[18]).strip() if len(row) > 18 and row[18] else ''
+            
             if is_supplier or is_customer:
-                account_doc['contact_info'] = {
+                contact = {
                     'name': name_field or account_name,
                     'address': address_field,
                     'phone': phone_field,
                     'is_supplier': is_supplier,
                     'is_customer': is_customer
                 }
+                if is_customer and region_id and region_id != '0':
+                    contact['region_id'] = region_id
+                account_doc['contact_info'] = contact
             
             accounts_to_insert.append(account_doc)
             
