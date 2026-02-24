@@ -117,11 +117,15 @@ const DashboardPage = () => {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
+      // Build FY date filter params
+      const fyParams = selectedFY ? `&date_from=${selectedFY.start_date}&date_to=${selectedFY.end_date}` : '';
+      const fyIdParam = selectedFY ? `&fy_id=${selectedFY.id}` : '';
+      
       const [accountsRes, vouchersCountRes, vouchersRes, incomeRes, rateRes, crdbRes, archiveRes] = await Promise.all([
         axios.get(`${API}/accounts?organization_id=${currentOrg.id}`),
-        axios.get(`${API}/vouchers/count?organization_id=${currentOrg.id}`),
-        axios.get(`${API}/vouchers?organization_id=${currentOrg.id}&limit=100`),  // Get recent 100 for activity
-        axios.get(`${API}/reports/income-statement?organization_id=${currentOrg.id}`),
+        axios.get(`${API}/vouchers/count?organization_id=${currentOrg.id}${fyParams}`),
+        axios.get(`${API}/vouchers?organization_id=${currentOrg.id}&limit=100${fyParams}`),
+        axios.get(`${API}/reports/income-statement?organization_id=${currentOrg.id}${fyIdParam}`),
         axios.get(`${API}/exchange-rates/latest?organization_id=${currentOrg.id}`),
         axios.get(`${API}/crdb-notes?organization_id=${currentOrg.id}`),
         axios.get(`${API}/image-archive?organization_id=${currentOrg.id}`)
