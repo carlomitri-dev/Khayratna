@@ -2399,22 +2399,7 @@ async def close_fiscal_year(fy_id: str, current_user: dict = Depends(get_current
         
         closing_lines = []
         
-        # Get all revenue and expense accounts with movements
-        account_movements = {}
-        for voucher in vouchers_in_fy:
-            for line in voucher.get('lines', []):
-                code = line.get('account_code', '')
-                if code.startswith('6') or code.startswith('7'):
-                    if code not in account_movements:
-                        account_movements[code] = {'lbp': 0, 'usd': 0, 'name': line.get('description', code)}
-                    debit_lbp = line.get('debit_lbp', 0) or 0
-                    credit_lbp = line.get('credit_lbp', 0) or 0
-                    debit_usd = line.get('debit_usd', 0) or 0
-                    credit_usd = line.get('credit_usd', 0) or 0
-                    account_movements[code]['lbp'] += debit_lbp - credit_lbp
-                    account_movements[code]['usd'] += debit_usd - credit_usd
-        
-        # Create lines to zero out each P&L account
+        # Create lines to zero out each P&L account (using aggregated movements)
         for code, movement in account_movements.items():
             if movement['lbp'] != 0 or movement['usd'] != 0:
                 # Reverse the movement to zero it out
