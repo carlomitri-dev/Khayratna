@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SyncProvider } from './context/SyncContext';
+import { FiscalYearProvider } from './context/FiscalYearContext';
 import { Toaster } from './components/ui/sonner';
 import OfflineToast from './components/OfflineToast';
 import Layout from './components/Layout';
