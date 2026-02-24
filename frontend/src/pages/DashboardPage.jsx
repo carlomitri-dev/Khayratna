@@ -72,6 +72,7 @@ const MetricCard = ({ title, value, subValue, icon: Icon, trend, trendValue, col
 
 const DashboardPage = () => {
   const { currentOrg, user } = useAuth();
+  const { selectedFY } = useFiscalYear();
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState({
     totalAccounts: 0,
