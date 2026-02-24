@@ -817,7 +817,7 @@ const SettingsPage = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6 lg:w-[900px]">
+        <TabsList className="grid w-full grid-cols-8 lg:w-[1050px]">
           <TabsTrigger value="users" className="text-xs lg:text-sm">
             <Users className="w-4 h-4 mr-1 lg:mr-2" />
             <span className="hidden sm:inline">Users</span>
@@ -825,6 +825,10 @@ const SettingsPage = () => {
           <TabsTrigger value="organizations" className="text-xs lg:text-sm">
             <Building2 className="w-4 h-4 mr-1 lg:mr-2" />
             <span className="hidden sm:inline">Organizations</span>
+          </TabsTrigger>
+          <TabsTrigger value="fiscal-years" className="text-xs lg:text-sm" data-testid="tab-fiscal-years">
+            <Calendar className="w-4 h-4 mr-1 lg:mr-2" />
+            <span className="hidden sm:inline">Fiscal Years</span>
           </TabsTrigger>
           <TabsTrigger value="services" className="text-xs lg:text-sm">
             <Package className="w-4 h-4 mr-1 lg:mr-2" />
