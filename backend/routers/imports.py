@@ -271,6 +271,7 @@ async def import_vouchers(
     
     vouchers_created = 0
     vouchers_failed = 0
+    vouchers_skipped = 0
     lines_processed = 0
     errors = []
     
@@ -287,6 +288,12 @@ async def import_vouchers(
                 date_str = date_raw
             else:
                 date_str = '2016-01-01'  # Fallback
+            
+            # Skip vouchers outside the selected fiscal year
+            if fy_start and fy_end:
+                if date_str < fy_start or date_str > fy_end:
+                    vouchers_skipped += 1
+                    continue
             
             # Get description from first line
             description = str(rows[0][14]).strip() if rows[0][14] else f'Import TRAN-{tran_id}'
