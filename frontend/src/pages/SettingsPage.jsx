@@ -814,6 +814,99 @@ const SettingsPage = () => {
     viewer: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
   };
 
+  // =================== FISCAL YEAR HANDLERS ===================
+  const handleCreateFY = async (e) => {
+    e.preventDefault();
+    if (!currentOrg) return;
+    setFyLoading(true);
+    try {
+      await axios.post(`${API}/fiscal-years`, {
+        ...newFY,
+        organization_id: currentOrg.id
+      });
+      setNewFY({ name: '', start_date: '', end_date: '' });
+      setIsFYDialogOpen(false);
+      setEditingFY(null);
+      fetchFiscalYears();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to create fiscal year');
+    } finally {
+      setFyLoading(false);
+    }
+  };
+
+  const handleUpdateFY = async (e) => {
+    e.preventDefault();
+    if (!editingFY) return;
+    setFyLoading(true);
+    try {
+      await axios.put(`${API}/fiscal-years/${editingFY.id}`, {
+        name: newFY.name,
+        start_date: newFY.start_date,
+        end_date: newFY.end_date
+      });
+      setNewFY({ name: '', start_date: '', end_date: '' });
+      setIsFYDialogOpen(false);
+      setEditingFY(null);
+      fetchFiscalYears();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to update fiscal year');
+    } finally {
+      setFyLoading(false);
+    }
+  };
+
+  const handleDeleteFY = async () => {
+    if (!deleteFYConfirm) return;
+    try {
+      await axios.delete(`${API}/fiscal-years/${deleteFYConfirm.id}`);
+      setDeleteFYConfirm(null);
+      fetchFiscalYears();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to delete fiscal year');
+    }
+  };
+
+  const handleCloseFY = async () => {
+    if (!closeConfirmFY) return;
+    setClosingFY(true);
+    try {
+      const response = await axios.post(`${API}/fiscal-years/${closeConfirmFY.id}/close`);
+      setCloseResult(response.data);
+      fetchFiscalYears();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to close fiscal year');
+    } finally {
+      setClosingFY(false);
+    }
+  };
+
+  const handleReopenFY = async (fy) => {
+    if (!window.confirm(`Are you sure you want to reopen fiscal year "${fy.name}"? This will reverse closing entries.`)) return;
+    try {
+      await axios.post(`${API}/fiscal-years/${fy.id}/reopen`);
+      fetchFiscalYears();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to reopen fiscal year');
+    }
+  };
+
+  const openEditFY = (fy) => {
+    setEditingFY(fy);
+    setNewFY({
+      name: fy.name,
+      start_date: fy.start_date,
+      end_date: fy.end_date
+    });
+    setIsFYDialogOpen(true);
+  };
+
+  const openCreateFY = () => {
+    setEditingFY(null);
+    setNewFY({ name: '', start_date: '', end_date: '' });
+    setIsFYDialogOpen(true);
+  };
+
   if (user?.role !== 'super_admin') {
     return (
       <div className="flex items-center justify-center h-64">
