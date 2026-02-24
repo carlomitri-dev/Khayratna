@@ -2181,8 +2181,8 @@ async def seed_demo_data():
     if existing_org:
         return {
             "message": "Demo data already exists",
-            "admin_email": "admin@lebfinance.com",
-            "admin_password": "admin123"
+            "admin_email": "carlo.mitri@gmail.com",
+            "admin_password": "Carinemi@28"
         }
     
     # Create organizations
@@ -2211,8 +2211,8 @@ async def seed_demo_data():
     admin_id = str(uuid.uuid4())
     admin_user = {
         'id': admin_id,
-        'email': 'admin@lebfinance.com',
-        'password': hash_password('admin123'),
+        'email': 'carlo.mitri@gmail.com',
+        'password': hash_password('Carinemi@28'),
         'name': 'Super Admin',
         'role': 'super_admin',
         'organization_id': org1_id,
