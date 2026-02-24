@@ -620,7 +620,7 @@ async def import_inventory(
                 'category_id': cat_id,
                 'category_name': cat_name,
                 'supplier_code': sup_id,
-                'pack_size': pak,
+                'package': pak,
                 'pack_description': pack_desc,
                 'sell_price': price,
                 'cost_price': cost,
