@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useFiscalYear } from '../context/FiscalYearContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { TrendingUp, TrendingDown, Download, Printer } from 'lucide-react';
@@ -11,6 +12,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const IncomeStatementPage = () => {
   const { currentOrg } = useAuth();
+  const { selectedFY } = useFiscalYear();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -18,12 +20,16 @@ const IncomeStatementPage = () => {
     if (currentOrg) {
       fetchIncomeStatement();
     }
-  }, [currentOrg]);
+  }, [currentOrg, selectedFY]);
 
   const fetchIncomeStatement = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API}/reports/income-statement?organization_id=${currentOrg.id}`);
+      const params = new URLSearchParams({ organization_id: currentOrg.id });
+      if (selectedFY?.id) {
+        params.append('fy_id', selectedFY.id);
+      }
+      const response = await axios.get(`${API}/reports/income-statement?${params.toString()}`);
       setData(response.data);
     } catch (error) {
       console.error('Failed to fetch income statement:', error);
