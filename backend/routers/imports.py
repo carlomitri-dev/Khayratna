@@ -635,15 +635,21 @@ async def import_inventory(
                 'name_ar': name_ar,
                 'description': description,
                 'category_id': cat_id,
+                'category': cat_name,
                 'category_name': cat_name,
-                'supplier_code': sup_id,
+                'supplier_id': sup_id,
+                'supplier_name': '',
                 'package': pak,
                 'pack_description': pack_desc,
-                'sell_price': price,
-                'cost_price': cost,
-                'on_hand_qty': 0,  # No qty on hand for now
-                'organization_id': organization_id,
+                'price': price,
+                'cost': cost,
+                'currency': 'USD',
+                'unit': 'piece',
+                'min_qty': 0,
+                'on_hand_qty': 0,
                 'is_active': True,
+                'is_taxable': True,
+                'organization_id': organization_id,
                 'created_at': datetime.now(timezone.utc).isoformat()
             }
             
