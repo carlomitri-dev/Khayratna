@@ -142,6 +142,7 @@ const UsedItemSelector = ({ items, value, onChange, placeholder = "Search parts.
 
 const SalesInvoicePage = () => {
   const { currentOrg, user, fetchOrganizations } = useAuth();
+  const { selectedFY } = useFiscalYear();
   const { isOnline, updatePendingCount } = useSync();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
