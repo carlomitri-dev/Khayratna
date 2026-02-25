@@ -690,10 +690,15 @@ async def import_inventory(
     
     def get_col(row, field_name, default_idx):
         idx = mapping.get(field_name, default_idx) if mapping else default_idx
-        if idx is None or idx < 0 or idx == '':
+        if idx is None or idx == '' or idx == '-1':
             return None
-        idx = int(idx)
-        return row[idx] if len(row) > idx and row[idx] is not None else None
+        try:
+            idx = int(idx)
+        except (ValueError, TypeError):
+            return None
+        if idx < 0 or idx >= len(row):
+            return None
+        return row[idx] if row[idx] is not None else None
     
     contents = await file.read()
     wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
