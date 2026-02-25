@@ -281,17 +281,37 @@ async def delete_account(account_id: str, current_user: dict = Depends(get_curre
 # ================== CUSTOMER/SUPPLIER SHORTCUTS ==================
 
 @router.get("/customers", response_model=List[AccountResponse])
-async def get_customers(organization_id: str, fy_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
-    """Get customer accounts (code starts with 41 and length > 4)"""
-    accounts = await db.accounts.find(
-        {
-            'organization_id': organization_id,
-            'code': {'$regex': '^41'},
-            'is_active': True,
-            '$expr': {'$gt': [{'$strLenCP': '$code'}, 4]}
-        },
-        {'_id': 0}
-    ).sort('code', 1).to_list(None)
+async def get_customers(
+    organization_id: str, 
+    fy_id: Optional[str] = None,
+    search: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get customer accounts with pagination and search"""
+    query = {
+        'organization_id': organization_id,
+        'code': {'$regex': '^41'},
+        '$expr': {'$gt': [{'$strLenCP': '$code'}, 4]}
+    }
+    
+    if search:
+        search_regex = {'$regex': search, '$options': 'i'}
+        query['$or'] = [
+            {'name': search_regex},
+            {'name_ar': search_regex},
+            {'code': search_regex},
+            {'mobile': search_regex},
+            {'address': search_regex},
+            {'contact_person': search_regex}
+        ]
+        # Remove the $expr when using $or at top level
+        del query['$expr']
+        query['code'] = {'$regex': '^41.{4,}'}  # Use regex instead of $expr
+    
+    total = await db.accounts.count_documents(query)
+    accounts = await db.accounts.find(query, {'_id': 0}).sort('code', 1).skip(skip).limit(limit).to_list(limit)
     
     for acc in accounts:
         acc.setdefault('balance_lbp', 0)
@@ -310,10 +330,11 @@ async def get_customers(organization_id: str, fy_id: Optional[str] = None, curre
             for a in accounts:
                 a['balance_lbp'] = 0
                 a['balance_usd'] = 0
+            codes = [a['code'] for a in accounts]
             pipeline = [
                 {'$match': {'organization_id': organization_id, 'is_posted': True, 'date': {'$gte': fy['start_date'], '$lte': fy['end_date']}}},
                 {'$unwind': '$lines'},
-                {'$match': {'lines.account_code': {'$regex': '^41'}}},
+                {'$match': {'lines.account_code': {'$in': codes}}},
                 {'$group': {'_id': '$lines.account_code', 'dr_lbp': {'$sum': {'$ifNull': ['$lines.debit_lbp', 0]}}, 'cr_lbp': {'$sum': {'$ifNull': ['$lines.credit_lbp', 0]}}, 'dr_usd': {'$sum': {'$ifNull': ['$lines.debit_usd', 0]}}, 'cr_usd': {'$sum': {'$ifNull': ['$lines.credit_usd', 0]}}}}
             ]
             async for r in db.vouchers.aggregate(pipeline):
@@ -321,21 +342,47 @@ async def get_customers(organization_id: str, fy_id: Optional[str] = None, curre
                     acc_lookup[r['_id']]['balance_lbp'] = r['dr_lbp'] - r['cr_lbp']
                     acc_lookup[r['_id']]['balance_usd'] = r['dr_usd'] - r['cr_usd']
     
-    return [AccountResponse(**acc) for acc in accounts]
+    return accounts
+
+
+@router.get("/customers/count")
+async def get_customers_count(organization_id: str, search: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    query = {'organization_id': organization_id, 'code': {'$regex': '^41.{4,}'}}
+    if search:
+        sr = {'$regex': search, '$options': 'i'}
+        query['$or'] = [{'name': sr}, {'name_ar': sr}, {'code': sr}, {'mobile': sr}]
+    return {"count": await db.accounts.count_documents(query)}
 
 
 @router.get("/suppliers", response_model=List[AccountResponse])
-async def get_suppliers(organization_id: str, fy_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
-    """Get supplier accounts (code starts with 40 and length > 4)"""
-    accounts = await db.accounts.find(
-        {
-            'organization_id': organization_id,
-            'code': {'$regex': '^40'},
-            'is_active': True,
-            '$expr': {'$gt': [{'$strLenCP': '$code'}, 4]}
-        },
-        {'_id': 0}
-    ).sort('code', 1).to_list(None)
+async def get_suppliers(
+    organization_id: str, 
+    fy_id: Optional[str] = None,
+    search: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get supplier accounts with pagination and search"""
+    query = {
+        'organization_id': organization_id,
+        'code': {'$regex': '^40'},
+        '$expr': {'$gt': [{'$strLenCP': '$code'}, 4]}
+    }
+    
+    if search:
+        search_regex = {'$regex': search, '$options': 'i'}
+        query['$or'] = [
+            {'name': search_regex},
+            {'name_ar': search_regex},
+            {'code': search_regex},
+            {'mobile': search_regex}
+        ]
+        del query['$expr']
+        query['code'] = {'$regex': '^40.{4,}'}
+    
+    total = await db.accounts.count_documents(query)
+    accounts = await db.accounts.find(query, {'_id': 0}).sort('code', 1).skip(skip).limit(limit).to_list(limit)
     
     for acc in accounts:
         acc.setdefault('balance_lbp', 0)
@@ -354,10 +401,11 @@ async def get_suppliers(organization_id: str, fy_id: Optional[str] = None, curre
             for a in accounts:
                 a['balance_lbp'] = 0
                 a['balance_usd'] = 0
+            codes = [a['code'] for a in accounts]
             pipeline = [
                 {'$match': {'organization_id': organization_id, 'is_posted': True, 'date': {'$gte': fy['start_date'], '$lte': fy['end_date']}}},
                 {'$unwind': '$lines'},
-                {'$match': {'lines.account_code': {'$regex': '^40'}}},
+                {'$match': {'lines.account_code': {'$in': codes}}},
                 {'$group': {'_id': '$lines.account_code', 'dr_lbp': {'$sum': {'$ifNull': ['$lines.debit_lbp', 0]}}, 'cr_lbp': {'$sum': {'$ifNull': ['$lines.credit_lbp', 0]}}, 'dr_usd': {'$sum': {'$ifNull': ['$lines.debit_usd', 0]}}, 'cr_usd': {'$sum': {'$ifNull': ['$lines.credit_usd', 0]}}}}
             ]
             async for r in db.vouchers.aggregate(pipeline):
@@ -365,7 +413,16 @@ async def get_suppliers(organization_id: str, fy_id: Optional[str] = None, curre
                     acc_lookup[r['_id']]['balance_lbp'] = r['dr_lbp'] - r['cr_lbp']
                     acc_lookup[r['_id']]['balance_usd'] = r['dr_usd'] - r['cr_usd']
     
-    return [AccountResponse(**acc) for acc in accounts]
+    return accounts
+
+
+@router.get("/suppliers/count")
+async def get_suppliers_count(organization_id: str, search: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    query = {'organization_id': organization_id, 'code': {'$regex': '^40.{4,}'}}
+    if search:
+        sr = {'$regex': search, '$options': 'i'}
+        query['$or'] = [{'name': sr}, {'name_ar': sr}, {'code': sr}, {'mobile': sr}]
+    return {"count": await db.accounts.count_documents(query)}
 
 
 @router.put("/accounts/{account_id}/contact-info", response_model=AccountResponse)
