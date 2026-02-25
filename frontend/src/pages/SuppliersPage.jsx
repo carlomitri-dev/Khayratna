@@ -105,8 +105,12 @@ const SuppliersPage = () => {
       }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
+
+  const handleLoadMore = () => fetchSuppliers(false);
+  const hasMore = suppliers.length < totalCount;
 
   const handleUpdateContact = async () => {
     if (!editSupplier) return;
