@@ -299,10 +299,15 @@ async def import_vouchers(
     
     def get_col(row, field_name, default_idx):
         idx = mapping.get(field_name, default_idx) if mapping else default_idx
-        if idx is None or idx < 0 or idx == '':
+        if idx is None or idx == '' or idx == '-1':
             return None
-        idx = int(idx)
-        return row[idx] if len(row) > idx else None
+        try:
+            idx = int(idx)
+        except (ValueError, TypeError):
+            return None
+        if idx < 0 or idx >= len(row):
+            return None
+        return row[idx] if row[idx] is not None else None
     
     # Read the file
     contents = await file.read()
