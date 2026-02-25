@@ -461,22 +461,35 @@ async def import_vouchers(
             if len(errors) > 50:
                 break
     
-    # Step 4: Batch insert vouchers
+    # Step 4: Batch insert vouchers (skip existing by source_id)
+    vouchers_duplicate = 0
     if voucher_docs:
-        for i in range(0, len(voucher_docs), 500):
-            batch = voucher_docs[i:i+500]
-            await db.vouchers.insert_many(batch)
+        # Check for existing vouchers by source_id to avoid duplicates on reimport
+        existing_source_ids = set()
+        existing = await db.vouchers.find(
+            {'organization_id': organization_id, 'source_id': {'$in': [v['source_id'] for v in voucher_docs]}},
+            {'source_id': 1, '_id': 0}
+        ).to_list(None)
+        existing_source_ids = {e['source_id'] for e in existing}
+        
+        new_vouchers = [v for v in voucher_docs if v['source_id'] not in existing_source_ids]
+        vouchers_duplicate = len(voucher_docs) - len(new_vouchers)
+        
+        if new_vouchers:
+            for i in range(0, len(new_vouchers), 500):
+                batch = new_vouchers[i:i+500]
+                await db.vouchers.insert_many(batch)
+    else:
+        new_vouchers = []
     
-    # Step 5: Update account balances from posted vouchers
-    # Aggregate balance changes per account
+    # Step 5: Update account balances from NEW posted vouchers only
     balance_updates = defaultdict(lambda: {'lbp': 0, 'usd': 0})
-    for voucher in voucher_docs:
+    for voucher in new_vouchers:
         for line in voucher['lines']:
             code = line['account_code']
             balance_updates[code]['lbp'] += line['debit_lbp'] - line['credit_lbp']
             balance_updates[code]['usd'] += line['debit_usd'] - line['credit_usd']
     
-    # Apply balance updates
     accounts_updated = 0
     for code, deltas in balance_updates.items():
         if deltas['lbp'] != 0 or deltas['usd'] != 0:
@@ -489,8 +502,9 @@ async def import_vouchers(
     
     return {
         "message": "Voucher history imported successfully",
-        "vouchers_created": vouchers_created,
+        "vouchers_created": len(new_vouchers),
         "vouchers_skipped": vouchers_skipped,
+        "vouchers_duplicate": vouchers_duplicate,
         "vouchers_failed": vouchers_failed,
         "lines_processed": lines_processed,
         "accounts_balance_updated": accounts_updated,
