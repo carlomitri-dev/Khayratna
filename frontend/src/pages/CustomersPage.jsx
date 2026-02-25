@@ -105,8 +105,12 @@ const CustomersPage = () => {
       }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
+
+  const handleLoadMore = () => fetchCustomers(false);
+  const hasMore = customers.length < totalCount;
 
   const handleUpdateContact = async () => {
     if (!editCustomer) return;
@@ -122,19 +126,14 @@ const CustomersPage = () => {
       
       alert('Customer information updated successfully!');
       setEditCustomer(null);
-      fetchCustomers();
+      fetchCustomers(true);
     } catch (error) {
       alert(error.response?.data?.detail || 'Failed to update customer');
     }
   };
 
-  const filteredCustomers = customers.filter(c => 
-    c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (c.name_ar && c.name_ar.includes(searchTerm)) ||
-    (c.contact_person && c.contact_person.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (c.mobile && c.mobile.includes(searchTerm))
-  );
+  // Server-side search - no client-side filter needed
+  const filteredCustomers = customers;
 
   const canEdit = user?.role === 'super_admin' || user?.role === 'admin' || user?.role === 'accountant';
 
