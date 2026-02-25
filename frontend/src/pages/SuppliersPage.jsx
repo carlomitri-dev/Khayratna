@@ -126,19 +126,13 @@ const SuppliersPage = () => {
       
       alert('Supplier information updated successfully!');
       setEditSupplier(null);
-      fetchSuppliers();
+      fetchSuppliers(true);
     } catch (error) {
       alert(error.response?.data?.detail || 'Failed to update supplier');
     }
   };
 
-  const filteredSuppliers = suppliers.filter(s => 
-    s.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (s.name_ar && s.name_ar.includes(searchTerm)) ||
-    (s.contact_person && s.contact_person.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (s.mobile && s.mobile.includes(searchTerm))
-  );
+  const filteredSuppliers = suppliers;
 
   const canEdit = user?.role === 'super_admin' || user?.role === 'admin' || user?.role === 'accountant';
 
