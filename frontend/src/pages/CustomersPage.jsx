@@ -308,6 +308,15 @@ const CustomersPage = () => {
                   </tbody>
                 </table>
               </div>
+              
+              {/* Load More */}
+              {hasMore && (
+                <div className="text-center py-4">
+                  <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={loadingMore}>
+                    {loadingMore ? 'Loading...' : `Load More (${customers.length} of ${totalCount})`}
+                  </Button>
+                </div>
+              )}
             </>
           )}
         </CardContent>
