@@ -8524,6 +8524,23 @@ async def create_indexes():
         # Exchange rates
         await db.exchange_rates.create_index([("organization_id", 1), ("date", -1)])
         
+        # Customer/Supplier specific indexes (for fast code-prefix queries)
+        await db.accounts.create_index([("organization_id", 1), ("code", 1), ("is_active", 1)])
+        await db.accounts.create_index([("organization_id", 1), ("name", 1)])
+        
+        # Inventory indexes
+        await db.inventory_items.create_index([("organization_id", 1), ("item_code", 1)], unique=True, sparse=True)
+        await db.inventory_items.create_index([("organization_id", 1), ("name", 1)])
+        await db.inventory_items.create_index([("organization_id", 1), ("category_id", 1)])
+        await db.inventory_items.create_index([("organization_id", 1), ("supplier_id", 1)])
+        
+        # Categories & Regions indexes
+        await db.inventory_categories.create_index([("organization_id", 1), ("cat_id", 1)], unique=True, sparse=True)
+        await db.regions.create_index([("organization_id", 1), ("reg_id", 1)], unique=True, sparse=True)
+        
+        # Voucher source_id for duplicate detection on reimport
+        await db.vouchers.create_index([("organization_id", 1), ("source_id", 1)])
+        
         logger.info("Database indexes created successfully")
     except Exception as e:
         logger.warning(f"Index creation warning (may already exist): {e}")
