@@ -1,14 +1,14 @@
 [
   {
     "content": "Add MongoDB indexes for customers/suppliers + pagination to accounts endpoints",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Add pagination to Customers and Suppliers frontend pages",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update all imports to upsert (COA, Customers, Suppliers, Inventory, Vouchers)",
-    "status": "pending"
+    "status": "completed"
   }
 ]
