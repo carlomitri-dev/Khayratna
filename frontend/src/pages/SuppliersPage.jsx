@@ -33,25 +33,48 @@ const SuppliersPage = () => {
   const { isOnline } = useSync();
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewSupplier, setViewSupplier] = useState(null);
   const [editSupplier, setEditSupplier] = useState(null);
   const [ledgerAccount, setLedgerAccount] = useState(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const PAGE_SIZE = 50;
 
   useEffect(() => {
     if (currentOrg) {
-      fetchSuppliers();
+      setCurrentPage(0);
+      fetchSuppliers(true);
     }
-  }, [currentOrg, isOnline, selectedFY]);
+  }, [currentOrg, isOnline, selectedFY, searchTerm]);
 
-  const fetchSuppliers = async () => {
-    setLoading(true);
+  const fetchSuppliers = async (reset = false) => {
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
     try {
       if (isOnline) {
-        const params = new URLSearchParams({ organization_id: currentOrg.id });
+        const params = new URLSearchParams({ 
+          organization_id: currentOrg.id,
+          skip: reset ? 0 : currentPage * PAGE_SIZE,
+          limit: PAGE_SIZE
+        });
         if (selectedFY?.id) params.append('fy_id', selectedFY.id);
-        const response = await axios.get(`${API}/suppliers?${params.toString()}`);
-        setSuppliers(response.data);
+        if (searchTerm) params.append('search', searchTerm);
+        
+        const [dataRes, countRes] = await Promise.all([
+          axios.get(`${API}/suppliers?${params.toString()}`),
+          axios.get(`${API}/suppliers/count?organization_id=${currentOrg.id}${searchTerm ? '&search=' + searchTerm : ''}`)
+        ]);
+        
+        if (reset) {
+          setSuppliers(dataRes.data);
+          setCurrentPage(1);
+        } else {
+          setSuppliers(prev => [...prev, ...dataRes.data]);
+          setCurrentPage(prev => prev + 1);
+        }
+        setTotalCount(countRes.data.count);
         
         // Cache in IndexedDB
         try {
