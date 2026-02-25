@@ -105,10 +105,15 @@ async def import_chart_of_accounts(
     # Helper to get value from row using mapping or default index
     def get_col(row, field_name, default_idx):
         idx = mapping.get(field_name, default_idx) if mapping else default_idx
-        if idx is None or idx < 0 or idx == '':
-            return ''
-        idx = int(idx)
-        return row[idx] if len(row) > idx and row[idx] is not None else ''
+        if idx is None or idx == '' or idx == '-1':
+            return None
+        try:
+            idx = int(idx)
+        except (ValueError, TypeError):
+            return None
+        if idx < 0 or idx >= len(row):
+            return None
+        return row[idx] if row[idx] is not None else None
     
     accounts_created = 0
     accounts_updated = 0
