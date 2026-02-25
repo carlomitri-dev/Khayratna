@@ -1,18 +1,14 @@
 [
   {
-    "content": "Backend: Import COA from Excel endpoint (accounts + suppliers/customers detection)",
-    "status": "completed"
+    "content": "Add MongoDB indexes for customers/suppliers + pagination to accounts endpoints",
+    "status": "in_progress"
   },
   {
-    "content": "Backend: Import Vouchers from Excel endpoint (group by TRAN, auto-post)",
-    "status": "completed"
+    "content": "Add pagination to Customers and Suppliers frontend pages",
+    "status": "pending"
   },
   {
-    "content": "Frontend: Import page UI with file upload, org/FY selectors, progress",
-    "status": "completed"
-  },
-  {
-    "content": "Testing: End-to-end test with provided Excel files",
-    "status": "completed"
+    "content": "Update all imports to upsert (COA, Customers, Suppliers, Inventory, Vouchers)",
+    "status": "pending"
   }
 ]
