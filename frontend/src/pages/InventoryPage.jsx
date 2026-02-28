@@ -1461,7 +1461,6 @@ const InventoryPage = () => {
                             {!item.item_code && !item.barcode && <span className="text-muted-foreground">-</span>}
                           </div>
                         </td>
-                        <td className="font-mono text-xs text-emerald-400">{item.moh_code || '-'}</td>
                         <td>
                           <div>
                             <p className="font-medium">{item.name}</p>
@@ -1476,10 +1475,6 @@ const InventoryPage = () => {
                         <td className="text-right font-mono">{item.currency} {formatUSD(item.price)}</td>
                         <td className={`text-right font-mono ${isLowStock(item) ? 'text-amber-400 font-bold' : ''}`}>
                           {item.on_hand_qty} {item.unit}
-                        </td>
-                        <td className="text-right font-mono text-muted-foreground">{item.min_qty}</td>
-                        <td className={isExpiringSoon(item) ? 'text-red-400' : 'text-muted-foreground'}>
-                          {item.expiry_date || '-'}
                         </td>
                         <td className="text-center">
                           {item.is_taxable !== false ? (
