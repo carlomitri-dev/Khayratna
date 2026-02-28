@@ -205,7 +205,7 @@ const ChartOfAccountsPage = () => {
       
       setIsDialogOpen(false);
       resetForm();
-      fetchAccounts();
+      fetchAccounts(true);
     } catch (error) {
       const errorMsg = error.response?.data?.detail || error.message || 'Failed to save account';
       // Store the failed operation for retry
@@ -237,7 +237,7 @@ const ChartOfAccountsPage = () => {
       setFailedOperation(null);
       setIsDialogOpen(false);
       resetForm();
-      fetchAccounts();
+      fetchAccounts(true);
       alert('Account saved successfully!');
     } catch (error) {
       const errorMsg = error.response?.data?.detail || error.message || 'Failed to save account';
@@ -275,7 +275,7 @@ const ChartOfAccountsPage = () => {
       });
       
       setRebuildResult(response.data);
-      fetchAccounts();
+      fetchAccounts(true);
       alert(`Rebuild complete!\nCreated: ${response.data.created || 0}\nUpdated: ${response.data.updated || 0}`);
     } catch (error) {
       const errorMsg = error.response?.data?.detail || error.message || 'Failed to rebuild accounts';
@@ -291,7 +291,7 @@ const ChartOfAccountsPage = () => {
       const response = await axios.post(`${API}/accounts/seed-coa?organization_id=${currentOrg.id}`);
       alert(response.data.message);
       setSeedDialogOpen(false);
-      fetchAccounts();
+      fetchAccounts(true);
     } catch (error) {
       alert(error.response?.data?.detail || 'Failed to seed COA');
     } finally {
@@ -304,7 +304,7 @@ const ChartOfAccountsPage = () => {
     try {
       await axios.delete(`${API}/accounts/${deleteConfirm.id}`);
       setDeleteConfirm(null);
-      fetchAccounts();
+      fetchAccounts(true);
     } catch (error) {
       alert(error.response?.data?.detail || 'Failed to delete account');
     }
@@ -387,7 +387,7 @@ const ChartOfAccountsPage = () => {
       
       setImportResult(response.data);
       setImportStep('result');
-      fetchAccounts();
+      fetchAccounts(true);
     } catch (error) {
       alert(error.response?.data?.detail || 'Failed to import CSV');
     } finally {
