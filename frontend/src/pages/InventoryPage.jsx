@@ -1782,7 +1782,7 @@ const InventoryPage = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>On Hand Qty</Label>
                 <Input
@@ -1801,16 +1801,6 @@ const InventoryPage = () => {
                   placeholder="0"
                   value={formData.min_qty}
                   onChange={(e) => setFormData({ ...formData, min_qty: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2 col-span-2 sm:col-span-1">
-                <Label className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  Expiry Date
-                </Label>
-                <DateInput
-                  value={formData.expiry_date}
-                  onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
                 />
               </div>
             </div>
