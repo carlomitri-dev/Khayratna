@@ -558,7 +558,6 @@ async def post_sales_invoice(invoice_id: str, current_user: dict = Depends(get_c
                 {'code': line['account_code'], 'organization_id': invoice['organization_id']},
                 {'$inc': {'balance_usd': net_usd, 'balance_lbp': net_lbp}}
             )
-    )
     
     # Update inventory quantities (reduce stock) with batch handling
     for line in invoice.get('lines', []):
