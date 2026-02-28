@@ -84,18 +84,36 @@ const ChartOfAccountsPage = () => {
 
   useEffect(() => {
     if (currentOrg) {
-      fetchAccounts();
+      setCurrentPage(0);
+      fetchAccounts(true);
     }
-  }, [currentOrg, selectedFY]);
+  }, [currentOrg, selectedFY, searchTerm]);
 
-  const fetchAccounts = async () => {
-    setLoading(true);
+  const fetchAccounts = async (reset = false) => {
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
     try {
       if (isOnline) {
-        const params = new URLSearchParams({ organization_id: currentOrg.id });
+        const params = new URLSearchParams({ 
+          organization_id: currentOrg.id,
+          skip: reset ? 0 : currentPage * PAGE_SIZE,
+          limit: PAGE_SIZE
+        });
         if (selectedFY?.id) params.append('fy_id', selectedFY.id);
+        if (searchTerm) params.append('search', searchTerm);
         const response = await axios.get(`${API}/accounts?${params.toString()}`);
-        setAccounts(response.data);
+        const data = response.data;
+        const accts = data.accounts || data;
+        const total = data.total || (Array.isArray(data) ? data.length : 0);
+        
+        if (reset) {
+          setAccounts(Array.isArray(accts) ? accts : []);
+          setCurrentPage(1);
+        } else {
+          setAccounts(prev => [...prev, ...(Array.isArray(accts) ? accts : [])]);
+          setCurrentPage(prev => prev + 1);
+        }
+        setTotalCount(total);
         
         // Cache in IndexedDB for offline use
         try {
