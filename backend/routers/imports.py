@@ -205,6 +205,30 @@ async def import_chart_of_accounts(
             
             accounts_to_insert.append(account_doc)
             
+            # Auto-create VAT mirror account for customers (4111→4114) and suppliers (4011→4014)
+            vat_code = None
+            if code.startswith('4111') and len(code) > 4:
+                vat_code = '4114' + code[4:]
+            elif code.startswith('4011') and len(code) > 4:
+                vat_code = '4014' + code[4:]
+            
+            if vat_code and vat_code not in seen_codes:
+                seen_codes.add(vat_code)
+                vat_doc = {
+                    'id': str(uuid.uuid4()),
+                    'code': vat_code,
+                    'name': account_name,
+                    'name_ar': account_name,
+                    'account_class': 4,
+                    'account_type': 'asset' if code.startswith('41') else 'liability',
+                    'organization_id': organization_id,
+                    'balance_lbp': 0,
+                    'balance_usd': 0,
+                    'is_active': True,
+                    'created_at': datetime.now(timezone.utc).isoformat()
+                }
+                accounts_to_insert.append(vat_doc)
+            
         except Exception as e:
             errors.append(f"Row {row_num + 1}: {str(e)}")
             if len(errors) > 50:
