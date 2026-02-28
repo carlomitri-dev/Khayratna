@@ -341,12 +341,12 @@ async def get_inventory_items(
     # Enrich with category and supplier names
     for item in items:
         if item.get('category_id'):
-            category = await db.inventory_categories.find_one({'id': item['category_id']}, {'name': 1})
+            category = await db.inventory_categories.find_one({'$or': [{'id': item['category_id']}, {'cat_id': item['category_id']}]}, {'name': 1})
             item['category_name'] = category['name'] if category else None
         else:
             item['category_name'] = None
         if item.get('supplier_id'):
-            supplier = await db.accounts.find_one({'id': item['supplier_id']}, {'name': 1})
+            supplier = await db.accounts.find_one({'$or': [{'id': item['supplier_id']}, {'code': item['supplier_id']}]}, {'name': 1})
             item['supplier_name'] = supplier['name'] if supplier else None
         else:
             item['supplier_name'] = None
@@ -368,12 +368,12 @@ async def get_inventory_item(item_id: str, current_user: dict = Depends(get_curr
         raise HTTPException(status_code=404, detail="Inventory item not found")
     
     if item.get('category_id'):
-        category = await db.inventory_categories.find_one({'id': item['category_id']}, {'name': 1})
+        category = await db.inventory_categories.find_one({'$or': [{'id': item['category_id']}, {'cat_id': item['category_id']}]}, {'name': 1})
         item['category_name'] = category['name'] if category else None
     else:
         item['category_name'] = None
     if item.get('supplier_id'):
-        supplier = await db.accounts.find_one({'id': item['supplier_id']}, {'name': 1})
+        supplier = await db.accounts.find_one({'$or': [{'id': item['supplier_id']}, {'code': item['supplier_id']}]}, {'name': 1})
         item['supplier_name'] = supplier['name'] if supplier else None
     else:
         item['supplier_name'] = None
@@ -424,10 +424,10 @@ async def create_inventory_item(item_data: InventoryItemCreate, current_user: di
     item_doc['supplier_name'] = None
     
     if item_data.category_id:
-        category = await db.inventory_categories.find_one({'id': item_data.category_id}, {'name': 1})
+        category = await db.inventory_categories.find_one({'$or': [{'id': item_data.category_id}, {'cat_id': item_data.category_id}]}, {'name': 1})
         item_doc['category_name'] = category['name'] if category else None
     if item_data.supplier_id:
-        supplier = await db.accounts.find_one({'id': item_data.supplier_id}, {'name': 1})
+        supplier = await db.accounts.find_one({'$or': [{'id': item_data.supplier_id}, {'code': item_data.supplier_id}]}, {'name': 1})
         item_doc['supplier_name'] = supplier['name'] if supplier else None
     
     return InventoryItemResponse(**item_doc)
@@ -455,12 +455,12 @@ async def update_inventory_item(item_id: str, item_data: InventoryItemUpdate, cu
     updated = await db.inventory_items.find_one({'id': item_id}, {'_id': 0})
     
     if updated.get('category_id'):
-        category = await db.inventory_categories.find_one({'id': updated['category_id']}, {'name': 1})
+        category = await db.inventory_categories.find_one({'$or': [{'id': updated['category_id']}, {'cat_id': updated['category_id']}]}, {'name': 1})
         updated['category_name'] = category['name'] if category else None
     else:
         updated['category_name'] = None
     if updated.get('supplier_id'):
-        supplier = await db.accounts.find_one({'id': updated['supplier_id']}, {'name': 1})
+        supplier = await db.accounts.find_one({'$or': [{'id': updated['supplier_id']}, {'code': updated['supplier_id']}]}, {'name': 1})
         updated['supplier_name'] = supplier['name'] if supplier else None
     else:
         updated['supplier_name'] = None
