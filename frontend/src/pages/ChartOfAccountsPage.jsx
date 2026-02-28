@@ -1260,6 +1260,15 @@ const ChartOfAccountsPage = () => {
               </p>
             </div>
           )}
+          
+          {/* Load More */}
+          {hasMore && filteredAccounts.length > 0 && (
+            <div className="text-center py-4">
+              <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={loadingMore}>
+                {loadingMore ? 'Loading...' : `Load More (${accounts.length} of ${totalCount})`}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
