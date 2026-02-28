@@ -4146,14 +4146,21 @@ async def get_inventory_item(item_id: str, current_user: dict = Depends(get_curr
         raise HTTPException(status_code=404, detail="Inventory item not found")
     
     # Enrich with category and supplier names
+    org_id = item.get('organization_id', '')
     if item.get('category_id'):
-        category = await db.inventory_categories.find_one({'id': item['category_id']}, {'name': 1})
-        item['category_name'] = category['name'] if category else None
+        category = await db.inventory_categories.find_one(
+            {'$or': [{'id': item['category_id']}, {'cat_id': item['category_id']}], 'organization_id': org_id},
+            {'name': 1}
+        )
+        item['category_name'] = category['name'] if category else item.get('category', None)
     else:
-        item['category_name'] = None
+        item['category_name'] = item.get('category', None)
         
     if item.get('supplier_id'):
-        supplier = await db.accounts.find_one({'id': item['supplier_id']}, {'name': 1})
+        supplier = await db.accounts.find_one(
+            {'$or': [{'id': item['supplier_id']}, {'code': item['supplier_id']}], 'organization_id': org_id},
+            {'name': 1}
+        )
         item['supplier_name'] = supplier['name'] if supplier else None
     else:
         item['supplier_name'] = None
