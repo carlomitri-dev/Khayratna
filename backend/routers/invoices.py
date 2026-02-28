@@ -943,9 +943,15 @@ async def post_purchase_invoice(invoice_id: str, current_user: dict = Depends(ge
     if invoice.get('is_posted'):
         raise HTTPException(status_code=400, detail="Invoice is already posted")
     
-    # Get account details
-    debit_account = await db.accounts.find_one({'id': invoice['debit_account_id']}, {'_id': 0})
-    credit_account = await db.accounts.find_one({'id': invoice['credit_account_id']}, {'_id': 0})
+    # Get account details  
+    debit_account = await db.accounts.find_one(
+        {'$or': [{'id': invoice['debit_account_id']}, {'code': invoice.get('debit_account_code', '')}], 'organization_id': invoice['organization_id']},
+        {'_id': 0}
+    )
+    credit_account = await db.accounts.find_one(
+        {'$or': [{'id': invoice['credit_account_id']}, {'code': invoice.get('credit_account_code', '')}], 'organization_id': invoice['organization_id']},
+        {'_id': 0}
+    )
     
     if not debit_account or not credit_account:
         raise HTTPException(status_code=400, detail="Invalid account configuration")
@@ -958,11 +964,41 @@ async def post_purchase_invoice(invoice_id: str, current_user: dict = Depends(ge
     )
     base_rate = rate_doc['rate'] if rate_doc else 89500
     
-    # Calculate amounts - use total_usd if available, otherwise use total
-    amount_usd = invoice.get('total_usd') or invoice.get('total', 0)
-    amount_lbp = amount_usd * base_rate
+    # Get organization tax settings
+    org = await db.organizations.find_one({'id': invoice['organization_id']}, {'tax_percent': 1, '_id': 0})
+    tax_percent = org.get('tax_percent', 11) if org else 11
     
-    # Generate voucher number (PV = Purchase Voucher)
+    # Calculate amounts
+    total_usd = invoice.get('total_usd') or invoice.get('total', 0)
+    tax_usd = invoice.get('tax_amount_usd') or invoice.get('tax_amount', 0)
+    
+    if tax_usd == 0 and tax_percent > 0:
+        subtotal_usd = invoice.get('subtotal_usd') or invoice.get('subtotal', 0)
+        if subtotal_usd > 0:
+            tax_usd = subtotal_usd * tax_percent / 100
+        else:
+            tax_usd = total_usd * tax_percent / (100 + tax_percent)
+    
+    amount_without_vat_usd = total_usd - tax_usd
+    amount_without_vat_lbp = amount_without_vat_usd * base_rate
+    tax_lbp = tax_usd * base_rate
+    
+    # Determine VAT supplier account (4011xxxx → 4014xxxx)
+    supplier_code = credit_account['code']
+    vat_supplier_code = supplier_code.replace('4011', '4014', 1) if supplier_code.startswith('4011') else None
+    
+    vat_supplier_account = None
+    if vat_supplier_code:
+        vat_supplier_account = await db.accounts.find_one(
+            {'code': vat_supplier_code, 'organization_id': invoice['organization_id']}, {'_id': 0}
+        )
+    
+    # VAT input/receivable account (44260006)
+    vat_input_account = await db.accounts.find_one(
+        {'code': '44260006', 'organization_id': invoice['organization_id']}, {'_id': 0}
+    )
+    
+    # Generate voucher number
     year = datetime.now().year
     prefix = f"PV-{year}-"
     last_voucher = await db.vouchers.find_one(
@@ -976,43 +1012,78 @@ async def post_purchase_invoice(invoice_id: str, current_user: dict = Depends(ge
     else:
         voucher_number = f"{prefix}00001"
     
-    # Create the purchase voucher
-    # Debit: Purchases/Inventory (expense/asset increases)
-    # Credit: Supplier Payable (liability increases)
+    # Build voucher lines - 4 line pattern for purchases
+    voucher_lines = []
+    desc = f"Purchase Invoice {invoice.get('invoice_number', '')}"
+    
+    # Line 1: Debit Expense/Purchase (amount without VAT)
+    voucher_lines.append({
+        'account_code': debit_account['code'],
+        'account_name': debit_account['name'],
+        'description': desc,
+        'debit_lbp': amount_without_vat_lbp,
+        'credit_lbp': 0,
+        'debit_usd': amount_without_vat_usd,
+        'credit_usd': 0,
+        'exchange_rate': base_rate
+    })
+    
+    # Line 2: Debit VAT Input/Receivable (VAT amount)
+    if vat_input_account and tax_usd > 0:
+        voucher_lines.append({
+            'account_code': '44260006',
+            'account_name': vat_input_account['name'],
+            'description': desc,
+            'debit_lbp': tax_lbp,
+            'credit_lbp': 0,
+            'debit_usd': tax_usd,
+            'credit_usd': 0,
+            'exchange_rate': base_rate
+        })
+    
+    # Line 3: Credit Supplier (amount without VAT)
+    voucher_lines.append({
+        'account_code': credit_account['code'],
+        'account_name': credit_account['name'],
+        'description': desc,
+        'debit_lbp': 0,
+        'credit_lbp': amount_without_vat_lbp,
+        'debit_usd': 0,
+        'credit_usd': amount_without_vat_usd,
+        'exchange_rate': base_rate
+    })
+    
+    # Line 4: Credit Supplier VAT (VAT amount)
+    if vat_supplier_account and tax_usd > 0:
+        voucher_lines.append({
+            'account_code': vat_supplier_code,
+            'account_name': vat_supplier_account['name'],
+            'description': desc,
+            'debit_lbp': 0,
+            'credit_lbp': tax_lbp,
+            'debit_usd': 0,
+            'credit_usd': tax_usd,
+            'exchange_rate': base_rate
+        })
+    
+    total_debit_usd = sum(l['debit_usd'] for l in voucher_lines)
+    total_credit_usd = sum(l['credit_usd'] for l in voucher_lines)
+    total_debit_lbp = sum(l['debit_lbp'] for l in voucher_lines)
+    total_credit_lbp = sum(l['credit_lbp'] for l in voucher_lines)
+    
     voucher_id = str(uuid.uuid4())
     voucher_doc = {
         'id': voucher_id,
         'voucher_number': voucher_number,
-        'voucher_type': 'PV',  # Purchase Voucher
+        'voucher_type': 'PV',
         'date': invoice['date'],
-        'description': f"Purchase Invoice {invoice['invoice_number']}",
+        'description': desc,
         'reference': invoice['invoice_number'],
-        'lines': [
-            {
-                'account_id': invoice['debit_account_id'],
-                'account_code': debit_account['code'],
-                'account_name': debit_account['name'],
-                'description': f"Purchases from {credit_account['name']}",
-                'debit_lbp': amount_lbp,
-                'credit_lbp': 0,
-                'debit_usd': amount_usd,
-                'credit_usd': 0
-            },
-            {
-                'account_id': invoice['credit_account_id'],
-                'account_code': credit_account['code'],
-                'account_name': credit_account['name'],
-                'description': f"Payable to {credit_account['name']}",
-                'debit_lbp': 0,
-                'credit_lbp': amount_lbp,
-                'debit_usd': 0,
-                'credit_usd': amount_usd
-            }
-        ],
-        'total_debit_lbp': amount_lbp,
-        'total_credit_lbp': amount_lbp,
-        'total_debit_usd': amount_usd,
-        'total_credit_usd': amount_usd,
+        'lines': voucher_lines,
+        'total_debit_lbp': total_debit_lbp,
+        'total_credit_lbp': total_credit_lbp,
+        'total_debit_usd': total_debit_usd,
+        'total_credit_usd': total_credit_usd,
         'currency': invoice.get('currency', 'USD'),
         'exchange_rate': base_rate,
         'is_posted': True,
@@ -1028,17 +1099,15 @@ async def post_purchase_invoice(invoice_id: str, current_user: dict = Depends(ge
     
     await db.vouchers.insert_one(voucher_doc)
     
-    # Update account balances
-    # Debit account (Purchases/Inventory) increases
-    await db.accounts.update_one(
-        {'id': invoice['debit_account_id']},
-        {'$inc': {'balance_usd': amount_usd, 'balance_lbp': amount_lbp}}
-    )
-    # Credit account (Supplier Payable) increases (credit = negative for liabilities display)
-    await db.accounts.update_one(
-        {'id': invoice['credit_account_id']},
-        {'$inc': {'balance_usd': -amount_usd, 'balance_lbp': -amount_lbp}}
-    )
+    # Update ALL account balances from voucher lines
+    for line in voucher_lines:
+        net_usd = line['debit_usd'] - line['credit_usd']
+        net_lbp = line['debit_lbp'] - line['credit_lbp']
+        if net_usd != 0 or net_lbp != 0:
+            await db.accounts.update_one(
+                {'code': line['account_code'], 'organization_id': invoice['organization_id']},
+                {'$inc': {'balance_usd': net_usd, 'balance_lbp': net_lbp}}
+            )
     
     # Update inventory quantities (ADD stock - opposite of sales)
     for line in invoice.get('lines', []):
