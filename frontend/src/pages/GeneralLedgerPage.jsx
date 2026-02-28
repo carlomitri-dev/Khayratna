@@ -408,6 +408,20 @@ const GeneralLedgerPage = () => {
                     </tfoot>
                   </table>
                 </div>
+                
+                {/* Load More */}
+                {hasMoreEntries && (
+                  <div className="text-center py-4">
+                    <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={loadingMore}>
+                      {loadingMore ? 'Loading...' : `Load More (${ledgerData.entries.length} of ${totalEntries} entries)`}
+                    </Button>
+                  </div>
+                )}
+                {!hasMoreEntries && totalEntries > 0 && (
+                  <p className="text-center text-xs text-muted-foreground py-2">
+                    Showing all {totalEntries} entries
+                  </p>
+                )}
               </>
             )}
           </CardContent>
