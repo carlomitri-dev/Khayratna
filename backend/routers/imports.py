@@ -811,7 +811,8 @@ async def import_inventory(
                         'price': item['price'],
                         'cost': item['cost'],
                         'package': item['package'],
-                        'pack_description': item['pack_description']
+                        'pack_description': item['pack_description'],
+                        'is_taxable': item['is_taxable']
                     }}
                 )
                 updated += 1
