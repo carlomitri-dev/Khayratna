@@ -1773,7 +1773,7 @@ const InventoryPage = () => {
                     </div>
                     <SelectItem value="none">No Supplier</SelectItem>
                     {filteredSuppliers.map(sup => (
-                      <SelectItem key={sup.id} value={sup.id}>{sup.code} - {sup.name}</SelectItem>
+                      <SelectItem key={sup.code || sup.id} value={sup.code || sup.id}>{sup.code} - {sup.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
