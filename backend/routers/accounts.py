@@ -204,7 +204,7 @@ async def get_accounts(
             acc['balance_lbp'] = child_lbp
             acc['balance_usd'] = child_usd
     
-    return [AccountResponse(**acc) for acc in accounts]
+    return {"accounts": accounts, "total": total}
 
 
 @router.get("/accounts/movable/list", response_model=List[AccountResponse])
