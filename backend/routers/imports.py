@@ -742,6 +742,15 @@ async def import_inventory(
             # Get category name
             cat_name = categories.get(cat_id, {}).get('name', '')
             
+            # TVA field (col 22) - if value is 11, item is taxed
+            tva_v = get_col(row, 'tva', 22)
+            is_taxable = False
+            if tva_v is not None:
+                try:
+                    is_taxable = int(float(str(tva_v))) == 11
+                except (ValueError, TypeError):
+                    is_taxable = False
+            
             item_name = name_ar or description or f'Item {item_code}'
             
             item_doc = {
@@ -764,7 +773,7 @@ async def import_inventory(
                 'min_qty': 0,
                 'on_hand_qty': 0,
                 'is_active': True,
-                'is_taxable': True,
+                'is_taxable': is_taxable,
                 'organization_id': organization_id,
                 'created_at': datetime.now(timezone.utc).isoformat()
             }
