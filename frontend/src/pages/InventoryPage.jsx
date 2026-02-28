@@ -1082,13 +1082,7 @@ const InventoryPage = () => {
       );
     }
     
-    if (filterCategory !== 'all') {
-      result = result.filter(item => item.category_id === filterCategory);
-    }
-    
-    if (filterSupplier !== 'all') {
-      result = result.filter(item => item.supplier_id === filterSupplier);
-    }
+    // Category and supplier filtering done server-side
     
     if (filterStock === 'low') {
       result = result.filter(item => item.on_hand_qty <= item.min_qty);
