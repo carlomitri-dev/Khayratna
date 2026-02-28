@@ -1464,9 +1464,9 @@ const InventoryPage = () => {
                         </td>
                         <td>
                           <div className="space-y-0.5">
-                            {item.barcode && <span className="font-mono text-xs text-cyan-400 block">{item.barcode}</span>}
-                            {item.sku && <span className="font-mono text-xs text-muted-foreground block">{item.sku}</span>}
-                            {!item.barcode && !item.sku && <span className="text-muted-foreground">-</span>}
+                            {item.item_code && <span className="font-mono text-xs text-blue-600 block">{item.item_code}</span>}
+                            {item.barcode && <span className="font-mono text-xs text-muted-foreground block">{item.barcode}</span>}
+                            {!item.item_code && !item.barcode && <span className="text-muted-foreground">-</span>}
                           </div>
                         </td>
                         <td className="font-mono text-xs text-emerald-400">{item.moh_code || '-'}</td>
