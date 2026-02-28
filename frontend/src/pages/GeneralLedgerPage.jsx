@@ -113,7 +113,11 @@ const GeneralLedgerPage = () => {
   const [selectedAccount, setSelectedAccount] = useState('');
   const [ledgerData, setLedgerData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [accountsLoading, setAccountsLoading] = useState(true);
+  const [currentSkip, setCurrentSkip] = useState(0);
+  const [totalEntries, setTotalEntries] = useState(0);
+  const PAGE_SIZE = 100;
 
   useEffect(() => {
     if (currentOrg) {
@@ -121,18 +125,19 @@ const GeneralLedgerPage = () => {
     }
   }, [currentOrg]);
 
-  // Re-fetch ledger when FY changes
   useEffect(() => {
     if (selectedAccount && currentOrg) {
-      fetchLedger(selectedAccount);
+      setCurrentSkip(0);
+      fetchLedger(selectedAccount, true);
     }
   }, [selectedFY]);
 
   const fetchAccounts = async () => {
     setAccountsLoading(true);
     try {
-      const response = await axios.get(`${API}/accounts?organization_id=${currentOrg.id}`);
-      setAccounts(response.data);
+      const response = await axios.get(`${API}/accounts?organization_id=${currentOrg.id}&limit=5000`);
+      const data = response.data;
+      setAccounts(data.accounts || data);
     } catch (error) {
       console.error('Failed to fetch accounts:', error);
     } finally {
@@ -140,29 +145,59 @@ const GeneralLedgerPage = () => {
     }
   };
 
-  const fetchLedger = async (accountCode) => {
+  const fetchLedger = async (accountCode, reset = false) => {
     if (!accountCode) return;
     
-    setLoading(true);
+    if (reset) {
+      setLoading(true);
+      setCurrentSkip(0);
+    } else {
+      setLoadingMore(true);
+    }
+    
     try {
-      const params = new URLSearchParams({ organization_id: currentOrg.id });
-      if (selectedFY?.id) {
-        params.append('fy_id', selectedFY.id);
-      }
+      const skipVal = reset ? 0 : currentSkip;
+      const params = new URLSearchParams({ 
+        organization_id: currentOrg.id,
+        skip: skipVal,
+        limit: PAGE_SIZE
+      });
+      if (selectedFY?.id) params.append('fy_id', selectedFY.id);
+      
       const response = await axios.get(`${API}/reports/general-ledger/${accountCode}?${params.toString()}`);
-      setLedgerData(response.data);
+      const data = response.data;
+      
+      if (reset) {
+        setLedgerData(data);
+        setCurrentSkip(PAGE_SIZE);
+      } else {
+        setLedgerData(prev => ({
+          ...data,
+          entries: [...(prev?.entries || []), ...data.entries]
+        }));
+        setCurrentSkip(prev => prev + PAGE_SIZE);
+      }
+      setTotalEntries(data.total_entries || data.entries?.length || 0);
     } catch (error) {
       console.error('Failed to fetch ledger:', error);
-      setLedgerData(null);
+      if (reset) setLedgerData(null);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   const handleAccountChange = (value) => {
     setSelectedAccount(value);
-    fetchLedger(value);
+    setCurrentSkip(0);
+    fetchLedger(value, true);
   };
+
+  const handleLoadMore = () => {
+    fetchLedger(selectedAccount, false);
+  };
+
+  const hasMoreEntries = ledgerData && (ledgerData.entries?.length || 0) < totalEntries;
 
   const handlePrint = () => {
     printReport('General Ledger');
