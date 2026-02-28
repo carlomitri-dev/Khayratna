@@ -164,6 +164,7 @@ class InventoryCategoryUpdate(BaseModel):
 class InventoryCategoryResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
+    cat_id: Optional[str] = None
     name: str
     name_ar: Optional[str] = None
     description: Optional[str] = None
