@@ -655,11 +655,22 @@ async def delete_service_item(item_id: str, current_user: dict = Depends(get_cur
 @router.get("/inventory-suppliers")
 async def get_inventory_suppliers(
     organization_id: str,
+    search: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get accounts that can be suppliers (account_class 4)"""
+    """Get supplier accounts (code starts with 40, length > 4)"""
+    query = {
+        'organization_id': organization_id,
+        'code': {'$regex': '^40.{4,}'}
+    }
+    if search:
+        sr = {'$regex': search, '$options': 'i'}
+        query['$or'] = [{'name': sr}, {'name_ar': sr}, {'code': sr}]
+        del query['code']
+        query['code'] = {'$regex': '^40.{4,}'}
+    
     suppliers = await db.accounts.find(
-        {'organization_id': organization_id, 'account_class': 4},
+        query,
         {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1}
     ).sort('code', 1).to_list(1000)
     return suppliers
