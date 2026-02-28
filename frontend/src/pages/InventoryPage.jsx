@@ -1594,58 +1594,16 @@ const InventoryPage = () => {
           </DialogHeader>
           
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-2">
                 <Label className="flex items-center gap-1">
                   <Hash className="w-3 h-3" />
-                  Barcode
+                  Item Code
                 </Label>
-                <div className="flex gap-1">
-                  <Input
-                    placeholder="e.g., 6001234567890"
-                    value={formData.barcode}
-                    onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                    className="font-mono flex-1"
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
-                    onClick={handleBarcodeLookup}
-                    disabled={barcodeLookupLoading || !formData.barcode}
-                    className="px-2 shrink-0"
-                    title="Lookup product info from barcode"
-                  >
-                    {barcodeLookupLoading ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Search className="w-4 h-4" />
-                    )}
-                  </Button>
-                </div>
-                {pendingImageUrl ? (
-                  <p className="text-xs text-green-500 flex items-center gap-1">
-                    <Check className="w-3 h-3" /> Product image will be imported
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Enter barcode and click search to auto-fill</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>SKU / Item Code</Label>
                 <Input
-                  placeholder="e.g., SKU001"
+                  placeholder="e.g., 1, 2, 3..."
                   value={formData.sku}
                   onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                  className="font-mono"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-cyan-400">MOH Code</Label>
-                <Input
-                  placeholder="Ministry of Health Code"
-                  value={formData.moh_code}
-                  onChange={(e) => setFormData({ ...formData, moh_code: e.target.value })}
                   className="font-mono"
                 />
               </div>
@@ -1658,9 +1616,6 @@ const InventoryPage = () => {
                   required
                 />
               </div>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-1 gap-3">
               <div className="space-y-2">
                 <Label>Name (Arabic)</Label>
                 <Input
