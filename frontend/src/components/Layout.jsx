@@ -78,7 +78,6 @@ const Sidebar = ({ isOpen, onClose, collapsed, onToggleCollapse }) => {
     { path: '/customers', icon: Users, label: 'Customers' },
     { path: '/suppliers', icon: Truck, label: 'Suppliers' },
     { path: '/inventory', icon: Package, label: 'Inventory' },
-    { path: '/image-archive', icon: Archive, label: 'Image Archive', requiresEdit: true },
     { path: '/exchange-rates', icon: DollarSign, label: 'Exchange Rates' },
     { path: '/trial-balance', icon: FileBarChart, label: 'Trial Balance' },
     { path: '/income-statement', icon: TrendingUp, label: 'Income Statement' },
