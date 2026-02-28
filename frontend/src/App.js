@@ -145,14 +145,6 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/image-archive"
-        element={
-          <ProtectedRoute>
-            <ImageArchivePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
         path="/customers"
         element={
           <ProtectedRoute>
