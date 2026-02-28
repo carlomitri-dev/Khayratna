@@ -1,14 +1,18 @@
 [
   {
-    "content": "Add MongoDB indexes for customers/suppliers + pagination to accounts endpoints",
-    "status": "completed"
+    "content": "Auto-create VAT accounts (4114/4014) when adding customers/suppliers",
+    "status": "in_progress"
   },
   {
-    "content": "Add pagination to Customers and Suppliers frontend pages",
-    "status": "completed"
+    "content": "Update Sales Invoice posting to 4-line pattern (customer + VAT + VAT payable + revenue)",
+    "status": "pending"
   },
   {
-    "content": "Update all imports to upsert (COA, Customers, Suppliers, Inventory, Vouchers)",
-    "status": "completed"
+    "content": "Update Purchase Invoice posting to 4-line pattern (supplier + VAT + VAT input + expense)",
+    "status": "pending"
+  },
+  {
+    "content": "Remove Image Archive module from sidebar and routes",
+    "status": "pending"
   }
 ]
