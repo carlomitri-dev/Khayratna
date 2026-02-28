@@ -315,16 +315,19 @@ async def get_inventory_items(
     query = {'organization_id': organization_id}
     
     if category_id:
+        # Support both cat_id and MongoDB id
         query['category_id'] = category_id
     if supplier_id:
+        # Support both account code and MongoDB id
         query['supplier_id'] = supplier_id
     
     if search:
         query['$or'] = [
             {'name': {'$regex': search, '$options': 'i'}},
+            {'name_ar': {'$regex': search, '$options': 'i'}},
+            {'item_code': {'$regex': search, '$options': 'i'}},
             {'barcode': {'$regex': search, '$options': 'i'}},
-            {'sku': {'$regex': search, '$options': 'i'}},
-            {'name_ar': {'$regex': search, '$options': 'i'}}
+            {'sku': {'$regex': search, '$options': 'i'}}
         ]
     
     total_count = await db.inventory_items.count_documents(query)
