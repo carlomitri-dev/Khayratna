@@ -16,7 +16,6 @@ import IncomeStatementPage from './pages/IncomeStatementPage';
 import GeneralLedgerPage from './pages/GeneralLedgerPage';
 import SettingsPage from './pages/SettingsPage';
 import CrDbNotesPage from './pages/CrDbNotesPage';
-import ImageArchivePage from './pages/ImageArchivePage';
 import CustomersPage from './pages/CustomersPage';
 import SuppliersPage from './pages/SuppliersPage';
 import InventoryPage from './pages/InventoryPage';
