@@ -2003,7 +2003,7 @@ const SalesInvoicePage = () => {
 
       {/* Invoice Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) resetForm(); }}>
-        <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
+        <DialogContent className="max-w-[98vw] w-full max-h-[95vh] overflow-y-auto">
           {/* Loading Overlay */}
           {loading && (
             <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
