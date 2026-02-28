@@ -1433,7 +1433,7 @@ const InventoryPage = () => {
                   <thead>
                     <tr>
                       <th className="w-14">Image</th>
-                      <th>Barcode / SKU</th>
+                      <th>Code</th>
                       <th>MOH</th>
                       <th>Name</th>
                       <th>Category</th>
