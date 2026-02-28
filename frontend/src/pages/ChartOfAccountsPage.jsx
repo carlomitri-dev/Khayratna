@@ -151,8 +151,12 @@ const ChartOfAccountsPage = () => {
       }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
+
+  const handleLoadMore = () => fetchAccounts(false);
+  const hasMore = accounts.length < totalCount;
 
   const handleCreateAccount = async (e) => {
     e.preventDefault();
