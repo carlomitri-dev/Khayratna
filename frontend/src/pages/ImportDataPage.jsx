@@ -57,6 +57,7 @@ const INVENTORY_FIELDS = [
   { key: 'pack_desc', label: 'Pack Description', required: false, defaultCol: 6, keywords: ['PACK'] },
   { key: 'price', label: 'Selling Price', required: false, defaultCol: 7, keywords: ['PRICE', 'سعر', 'sell'] },
   { key: 'cost', label: 'Cost Price', required: false, defaultCol: 8, keywords: ['COST', 'تكلفة'] },
+  { key: 'tva', label: 'TVA (11=Taxed)', required: false, defaultCol: 22, keywords: ['TVA', 'tax', 'ضريبة'] },
 ];
 
 // Result Display
