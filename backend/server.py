@@ -4113,13 +4113,19 @@ async def get_inventory(
     # Enrich with category and supplier names
     for item in items:
         if item.get('category_id'):
-            category = await db.inventory_categories.find_one({'id': item['category_id']}, {'name': 1})
-            item['category_name'] = category['name'] if category else None
+            category = await db.inventory_categories.find_one(
+                {'$or': [{'id': item['category_id']}, {'cat_id': item['category_id']}], 'organization_id': organization_id},
+                {'name': 1}
+            )
+            item['category_name'] = category['name'] if category else item.get('category', None)
         else:
-            item['category_name'] = None
+            item['category_name'] = item.get('category', None)
             
         if item.get('supplier_id'):
-            supplier = await db.accounts.find_one({'id': item['supplier_id']}, {'name': 1})
+            supplier = await db.accounts.find_one(
+                {'$or': [{'id': item['supplier_id']}, {'code': item['supplier_id']}], 'organization_id': organization_id},
+                {'name': 1}
+            )
             item['supplier_name'] = supplier['name'] if supplier else None
         else:
             item['supplier_name'] = None
