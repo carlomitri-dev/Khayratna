@@ -1263,27 +1263,27 @@ const InventoryPage = () => {
             
             <div className="flex flex-wrap gap-2">
               <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-[160px]">
                   <Tag className="w-3 h-3 mr-1" />
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
                   {categories.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    <SelectItem key={cat.cat_id || cat.id} value={cat.cat_id || cat.id}>{cat.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               
               <Select value={filterSupplier} onValueChange={setFilterSupplier}>
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-[160px]">
                   <Truck className="w-3 h-3 mr-1" />
                   <SelectValue placeholder="Supplier" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Suppliers</SelectItem>
                   {suppliers.map(sup => (
-                    <SelectItem key={sup.id} value={sup.id}>{sup.name}</SelectItem>
+                    <SelectItem key={sup.code || sup.id} value={sup.code || sup.id}>{sup.code} - {sup.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
