@@ -106,13 +106,28 @@ async def create_account(account_data: AccountCreate, current_user: dict = Depen
     return AccountResponse(**account_doc)
 
 
-@router.get("/accounts", response_model=List[AccountResponse])
-async def get_accounts(organization_id: str, fy_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
-    """Get all accounts for an organization, optionally filtered by fiscal year"""
-    accounts = await db.accounts.find(
-        {'organization_id': organization_id},
-        {'_id': 0}
-    ).sort('code', 1).to_list(None)
+@router.get("/accounts")
+async def get_accounts(
+    organization_id: str, 
+    fy_id: Optional[str] = None, 
+    search: Optional[str] = None,
+    account_class: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 200,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get accounts with pagination, search, and optional FY filter"""
+    query = {'organization_id': organization_id}
+    
+    if search:
+        sr = {'$regex': search, '$options': 'i'}
+        query['$or'] = [{'code': sr}, {'name': sr}, {'name_ar': sr}]
+    
+    if account_class is not None:
+        query['account_class'] = account_class
+    
+    total = await db.accounts.count_documents(query)
+    accounts = await db.accounts.find(query, {'_id': 0}).sort('code', 1).skip(skip).limit(limit).to_list(limit)
     
     # Normalize accounts
     for acc in accounts:
