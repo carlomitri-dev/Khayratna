@@ -41,7 +41,11 @@ const ChartOfAccountsPage = () => {
   const { isOnline } = useSync();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const PAGE_SIZE = 200;
   const [selectedClass, setSelectedClass] = useState('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [seedDialogOpen, setSeedDialogOpen] = useState(false);
