@@ -349,10 +349,10 @@ async def get_general_ledger(
     organization_id: str, 
     fy_id: Optional[str] = None,
     skip: int = 0,
-    limit: int = 200,  # Default 200 entries per page
+    limit: int = 100,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get general ledger for a specific account. If fy_id is provided, filters by FY date range."""
+    """Get general ledger with pagination. Returns paginated entries + total count + closing balance."""
     account = await db.accounts.find_one(
         {'code': account_code, 'organization_id': organization_id},
         {'_id': 0}
@@ -367,49 +367,101 @@ async def get_general_ledger(
         'lines.account_code': account_code
     }
     
-    # Add FY date filter if specified
     if fy_id:
         fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
         if fy:
             voucher_query['date'] = {'$gte': fy['start_date'], '$lte': fy['end_date']}
     
-    # Get all voucher lines for this account
-    vouchers = await db.vouchers.find(
-        voucher_query,
-        {'_id': 0}
-    ).sort('date', 1).to_list(None)
+    # Use aggregation to get entries efficiently with pagination
+    pipeline = [
+        {'$match': voucher_query},
+        {'$sort': {'date': 1}},
+        {'$unwind': '$lines'},
+        {'$match': {'lines.account_code': account_code}},
+        {'$project': {
+            'date': 1,
+            'id': 1,
+            'voucher_number': 1,
+            'voucher_type': 1,
+            'description': 1,
+            'source_type': 1,
+            'source_id': 1,
+            'line_desc': '$lines.description',
+            'debit_lbp': {'$ifNull': ['$lines.debit_lbp', 0]},
+            'credit_lbp': {'$ifNull': ['$lines.credit_lbp', 0]},
+            'debit_usd': {'$ifNull': [{'$ifNull': ['$lines.debit_usd', '$lines.debit']}, 0]},
+            'credit_usd': {'$ifNull': [{'$ifNull': ['$lines.credit_usd', '$lines.credit']}, 0]},
+        }}
+    ]
+    
+    # Get total count
+    count_pipeline = pipeline + [{'$count': 'total'}]
+    count_result = await db.vouchers.aggregate(count_pipeline).to_list(1)
+    total_entries = count_result[0]['total'] if count_result else 0
+    
+    # Get closing balance (sum of ALL entries, not just page)
+    balance_pipeline = pipeline + [
+        {'$group': {
+            '_id': None,
+            'total_debit_lbp': {'$sum': '$debit_lbp'},
+            'total_credit_lbp': {'$sum': '$credit_lbp'},
+            'total_debit_usd': {'$sum': '$debit_usd'},
+            'total_credit_usd': {'$sum': '$credit_usd'}
+        }}
+    ]
+    balance_result = await db.vouchers.aggregate(balance_pipeline).to_list(1)
+    
+    closing_lbp = 0
+    closing_usd = 0
+    if balance_result:
+        closing_lbp = balance_result[0]['total_debit_lbp'] - balance_result[0]['total_credit_lbp']
+        closing_usd = balance_result[0]['total_debit_usd'] - balance_result[0]['total_credit_usd']
+    
+    # Get paginated entries
+    entries_pipeline = pipeline + [{'$skip': skip}, {'$limit': limit}]
+    raw_entries = await db.vouchers.aggregate(entries_pipeline).to_list(limit)
+    
+    # Compute running balance for the page (need balance before this page)
+    if skip > 0:
+        pre_balance_pipeline = pipeline + [
+            {'$limit': skip},
+            {'$group': {
+                '_id': None,
+                'pre_debit_lbp': {'$sum': '$debit_lbp'},
+                'pre_credit_lbp': {'$sum': '$credit_lbp'},
+                'pre_debit_usd': {'$sum': '$debit_usd'},
+                'pre_credit_usd': {'$sum': '$credit_usd'}
+            }}
+        ]
+        pre_result = await db.vouchers.aggregate(pre_balance_pipeline).to_list(1)
+        running_lbp = (pre_result[0]['pre_debit_lbp'] - pre_result[0]['pre_credit_lbp']) if pre_result else 0
+        running_usd = (pre_result[0]['pre_debit_usd'] - pre_result[0]['pre_credit_usd']) if pre_result else 0
+    else:
+        running_lbp = 0
+        running_usd = 0
     
     entries = []
-    running_balance_lbp = 0
-    running_balance_usd = 0
+    for e in raw_entries:
+        dl = e.get('debit_lbp', 0)
+        cl = e.get('credit_lbp', 0)
+        du = e.get('debit_usd', 0)
+        cu = e.get('credit_usd', 0)
+        running_lbp += dl - cl
+        running_usd += du - cu
+        entries.append({
+            'date': e.get('date', ''),
+            'voucher_id': e.get('id', ''),
+            'voucher_number': e.get('voucher_number', ''),
+            'voucher_type': e.get('voucher_type', ''),
+            'description': e.get('line_desc') or e.get('description', ''),
+            'debit_lbp': dl, 'credit_lbp': cl,
+            'debit_usd': du, 'credit_usd': cu,
+            'balance_lbp': running_lbp,
+            'balance_usd': running_usd,
+            'source_type': e.get('source_type', 'voucher'),
+            'source_id': e.get('source_id')
+        })
     
-    for voucher in vouchers:
-        for line in voucher.get('lines', []):
-            if line.get('account_code') == account_code:
-                debit_lbp = line.get('debit_lbp', 0) or 0
-                credit_lbp = line.get('credit_lbp', 0) or 0
-                debit_usd = line.get('debit_usd', line.get('debit', 0)) or 0
-                credit_usd = line.get('credit_usd', line.get('credit', 0)) or 0
-                
-                running_balance_lbp += debit_lbp - credit_lbp
-                running_balance_usd += debit_usd - credit_usd
-                entries.append({
-                    'date': voucher.get('date', ''),
-                    'voucher_id': voucher.get('id', ''),
-                    'voucher_number': voucher.get('voucher_number', ''),
-                    'voucher_type': voucher.get('voucher_type', ''),
-                    'description': line.get('description') or voucher.get('description', ''),
-                    'debit_lbp': debit_lbp,
-                    'credit_lbp': credit_lbp,
-                    'debit_usd': debit_usd,
-                    'credit_usd': credit_usd,
-                    'balance_lbp': running_balance_lbp,
-                    'balance_usd': running_balance_usd,
-                    'source_type': voucher.get('source_type', 'voucher'),
-                    'source_id': voucher.get('source_id')
-                })
-    
-    # Normalize account fields
     account['account_class'] = account.get('account_class') or (int(account.get('code', '1')[0]) if account.get('code', '1')[0].isdigit() else None)
     account['balance_lbp'] = account.get('balance_lbp', 0) or 0
     account['balance_usd'] = account.get('balance_usd', 0) or 0
@@ -417,8 +469,9 @@ async def get_general_ledger(
     return {
         'account': account,
         'entries': entries,
+        'total_entries': total_entries,
         'closing_balance': {
-            'lbp': running_balance_lbp,
-            'usd': running_balance_usd
+            'lbp': closing_lbp,
+            'usd': closing_usd
         }
     }
