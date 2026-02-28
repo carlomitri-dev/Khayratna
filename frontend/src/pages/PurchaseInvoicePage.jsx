@@ -1528,7 +1528,7 @@ const PurchaseInvoicePage = () => {
 
       {/* View Invoice Dialog */}
       <Dialog open={!!viewInvoice} onOpenChange={() => setViewInvoice(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[98vw] w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Invoice {viewInvoice?.invoice_number}</DialogTitle>
           </DialogHeader>
