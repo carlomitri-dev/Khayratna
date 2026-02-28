@@ -1747,7 +1747,7 @@ const InventoryPage = () => {
                       </SelectItem>
                       <SelectItem value="none">No Category</SelectItem>
                       {filteredCategories.map(cat => (
-                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        <SelectItem key={cat.cat_id || cat.id} value={cat.cat_id || cat.id}>{cat.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
