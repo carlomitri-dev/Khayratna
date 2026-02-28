@@ -1435,8 +1435,6 @@ const InventoryPage = () => {
                       <th className="text-right">Cost</th>
                       <th className="text-right">Price</th>
                       <th className="text-right">On Hand</th>
-                      <th className="text-right">Min Qty</th>
-                      <th>Expiry</th>
                       <th className="text-center">Tax</th>
                       <th>Actions</th>
                     </tr>
