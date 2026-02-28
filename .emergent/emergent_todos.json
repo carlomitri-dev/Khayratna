@@ -1,18 +1,18 @@
 [
   {
     "content": "Auto-create VAT accounts (4114/4014) when adding customers/suppliers",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Update Sales Invoice posting to 4-line pattern (customer + VAT + VAT payable + revenue)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update Purchase Invoice posting to 4-line pattern (supplier + VAT + VAT input + expense)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Remove Image Archive module from sidebar and routes",
-    "status": "pending"
+    "status": "completed"
   }
 ]
