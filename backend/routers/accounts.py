@@ -46,7 +46,7 @@ router = APIRouter(tags=["Accounts"])
 
 @router.post("/accounts", response_model=AccountResponse)
 async def create_account(account_data: AccountCreate, current_user: dict = Depends(get_current_user)):
-    """Create a new account"""
+    """Create a new account. Auto-creates VAT mirror account for customers (4111→4114) and suppliers (4011→4014)."""
     if current_user['role'] not in ['super_admin', 'admin', 'accountant']:
         raise HTTPException(status_code=403, detail="Permission denied")
     
@@ -72,6 +72,37 @@ async def create_account(account_data: AccountCreate, current_user: dict = Depen
         'balance_usd': 0
     }
     await db.accounts.insert_one(account_doc)
+    
+    # Auto-create VAT mirror account for customers and suppliers
+    code = account_data.code
+    vat_code = None
+    if code.startswith('4111') and len(code) > 4:
+        # Customer: 4111xxxx → 4114xxxx
+        vat_code = '4114' + code[4:]
+    elif code.startswith('4011') and len(code) > 4:
+        # Supplier: 4011xxxx → 4014xxxx
+        vat_code = '4014' + code[4:]
+    
+    if vat_code:
+        vat_existing = await db.accounts.find_one({
+            'code': vat_code, 'organization_id': account_data.organization_id
+        })
+        if not vat_existing:
+            vat_doc = {
+                'id': str(uuid.uuid4()),
+                'code': vat_code,
+                'name': account_data.name,
+                'name_ar': account_data.name_ar or account_data.name,
+                'account_class': 4,
+                'account_type': 'asset' if code.startswith('41') else 'liability',
+                'parent_code': None,
+                'is_active': True,
+                'organization_id': account_data.organization_id,
+                'balance_lbp': 0,
+                'balance_usd': 0
+            }
+            await db.accounts.insert_one(vat_doc)
+    
     return AccountResponse(**account_doc)
 
 
