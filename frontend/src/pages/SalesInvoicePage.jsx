@@ -1368,408 +1368,187 @@ const SalesInvoicePage = () => {
 
   // Print with default format (backward compatible)
   const printDefaultFormat = (invoice, org, template, printCurrency = 'USD', withBackground = true) => {
-    const companyName = template.company_name || org.name || 'KAIROS';
-    const companyType = template.company_type || 'S.A.R.L.';
-    const telFax = template.tel_fax || '';
-    const mobile = template.mobile || '';
-    const email = template.email || '';
-    const address = template.address || '';
-    const footerText = template.footer_text || 'Thank you for your business!';
-    const showDiscount = template.show_discount_column !== false;
-    // Only use background image if withBackground is true
-    const backgroundImage = withBackground ? (template.background_image || '') : '';
-    const bgPosition = template.background_position || 'center';
-    const bgOpacity = template.background_opacity || 100;
-    const bgSize = template.background_size || 'cover';
+    const companyEn = org?.name || 'Michel Matar Trading Est.';
+    const companyAr = 'مؤسسة ميشال مطر التجارية';
+    const addressEn = org?.address || 'Kafarakka El-Koura';
+    const addressAr = 'كفر عقا - الكورة';
+    const phone = org?.phone || '06/950751';
+    const emailAddr = org?.email || template?.email || 'ets.michelmatar@hotmail.com';
+    const regNumber = org?.registration_number || '601-585164';
+    const taxPercent = org?.tax_percent || 11;
+
+    const rate = invoice?.exchange_rate || 89500;
+    const isUSD = printCurrency === 'USD';
+    const currSymbol = isUSD ? '$' : 'ل.ل.';
     
-    // Calculate background CSS
-    const getBgSizeCSS = () => {
-      switch (bgSize) {
-        case 'contain': return 'contain';
-        case 'stretch': return '100% 100%';
-        default: return 'cover';
-      }
-    };
-    const getBgPositionCSS = () => {
-      switch (bgPosition) {
-        case 'top': return 'center top';
-        case 'bottom': return 'center bottom';
-        default: return 'center center';
-      }
-    };
+    const subtotal = isUSD ? (invoice?.subtotal_usd || invoice?.subtotal || 0) : (invoice?.subtotal_lbp || (invoice?.subtotal || 0) * rate);
+    const taxAmount = isUSD ? (invoice?.tax_amount_usd || invoice?.tax_amount || 0) : (invoice?.tax_amount_lbp || (invoice?.tax_amount || 0) * rate);
+    const total = isUSD ? (invoice?.total_usd || invoice?.total || 0) : (invoice?.total_lbp || (invoice?.total || 0) * rate);
+
+    // Get customer info
+    const customerName = invoice?.customer_name || '';
+    const customerCode = invoice?.customer_code || invoice?.debit_account_code || '';
+    const customerAddress = invoice?.customer_address || '';
+
+    const lines = invoice?.lines || [];
     
-    // Currency conversion setup
-    const exchangeRate = currentOrg?.base_exchange_rate || 89500;
-    const currencySymbol = printCurrency === 'USD' ? '$' : 'LBP ';
-    
-    // Convert amount based on print currency
-    const convertAmount = (amountUsd) => {
-      if (printCurrency === 'LBP') {
-        return parseFloat(amountUsd || 0) * exchangeRate;
-      }
-      return parseFloat(amountUsd || 0);
-    };
-    
-    const formatAmount = (amount) => {
-      const converted = convertAmount(amount);
-      if (printCurrency === 'LBP') {
-        return `${currencySymbol}${Math.round(converted).toLocaleString()}`;
-      }
-      return `${currencySymbol}${converted.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    };
-    
-    const printContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Invoice ${invoice.invoice_number}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { 
-            font-family: Arial, sans-serif; 
-            font-size: 11px; 
-            padding: 15px;
-            line-height: 1.4;
-            position: relative;
-            min-height: 100vh;
-          }
-          .background-layer {
-            position: fixed;
-            inset: 0;
-            z-index: -1;
-            ${backgroundImage ? `background-image: url('${backgroundImage}');` : ''}
-            ${backgroundImage ? `background-size: ${getBgSizeCSS()};` : ''}
-            ${backgroundImage ? `background-position: ${getBgPositionCSS()};` : ''}
-            ${backgroundImage ? 'background-repeat: no-repeat;' : ''}
-            ${backgroundImage ? `opacity: ${bgOpacity / 100};` : ''}
-          }
-          @media print {
-            body {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            .background-layer {
-              ${backgroundImage ? `background-image: url('${backgroundImage}') !important;` : ''}
-              ${backgroundImage ? `background-size: ${getBgSizeCSS()} !important;` : ''}
-              ${backgroundImage ? `background-position: ${getBgPositionCSS()} !important;` : ''}
-              ${backgroundImage ? 'background-repeat: no-repeat !important;' : ''}
-              ${backgroundImage ? `opacity: ${bgOpacity / 100} !important;` : ''}
-              ${backgroundImage ? '-webkit-print-color-adjust: exact !important;' : ''}
-              ${backgroundImage ? 'print-color-adjust: exact !important;' : ''}
-            }
-          }
-          
-          /* Header Section */
-          .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #000;
-            padding-bottom: 10px;
-          }
-          .company-info {
-            flex: 1;
-          }
-          .company-name {
-            font-size: 24px;
-            font-weight: bold;
-            color: #1a365d;
-            margin-bottom: 5px;
-          }
-          .company-details {
-            font-size: 10px;
-            line-height: 1.5;
-          }
-          .company-type {
-            display: inline-block;
-            border: 1px solid #000;
-            padding: 2px 8px;
-            font-size: 10px;
-            margin-left: 10px;
-          }
-          .invoice-title {
-            font-size: 28px;
-            font-weight: bold;
-            font-style: italic;
-            color: #1a365d;
-          }
-          
-          /* Customer & Invoice Info Section */
-          .info-section {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 15px;
-            gap: 20px;
-          }
-          .customer-info, .invoice-info {
-            flex: 1;
-          }
-          .info-row {
-            display: flex;
-            margin-bottom: 8px;
-            align-items: center;
-          }
-          .info-label {
-            font-weight: bold;
-            min-width: 70px;
-          }
-          .info-value {
-            flex: 1;
-            border-bottom: 1px solid #000;
-            padding: 2px 5px;
-            min-height: 18px;
-          }
-          
-          /* Line Items Table */
-          .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 15px;
-            table-layout: fixed;
-          }
-          .items-table th {
-            background: #f0f0f0;
-            border: 1px solid #000;
-            padding: 8px 5px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 11px;
-          }
-          .items-table td {
-            border: 1px solid #000;
-            padding: 6px 5px;
-            text-align: center;
-            vertical-align: top;
-          }
-          .items-table td.left { 
-            text-align: left; 
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            white-space: pre-wrap;
-            line-height: 1.3;
-          }
-          .items-table td.right { text-align: right; font-family: monospace; vertical-align: top; }
-          .items-table tbody tr { 
-            page-break-inside: avoid;
-          }
-          
-          /* Description column styling - CRITICAL for long text wrapping */
-          .items-table td.desc-cell {
-            text-align: left !important;
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
-            word-break: break-word !important;
-            white-space: normal !important;
-            line-height: 1.4;
-            max-width: 250px;
-            vertical-align: top;
-          }
-          .desc-main {
-            display: block;
-            margin-bottom: 2px;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-          }
-          .desc-ar {
-            display: block;
-            direction: rtl;
-            font-size: 0.9em;
-            color: #555;
-            word-wrap: break-word;
-          }
-          .used-parts {
-            margin-top: 4px;
-            padding-top: 4px;
-            border-top: 1px dashed #ccc;
-            font-size: 0.85em;
-            color: #666;
-          }
-          .used-parts-label {
-            font-weight: bold;
-            color: #7c3aed;
-          }
-          
-          /* Empty rows for form */
-          .empty-row td { height: 25px; }
-          
-          /* Footer Section */
-          .footer-section {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            margin-top: 15px;
-          }
-          .amount-words {
-            flex: 2;
-          }
-          .amount-words-label {
-            font-weight: bold;
-          }
-          .amount-words-value {
-            border-bottom: 1px solid #000;
-            padding: 2px 5px;
-            min-height: 20px;
-            font-style: italic;
-          }
-          .signature-section {
-            flex: 1;
-            text-align: center;
-          }
-          .signature-line {
-            border-bottom: 1px solid #000;
-            margin-top: 30px;
-            margin-bottom: 5px;
-          }
-          .total-section {
-            flex: 1;
-            text-align: right;
-          }
-          .total-box {
-            display: inline-block;
-            border: 2px solid #000;
-            padding: 8px 15px;
-            font-size: 14px;
-            font-weight: bold;
-          }
-          .total-label {
-            font-weight: bold;
-            margin-bottom: 5px;
-          }
-          
-          @media print { 
-            body { padding: 0; }
-            .no-print { display: none; }
-          }
-        </style>
-      </head>
-      <body>
-        ${backgroundImage ? '<div class="background-layer"></div>' : ''}
-        <!-- Header -->
-        <div class="header">
-          <div class="company-info">
-            <div class="company-name">${companyName}</div>
-            ${companyType ? `<span class="company-type">${companyType}</span>` : ''}
-            <div class="company-details">
-              ${telFax ? `<div>Tel & Fax: ${telFax}</div>` : ''}
-              ${mobile ? `<div>Cell: ${mobile}</div>` : ''}
-              ${email ? `<div>E-mail: ${email}</div>` : ''}
-              ${address ? `<div>${address}</div>` : ''}
-            </div>
-          </div>
-          <div>
-            <div class="invoice-title">Invoice</div>
-            <div style="text-align: right; font-size: 12px; margin-top: 5px;">${invoice.invoice_number}</div>
-          </div>
-        </div>
-        
-        <!-- Customer & Invoice Info -->
-        <div class="info-section">
-          <div class="customer-info">
-            <div class="info-row">
-              <span class="info-label">Name:</span>
-              <span class="info-value">${invoice.debit_account_name || invoice.customer_name || ''}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Address:</span>
-              <span class="info-value">${invoice.customer_address || ''}</span>
-            </div>
-          </div>
-          <div class="invoice-info">
-            <div class="info-row">
-              <span class="info-label">Account:</span>
-              <span class="info-value">${invoice.debit_account_code || ''}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Date:</span>
-              <span class="info-value">${(() => { const d = new Date(invoice.date); return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; })()}</span>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Line Items Table -->
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th style="width: 8%;">Item No.</th>
-              <th style="width: ${showDiscount ? '35%' : '42%'};">Description</th>
-              <th style="width: 12%;">Quantity</th>
-              <th style="width: 15%;">Unit Price</th>
-              ${showDiscount ? '<th style="width: 10%;">Disc%</th>' : ''}
-              <th style="width: 20%;">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${invoice.lines.map((line, idx) => {
-              const lineUsdTotal = line.line_total_usd || line.line_total || 0;
-              const lineUsdPrice = lineUsdTotal / (line.quantity || 1);
-              const hasUsedItems = line.used_items && line.used_items.length > 0;
-              return `
-              <tr>
-                <td>${idx + 1}</td>
-                <td class="desc-cell">
-                  <span class="desc-main">${line.item_name}</span>
-                  ${line.item_name_ar ? `<span class="desc-ar">${line.item_name_ar}</span>` : ''}
-                  ${hasUsedItems ? `
-                    <div class="used-parts">
-                      <span class="used-parts-label">Parts Used:</span>
-                      ${line.used_items.map(u => `${u.item_name} (×${u.quantity})`).join(', ')}
-                    </div>
-                  ` : ''}
-                </td>
-                <td>${line.quantity}</td>
-                <td class="right">${formatAmount(lineUsdPrice)}</td>
-                ${showDiscount ? `<td class="right">${line.discount_percent || 0}%</td>` : ''}
-                <td class="right">${formatAmount(lineUsdTotal)}</td>
-              </tr>
-            `}).join('')}
-            ${Array(Math.max(0, 10 - invoice.lines.length)).fill(`<tr class="empty-row"><td></td><td></td><td></td><td></td>${showDiscount ? '<td></td>' : ''}<td></td></tr>`).join('')}
-            ${invoice.discount_amount > 0 ? `
-              <tr>
-                <td colspan="${showDiscount ? 5 : 4}" class="right"><strong>Discount (${invoice.discount_percent}%):</strong></td>
-                <td class="right">-${formatAmount(invoice.discount_amount)}</td>
-              </tr>
-            ` : ''}
-            ${invoice.tax_amount > 0 ? `
-              <tr>
-                <td colspan="${showDiscount ? 5 : 4}" class="right"><strong>Tax (${invoice.tax_percent}%):</strong></td>
-                <td class="right">${formatAmount(invoice.tax_amount)}</td>
-              </tr>
-            ` : ''}
-          </tbody>
-        </table>
-        
-        <!-- Footer Section -->
-        <div class="footer-section">
-          <div class="amount-words">
-            <span class="amount-words-label">Only:</span>
-            <div class="amount-words-value">${amountToWords(convertAmount(invoice.total), printCurrency)}</div>
-          </div>
-          <div class="signature-section">
-            <div class="signature-line"></div>
-            <div>Signature</div>
-          </div>
-          <div class="total-section">
-            <div class="total-label">Total (${printCurrency})</div>
-            <div class="total-box">${formatAmount(invoice.total)}</div>
-          </div>
-        </div>
-        
-        ${footerText ? `<div style="margin-top: 20px; text-align: center; font-size: 10px; color: #666;">${footerText}</div>` : ''}
-        
-        ${invoice.is_posted ? `
-          <div style="margin-top: 15px; padding: 5px; background: #f0f0f0; font-size: 10px;">
-            <strong>Voucher:</strong> ${invoice.voucher_number || 'N/A'} | <strong>Status:</strong> POSTED
-          </div>
-        ` : ''}
-      </body>
-      </html>
-    `;
-    
+    const itemRows = lines.map((line, i) => {
+      const isTaxed = line.is_taxable !== false;
+      const unitPrice = isUSD ? (line.unit_price || line.price || 0) : (line.unit_price_lbp || (line.unit_price || line.price || 0) * rate);
+      const lineTotal = (line.quantity || 0) * (line.unit_price || line.price || 0);
+      const discount = line.discount_percent || line.discount || 0;
+      const lineTotalAfterDisc = lineTotal * (1 - discount / 100);
+      const displayTotal = isUSD ? lineTotalAfterDisc : lineTotalAfterDisc * rate;
+      
+      return `
+        <tr>
+          <td style="text-align:center;padding:5px 3px;border:1px solid #999;">${i + 1}</td>
+          <td style="text-align:right;padding:5px 6px;border:1px solid #999;direction:rtl;font-size:11px;">
+            ${line.name_ar || line.item_name || line.name || ''}${isTaxed ? ' <span style="color:#c00;font-weight:bold;">*</span>' : ''}
+          </td>
+          <td style="text-align:center;padding:5px 3px;border:1px solid #999;font-size:10px;">${line.pack_description || line.package || '-'}</td>
+          <td style="text-align:center;padding:5px 3px;border:1px solid #999;">${line.quantity || 0}</td>
+          <td style="text-align:right;padding:5px 4px;border:1px solid #999;font-family:monospace;">${unitPrice.toFixed(2)}</td>
+          <td style="text-align:center;padding:5px 3px;border:1px solid #999;">${discount ? discount + '%' : '-'}</td>
+          <td style="text-align:right;padding:5px 4px;border:1px solid #999;font-family:monospace;font-weight:bold;">${displayTotal.toFixed(2)}</td>
+        </tr>`;
+    }).join('');
+
+    const emptyCount = Math.max(0, 18 - lines.length);
+    const emptyRows = Array(emptyCount).fill(
+      '<tr>' + '<td style="padding:5px 3px;border:1px solid #999;">&nbsp;</td>'.repeat(7) + '</tr>'
+    ).join('');
+
     const printWindow = window.open('', '_blank');
-    printWindow.document.write(printContent);
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Invoice ${invoice?.invoice_number || ''}</title>
+  <style>
+    @page { size: A4; margin: 8mm; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, 'Segoe UI', sans-serif; font-size: 11px; color: #1a2744; margin: 0; padding: 12px; }
+    
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1a2744; padding-bottom: 8px; margin-bottom: 6px; }
+    .header-left { text-align: left; flex: 1; }
+    .header-center { text-align: center; flex: 0 0 100px; padding-top: 5px; }
+    .header-right { text-align: right; flex: 1; direction: rtl; }
+    .header h2 { font-size: 15px; margin: 0 0 3px 0; color: #1a2744; }
+    .header p { margin: 1px 0; font-size: 9.5px; color: #444; }
+    
+    .logo { width: 55px; height: 55px; border-radius: 50%; border: 2.5px solid #1a2744; display: flex; align-items: center; justify-content: center; margin: 0 auto; }
+    .logo span { font-size: 20px; font-weight: bold; color: #1a2744; }
+    
+    .inv-title { text-align: center; font-size: 16px; font-weight: bold; color: #1a2744; margin: 6px 0; padding: 3px; border: 2px solid #1a2744; letter-spacing: 2px; }
+    
+    .cust { display: flex; justify-content: space-between; margin: 6px 0; padding: 6px 10px; border: 1px solid #bbb; background: #f8f9fb; border-radius: 3px; }
+    .cust-l { text-align: left; }
+    .cust-r { text-align: right; direction: rtl; }
+    .cf { margin: 2px 0; font-size: 11px; }
+    .cl { font-weight: bold; color: #1a2744; }
+    
+    table.items { width: 100%; border-collapse: collapse; margin: 6px 0; }
+    table.items th { background: #1a2744; color: #fff; padding: 6px 3px; font-size: 9px; text-transform: uppercase; border: 1px solid #1a2744; }
+    table.items td { font-size: 10.5px; vertical-align: middle; }
+    table.items tbody tr:nth-child(even) { background: #f4f6f9; }
+    
+    .totals { display: flex; justify-content: flex-end; margin-top: 4px; }
+    .totals table { width: 280px; border-collapse: collapse; }
+    .totals td { padding: 4px 8px; font-size: 11px; border: 1px solid #bbb; }
+    .totals .lbl { text-align: right; direction: rtl; font-weight: bold; background: #eef1f5; width: 170px; }
+    .totals .val { text-align: right; font-family: monospace; font-size: 11px; }
+    .totals .gt td { background: #1a2744; color: #fff; font-size: 13px; font-weight: bold; }
+    
+    .star { font-size: 9px; color: #c00; margin: 4px 0; direction: rtl; text-align: right; }
+    .receipt { font-size: 8.5px; color: #555; direction: rtl; text-align: right; margin-top: 10px; line-height: 1.5; }
+    .sigs { display: flex; justify-content: space-between; margin-top: 25px; }
+    .sig { width: 180px; text-align: center; }
+    .sig-line { border-top: 1px solid #333; margin-top: 35px; padding-top: 3px; font-size: 9.5px; color: #1a2744; font-weight: bold; }
+    .vat-notice { text-align: center; font-size: 8.5px; color: #1a2744; font-weight: bold; margin-top: 8px; padding-top: 6px; border-top: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <h2>${companyEn}</h2>
+      <p>${addressEn}</p>
+      <p>Tel: ${phone}</p>
+      <p>Email: ${emailAddr}</p>
+      <p style="font-weight:bold;">T.V.A.: ${regNumber}</p>
+    </div>
+    <div class="header-center">
+      <div class="logo"><span>MM</span></div>
+    </div>
+    <div class="header-right">
+      <h2>${companyAr}</h2>
+      <p>${addressAr}</p>
+      <p>تلفون: ${phone}</p>
+      <p>بريد: ${emailAddr}</p>
+      <p style="font-weight:bold;">ض.ق.م.: ${regNumber}</p>
+    </div>
+  </div>
+
+  <div class="inv-title">فاتورة &mdash; INVOICE</div>
+
+  <div class="cust">
+    <div class="cust-l">
+      <div class="cf"><span class="cl">Date / التاريخ:</span> ${invoice?.date || ''}</div>
+      <div class="cf"><span class="cl">Invoice # / رقم الفاتورة:</span> ${invoice?.invoice_number || ''}</div>
+    </div>
+    <div class="cust-r">
+      <div class="cf"><span class="cl">إسم الزبون:</span> ${customerName}</div>
+      <div class="cf"><span class="cl">رقم الزبون:</span> ${customerCode}</div>
+      <div class="cf"><span class="cl">العنوان:</span> ${customerAddress}</div>
+    </div>
+  </div>
+
+  <table class="items">
+    <thead>
+      <tr>
+        <th style="width:28px;">الرقم<br/>#</th>
+        <th>الصنف / Item</th>
+        <th style="width:55px;">صندوق<br/>Box</th>
+        <th style="width:45px;">العدد<br/>Qty</th>
+        <th style="width:60px;">السعر<br/>Price</th>
+        <th style="width:45px;">حسم<br/>Disc</th>
+        <th style="width:70px;">المجموع<br/>Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemRows}
+      ${emptyRows}
+    </tbody>
+  </table>
+
+  <p class="star"><span style="font-size:12px;font-weight:bold;">*</span> = خاضع للضريبة على القيمة المضافة / Subject to VAT</p>
+
+  <div class="totals">
+    <table>
+      <tr><td class="lbl">المجموع / Subtotal</td><td class="val">${currSymbol} ${subtotal.toFixed(2)}</td></tr>
+      <tr><td class="lbl">ض.ق.م. ${taxPercent}% / VAT</td><td class="val">${currSymbol} ${taxAmount.toFixed(2)}</td></tr>
+      <tr class="gt"><td class="lbl" style="background:#1a2744;color:#fff;">المجموع العام / Total</td><td class="val">${currSymbol} ${total.toFixed(2)}</td></tr>
+    </table>
+  </div>
+
+  <div class="receipt">
+    استلمت البضاعة طبقاً للمبين في الفاتورة أعلاه بحالة جيدة وتأكدت من سلامتها ونوعيتها ومن صلاحية تاريخ الصنع
+  </div>
+
+  <div class="sigs">
+    <div class="sig"><div class="sig-line">الإدارة / Administration</div></div>
+    <div class="sig"><div class="sig-line">إمضاء الزبون / Customer</div></div>
+  </div>
+
+  <div class="vat-notice">خاضع للضريبة على القيمة المضافة - Subject to Value Added Tax</div>
+
+  <script>window.onload = function() { window.print(); }</script>
+</body>
+</html>`);
     printWindow.document.close();
-    printWindow.print();
   };
 
   if (!currentOrg) {
