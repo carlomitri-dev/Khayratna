@@ -1376,179 +1376,82 @@ const SalesInvoicePage = () => {
     const emailAddr = org?.email || template?.email || 'ets.michelmatar@hotmail.com';
     const regNumber = org?.registration_number || '601-585164';
     const taxPercent = org?.tax_percent || 11;
-
     const rate = invoice?.exchange_rate || 89500;
     const isUSD = printCurrency === 'USD';
     const currSymbol = isUSD ? '$' : 'ل.ل.';
-    
     const subtotal = isUSD ? (invoice?.subtotal_usd || invoice?.subtotal || 0) : (invoice?.subtotal_lbp || (invoice?.subtotal || 0) * rate);
     const taxAmount = isUSD ? (invoice?.tax_amount_usd || invoice?.tax_amount || 0) : (invoice?.tax_amount_lbp || (invoice?.tax_amount || 0) * rate);
     const total = isUSD ? (invoice?.total_usd || invoice?.total || 0) : (invoice?.total_lbp || (invoice?.total || 0) * rate);
-
-    // Get customer info
-    const customerName = invoice?.customer_name || '';
-    const customerCode = invoice?.customer_code || invoice?.debit_account_code || '';
-    const customerAddress = invoice?.customer_address || '';
-
+    const discountAmt = isUSD ? (invoice?.discount_amount || invoice?.discount || 0) : ((invoice?.discount_amount || invoice?.discount || 0) * rate);
+    const custAccount = customers.find(c => c.id === invoice?.debit_account_id) || {};
+    const customerName = invoice?.debit_account_name || custAccount.name || invoice?.customer_name || '';
+    const customerCode = invoice?.debit_account_code || custAccount.code || '';
+    const customerAddress = custAccount.address || invoice?.customer_address || '';
     const lines = invoice?.lines || [];
-    
     const itemRows = lines.map((line, i) => {
       const isTaxed = line.is_taxable !== false;
-      const unitPrice = isUSD ? (line.unit_price || line.price || 0) : (line.unit_price_lbp || (line.unit_price || line.price || 0) * rate);
-      const lineTotal = (line.quantity || 0) * (line.unit_price || line.price || 0);
-      const discount = line.discount_percent || line.discount || 0;
-      const lineTotalAfterDisc = lineTotal * (1 - discount / 100);
-      const displayTotal = isUSD ? lineTotalAfterDisc : lineTotalAfterDisc * rate;
-      
-      return `
-        <tr>
-          <td style="text-align:center;padding:5px 3px;border:1px solid #999;">${i + 1}</td>
-          <td style="text-align:right;padding:5px 6px;border:1px solid #999;direction:rtl;font-size:11px;">
-            ${line.name_ar || line.item_name || line.name || ''}${isTaxed ? ' <span style="color:#c00;font-weight:bold;">*</span>' : ''}
-          </td>
-          <td style="text-align:center;padding:5px 3px;border:1px solid #999;font-size:10px;">${line.pack_description || line.package || '-'}</td>
-          <td style="text-align:center;padding:5px 3px;border:1px solid #999;">${line.quantity || 0}</td>
-          <td style="text-align:right;padding:5px 4px;border:1px solid #999;font-family:monospace;">${unitPrice.toFixed(2)}</td>
-          <td style="text-align:center;padding:5px 3px;border:1px solid #999;">${discount ? discount + '%' : '-'}</td>
-          <td style="text-align:right;padding:5px 4px;border:1px solid #999;font-family:monospace;font-weight:bold;">${displayTotal.toFixed(2)}</td>
-        </tr>`;
+      const up = isUSD ? (line.unit_price || line.price || 0) : ((line.unit_price || line.price || 0) * rate);
+      const lt = (line.quantity || 0) * (line.unit_price || line.price || 0);
+      const ld = line.discount_percent || line.discount || 0;
+      const dt = isUSD ? lt * (1 - ld / 100) : lt * (1 - ld / 100) * rate;
+      return '<tr><td style="text-align:center;padding:5px 3px;border:1px solid #666;">' + (i+1) + '</td>'
+        + '<td style="text-align:right;padding:5px 6px;border:1px solid #666;direction:rtl;">' + (line.name_ar || line.item_name || line.name || '') + (isTaxed ? ' <b>*</b>' : '') + '</td>'
+        + '<td style="text-align:center;padding:5px 3px;border:1px solid #666;">' + (line.pack_description || line.package || '-') + '</td>'
+        + '<td style="text-align:center;padding:5px 3px;border:1px solid #666;">' + (line.quantity || 0) + '</td>'
+        + '<td style="text-align:right;padding:5px 4px;border:1px solid #666;font-family:monospace;">' + up.toFixed(2) + '</td>'
+        + '<td style="text-align:center;padding:5px 3px;border:1px solid #666;">' + (ld ? ld + '%' : '-') + '</td>'
+        + '<td style="text-align:right;padding:5px 4px;border:1px solid #666;font-family:monospace;font-weight:bold;">' + dt.toFixed(2) + '</td></tr>';
     }).join('');
-
-    const emptyCount = Math.max(0, 18 - lines.length);
-    const emptyRows = Array(emptyCount).fill(
-      '<tr>' + '<td style="padding:5px 3px;border:1px solid #999;">&nbsp;</td>'.repeat(7) + '</tr>'
-    ).join('');
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Invoice ${invoice?.invoice_number || ''}</title>
-  <style>
-    @page { size: A4; margin: 8mm; }
-    * { box-sizing: border-box; }
-    body { font-family: Arial, 'Segoe UI', sans-serif; font-size: 11px; color: #1a2744; margin: 0; padding: 12px; }
-    
-    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1a2744; padding-bottom: 8px; margin-bottom: 6px; }
-    .header-left { text-align: left; flex: 1; }
-    .header-center { text-align: center; flex: 0 0 100px; padding-top: 5px; }
-    .header-right { text-align: right; flex: 1; direction: rtl; }
-    .header h2 { font-size: 15px; margin: 0 0 3px 0; color: #1a2744; }
-    .header p { margin: 1px 0; font-size: 9.5px; color: #444; }
-    
-    .logo { width: 55px; height: 55px; border-radius: 50%; border: 2.5px solid #1a2744; display: flex; align-items: center; justify-content: center; margin: 0 auto; }
-    .logo span { font-size: 20px; font-weight: bold; color: #1a2744; }
-    
-    .inv-title { text-align: center; font-size: 16px; font-weight: bold; color: #1a2744; margin: 6px 0; padding: 3px; border: 2px solid #1a2744; letter-spacing: 2px; }
-    
-    .cust { display: flex; justify-content: space-between; margin: 6px 0; padding: 6px 10px; border: 1px solid #bbb; background: #f8f9fb; border-radius: 3px; }
-    .cust-l { text-align: left; }
-    .cust-r { text-align: right; direction: rtl; }
-    .cf { margin: 2px 0; font-size: 11px; }
-    .cl { font-weight: bold; color: #1a2744; }
-    
-    table.items { width: 100%; border-collapse: collapse; margin: 6px 0; }
-    table.items th { background: #1a2744; color: #fff; padding: 6px 3px; font-size: 9px; text-transform: uppercase; border: 1px solid #1a2744; }
-    table.items td { font-size: 10.5px; vertical-align: middle; }
-    table.items tbody tr:nth-child(even) { background: #f4f6f9; }
-    
-    .totals { display: flex; justify-content: flex-end; margin-top: 4px; }
-    .totals table { width: 280px; border-collapse: collapse; }
-    .totals td { padding: 4px 8px; font-size: 11px; border: 1px solid #bbb; }
-    .totals .lbl { text-align: right; direction: rtl; font-weight: bold; background: #eef1f5; width: 170px; }
-    .totals .val { text-align: right; font-family: monospace; font-size: 11px; }
-    .totals .gt td { background: #1a2744; color: #fff; font-size: 13px; font-weight: bold; }
-    
-    .star { font-size: 9px; color: #c00; margin: 4px 0; direction: rtl; text-align: right; }
-    .receipt { font-size: 8.5px; color: #555; direction: rtl; text-align: right; margin-top: 10px; line-height: 1.5; }
-    .sigs { display: flex; justify-content: space-between; margin-top: 25px; }
-    .sig { width: 180px; text-align: center; }
-    .sig-line { border-top: 1px solid #333; margin-top: 35px; padding-top: 3px; font-size: 9.5px; color: #1a2744; font-weight: bold; }
-    .vat-notice { text-align: center; font-size: 8.5px; color: #1a2744; font-weight: bold; margin-top: 8px; padding-top: 6px; border-top: 1px solid #ccc; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="header-left">
-      <h2>${companyEn}</h2>
-      <p>${addressEn}</p>
-      <p>Tel: ${phone}</p>
-      <p>Email: ${emailAddr}</p>
-      <p style="font-weight:bold;">T.V.A.: ${regNumber}</p>
-    </div>
-    <div class="header-center">
-      <div class="logo"><span>MM</span></div>
-    </div>
-    <div class="header-right">
-      <h2>${companyAr}</h2>
-      <p>${addressAr}</p>
-      <p>تلفون: ${phone}</p>
-      <p>بريد: ${emailAddr}</p>
-      <p style="font-weight:bold;">ض.ق.م.: ${regNumber}</p>
-    </div>
-  </div>
-
-  <div class="inv-title">فاتورة &mdash; INVOICE</div>
-
-  <div class="cust">
-    <div class="cust-l">
-      <div class="cf"><span class="cl">Date / التاريخ:</span> ${invoice?.date || ''}</div>
-      <div class="cf"><span class="cl">Invoice # / رقم الفاتورة:</span> ${invoice?.invoice_number || ''}</div>
-    </div>
-    <div class="cust-r">
-      <div class="cf"><span class="cl">إسم الزبون:</span> ${customerName}</div>
-      <div class="cf"><span class="cl">رقم الزبون:</span> ${customerCode}</div>
-      <div class="cf"><span class="cl">العنوان:</span> ${customerAddress}</div>
-    </div>
-  </div>
-
-  <table class="items">
-    <thead>
-      <tr>
-        <th style="width:28px;">الرقم<br/>#</th>
-        <th>الصنف / Item</th>
-        <th style="width:55px;">صندوق<br/>Box</th>
-        <th style="width:45px;">العدد<br/>Qty</th>
-        <th style="width:60px;">السعر<br/>Price</th>
-        <th style="width:45px;">حسم<br/>Disc</th>
-        <th style="width:70px;">المجموع<br/>Total</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${itemRows}
-      ${emptyRows}
-    </tbody>
-  </table>
-
-  <p class="star"><span style="font-size:12px;font-weight:bold;">*</span> = خاضع للضريبة على القيمة المضافة / Subject to VAT</p>
-
-  <div class="totals">
-    <table>
-      <tr><td class="lbl">المجموع / Subtotal</td><td class="val">${currSymbol} ${subtotal.toFixed(2)}</td></tr>
-      <tr><td class="lbl">ض.ق.م. ${taxPercent}% / VAT</td><td class="val">${currSymbol} ${taxAmount.toFixed(2)}</td></tr>
-      <tr class="gt"><td class="lbl" style="background:#1a2744;color:#fff;">المجموع العام / Total</td><td class="val">${currSymbol} ${total.toFixed(2)}</td></tr>
-    </table>
-  </div>
-
-  <div class="receipt">
-    استلمت البضاعة طبقاً للمبين في الفاتورة أعلاه بحالة جيدة وتأكدت من سلامتها ونوعيتها ومن صلاحية تاريخ الصنع
-  </div>
-
-  <div class="sigs">
-    <div class="sig"><div class="sig-line">الإدارة / Administration</div></div>
-    <div class="sig"><div class="sig-line">إمضاء الزبون / Customer</div></div>
-  </div>
-
-  <div class="vat-notice">خاضع للضريبة على القيمة المضافة - Subject to Value Added Tax</div>
-
-  <script>window.onload = function() { window.print(); }</script>
-</body>
-</html>`);
-    printWindow.document.close();
+    const ec = Math.max(0, 18 - lines.length);
+    const er = Array(ec).fill('<tr>' + '<td style="padding:5px 3px;border:1px solid #666;">&nbsp;</td>'.repeat(7) + '</tr>').join('');
+    const pw = window.open('', '_blank');
+    if (!pw) return;
+    pw.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice ' + (invoice?.invoice_number || '') + '</title><style>'
+      + '@page{size:A4;margin:8mm}*{box-sizing:border-box}'
+      + 'body{font-family:Arial,sans-serif;font-size:13px;color:#000;margin:0;padding:12px}'
+      + '.hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:6px}'
+      + '.hdr-l{text-align:left;flex:1}.hdr-c{text-align:center;flex:0 0 100px;padding-top:5px}.hdr-r{text-align:right;flex:1;direction:rtl}'
+      + '.hdr h2{font-size:17px;margin:0 0 3px}.hdr p{margin:1px 0;font-size:11px}'
+      + '.logo{width:55px;height:55px;border-radius:50%;border:2px solid #000;display:flex;align-items:center;justify-content:center;margin:0 auto}'
+      + '.logo span{font-size:20px;font-weight:bold}'
+      + '.ttl{text-align:center;font-size:18px;font-weight:bold;margin:6px 0;padding:4px;border:2px solid #000;letter-spacing:2px}'
+      + '.cst{display:flex;justify-content:space-between;margin:8px 0;padding:8px 10px;border:1px solid #666}'
+      + '.cst-l{text-align:left}.cst-r{text-align:right;direction:rtl}'
+      + '.cf{margin:3px 0;font-size:13px}.cl{font-weight:bold}'
+      + 'table.it{width:100%;border-collapse:collapse;margin:8px 0}'
+      + 'table.it th{background:#000;color:#fff;padding:7px 4px;font-size:11px;border:1px solid #000}'
+      + 'table.it td{font-size:12px;vertical-align:middle}'
+      + '.tot{display:flex;justify-content:flex-end;margin-top:6px}'
+      + '.tot table{width:300px;border-collapse:collapse}'
+      + '.tot td{padding:5px 8px;font-size:13px;border:1px solid #666}'
+      + '.tot .lb{text-align:right;direction:rtl;font-weight:bold;width:180px}'
+      + '.tot .vl{text-align:right;font-family:monospace;font-size:13px}'
+      + '.tot .gt td{background:#000;color:#fff;font-size:15px;font-weight:bold}'
+      + '.st{font-size:11px;margin:5px 0;direction:rtl;text-align:right}'
+      + '.rc{font-size:10px;direction:rtl;text-align:right;margin-top:12px;line-height:1.6}'
+      + '.sg{display:flex;justify-content:space-between;margin-top:30px}'
+      + '.sb{width:180px;text-align:center}'
+      + '.sl{border-top:1px solid #000;margin-top:40px;padding-top:4px;font-size:11px;font-weight:bold}'
+      + '</style></head><body>'
+      + '<div class="hdr"><div class="hdr-l"><h2>' + companyEn + '</h2><p>' + addressEn + '</p><p>Tel: ' + phone + '</p><p>Email: ' + emailAddr + '</p><p style="font-weight:bold">T.V.A.: ' + regNumber + '</p></div>'
+      + '<div class="hdr-c"><div class="logo"><span>MM</span></div></div>'
+      + '<div class="hdr-r"><h2>' + companyAr + '</h2><p>' + addressAr + '</p><p>تلفون: ' + phone + '</p><p>بريد: ' + emailAddr + '</p><p style="font-weight:bold">ض.ق.م.: ' + regNumber + '</p></div></div>'
+      + '<div class="ttl">فاتورة &mdash; INVOICE</div>'
+      + '<div class="cst"><div class="cst-l"><div class="cf"><span class="cl">Date / التاريخ:</span> ' + (invoice?.date || '') + '</div><div class="cf"><span class="cl">Invoice # / رقم الفاتورة:</span> ' + (invoice?.invoice_number || '') + '</div></div>'
+      + '<div class="cst-r"><div class="cf"><span class="cl">إسم الزبون:</span> ' + customerName + '</div><div class="cf"><span class="cl">رقم الزبون:</span> ' + customerCode + '</div><div class="cf"><span class="cl">العنوان:</span> ' + customerAddress + '</div></div></div>'
+      + '<table class="it"><thead><tr><th style="width:28px">الرقم<br>#</th><th>الصنف / Item</th><th style="width:55px">صندوق<br>Box</th><th style="width:45px">العدد<br>Qty</th><th style="width:60px">السعر<br>Price</th><th style="width:45px">حسم<br>Disc</th><th style="width:70px">المجموع<br>Total</th></tr></thead><tbody>'
+      + itemRows + er + '</tbody></table>'
+      + '<p class="st"><b>*</b> = خاضع للضريبة على القيمة المضافة / Subject to VAT</p>'
+      + '<div class="tot"><table>'
+      + '<tr><td class="lb">المجموع / Subtotal</td><td class="vl">' + currSymbol + ' ' + subtotal.toFixed(2) + '</td></tr>'
+      + (discountAmt > 0 ? '<tr><td class="lb">حسم / Discount</td><td class="vl">' + currSymbol + ' ' + discountAmt.toFixed(2) + '</td></tr>' : '')
+      + '<tr><td class="lb">ض.ق.م. ' + taxPercent + '% / VAT</td><td class="vl">' + currSymbol + ' ' + taxAmount.toFixed(2) + '</td></tr>'
+      + '<tr class="gt"><td class="lb" style="background:#000;color:#fff">المجموع العام / Total</td><td class="vl">' + currSymbol + ' ' + total.toFixed(2) + '</td></tr>'
+      + '</table></div>'
+      + '<div class="rc">استلمت البضاعة طبقاً للمبين في الفاتورة أعلاه بحالة جيدة وتأكدت من سلامتها ونوعيتها ومن صلاحية تاريخ الصنع</div>'
+      + '<div class="sg"><div class="sb"><div class="sl">الإدارة / Administration</div></div><div class="sb"><div class="sl">إمضاء الزبون / Customer</div></div></div>'
+      + '<script>window.onload=function(){window.print()}</script></body></html>');
+    pw.document.close();
   };
 
   if (!currentOrg) {
