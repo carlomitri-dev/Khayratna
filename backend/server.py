@@ -8529,14 +8529,12 @@ app.include_router(quotations_module.router)
 spec = importlib.util.spec_from_file_location("sales_returns_router", "/app/backend/routers/sales_returns.py")
 sales_returns_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sales_returns_module)
-sales_returns_module.init_router(db, get_current_user)
 api_router.include_router(sales_returns_module.router)
 
 # Purchase Returns router - ENABLED
 spec = importlib.util.spec_from_file_location("purchase_returns_router", "/app/backend/routers/purchase_returns.py")
 purchase_returns_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(purchase_returns_module)
-purchase_returns_module.init_router(db, get_current_user)
 api_router.include_router(purchase_returns_module.router)
 
 app.include_router(api_router)

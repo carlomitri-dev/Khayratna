@@ -10,29 +10,10 @@ import uuid
 from models.schemas import (
     PurchaseReturnCreate, PurchaseReturnUpdate, PurchaseReturnResponse
 )
+from core.auth import get_current_user
+from core.database import db
 
 router = APIRouter(prefix="/purchase-returns", tags=["purchase-returns"])
-
-# These will be injected from main app
-db = None
-
-class AuthDependency:
-    def __init__(self):
-        self.auth_func = None
-    
-    def set_auth_func(self, func):
-        self.auth_func = func
-    
-    def __call__(self, *args, **kwargs):
-        return self.auth_func(*args, **kwargs)
-
-auth_dep = AuthDependency()
-
-def init_router(database, auth_dependency):
-    """Initialize router with dependencies"""
-    global db
-    db = database
-    auth_dep.set_auth_func(auth_dependency)
 
 
 async def enrich_purchase_return(ret: dict) -> dict:
@@ -54,7 +35,7 @@ async def get_purchase_returns(
     organization_id: str, status: Optional[str] = None, supplier_id: Optional[str] = None,
     search: Optional[str] = None, date_from: Optional[str] = None, date_to: Optional[str] = None,
     skip: int = 0, limit: int = 50,
-    current_user: dict = Depends(auth_dep)
+    current_user: dict = Depends(get_current_user)
 ):
     query = {'organization_id': organization_id}
     if status: query['status'] = status
@@ -75,7 +56,7 @@ async def get_purchase_returns(
 @router.get("/count")
 async def get_purchase_returns_count(
     organization_id: str, status: Optional[str] = None, search: Optional[str] = None,
-    current_user: dict = Depends(auth_dep)
+    current_user: dict = Depends(get_current_user)
 ):
     query = {'organization_id': organization_id}
     if status: query['status'] = status
@@ -89,7 +70,7 @@ async def get_purchase_returns_count(
 
 
 @router.get("/{return_id}", response_model=PurchaseReturnResponse)
-async def get_purchase_return(return_id: str, current_user: dict = Depends(auth_dep)):
+async def get_purchase_return(return_id: str, current_user: dict = Depends(get_current_user)):
     ret = await db.purchase_returns.find_one({'id': return_id}, {'_id': 0})
     if not ret:
         raise HTTPException(status_code=404, detail="Purchase return not found")
@@ -98,7 +79,7 @@ async def get_purchase_return(return_id: str, current_user: dict = Depends(auth_
 
 
 @router.post("", response_model=PurchaseReturnResponse)
-async def create_purchase_return(return_data: PurchaseReturnCreate, current_user: dict = Depends(auth_dep)):
+async def create_purchase_return(return_data: PurchaseReturnCreate, current_user: dict = Depends(get_current_user)):
     if current_user['role'] not in ['super_admin', 'admin', 'accountant']:
         raise HTTPException(status_code=403, detail="Permission denied")
     count = await db.purchase_returns.count_documents({'organization_id': return_data.organization_id})
@@ -121,7 +102,7 @@ async def create_purchase_return(return_data: PurchaseReturnCreate, current_user
 
 
 @router.put("/{return_id}", response_model=PurchaseReturnResponse)
-async def update_purchase_return(return_id: str, return_data: PurchaseReturnUpdate, current_user: dict = Depends(auth_dep)):
+async def update_purchase_return(return_id: str, return_data: PurchaseReturnUpdate, current_user: dict = Depends(get_current_user)):
     if current_user['role'] not in ['super_admin', 'admin', 'accountant']:
         raise HTTPException(status_code=403, detail="Permission denied")
     ret = await db.purchase_returns.find_one({'id': return_id}, {'_id': 0})
@@ -138,7 +119,7 @@ async def update_purchase_return(return_id: str, return_data: PurchaseReturnUpda
 
 
 @router.delete("/{return_id}")
-async def delete_purchase_return(return_id: str, current_user: dict = Depends(auth_dep)):
+async def delete_purchase_return(return_id: str, current_user: dict = Depends(get_current_user)):
     if current_user['role'] not in ['super_admin', 'admin']:
         raise HTTPException(status_code=403, detail="Permission denied")
     ret = await db.purchase_returns.find_one({'id': return_id}, {'_id': 0})
@@ -151,7 +132,7 @@ async def delete_purchase_return(return_id: str, current_user: dict = Depends(au
 
 
 @router.post("/{return_id}/post")
-async def post_purchase_return(return_id: str, current_user: dict = Depends(auth_dep)):
+async def post_purchase_return(return_id: str, current_user: dict = Depends(get_current_user)):
     """Post a purchase return - creates reversed voucher and removes inventory"""
     if current_user['role'] not in ['super_admin', 'admin', 'accountant']:
         raise HTTPException(status_code=403, detail="Permission denied")
@@ -252,7 +233,7 @@ async def post_purchase_return(return_id: str, current_user: dict = Depends(auth
 
 
 @router.post("/{return_id}/unpost")
-async def unpost_purchase_return(return_id: str, current_user: dict = Depends(auth_dep)):
+async def unpost_purchase_return(return_id: str, current_user: dict = Depends(get_current_user)):
     if current_user['role'] != 'super_admin':
         raise HTTPException(status_code=403, detail="Only super admin can unpost returns")
     ret = await db.purchase_returns.find_one({'id': return_id}, {'_id': 0})

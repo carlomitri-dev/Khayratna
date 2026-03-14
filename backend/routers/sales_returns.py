@@ -10,29 +10,10 @@ import uuid
 from models.schemas import (
     SalesReturnCreate, SalesReturnUpdate, SalesReturnResponse
 )
+from core.auth import get_current_user
+from core.database import db
 
 router = APIRouter(prefix="/sales-returns", tags=["sales-returns"])
-
-# These will be injected from main app
-db = None
-
-class AuthDependency:
-    def __init__(self):
-        self.auth_func = None
-    
-    def set_auth_func(self, func):
-        self.auth_func = func
-    
-    def __call__(self, *args, **kwargs):
-        return self.auth_func(*args, **kwargs)
-
-auth_dep = AuthDependency()
-
-def init_router(database, auth_dependency):
-    """Initialize router with dependencies"""
-    global db
-    db = database
-    auth_dep.set_auth_func(auth_dependency)
 
 
 async def enrich_sales_return(ret: dict) -> dict:
@@ -60,7 +41,7 @@ async def get_sales_returns(
     date_to: Optional[str] = None,
     skip: int = 0,
     limit: int = 50,
-    current_user: dict = Depends(auth_dep)
+    current_user: dict = Depends(get_current_user)
 ):
     query = {'organization_id': organization_id}
     if status:
@@ -92,7 +73,7 @@ async def get_sales_returns_count(
     organization_id: str,
     status: Optional[str] = None,
     search: Optional[str] = None,
-    current_user: dict = Depends(auth_dep)
+    current_user: dict = Depends(get_current_user)
 ):
     query = {'organization_id': organization_id}
     if status:
@@ -107,7 +88,7 @@ async def get_sales_returns_count(
 
 
 @router.get("/{return_id}", response_model=SalesReturnResponse)
-async def get_sales_return(return_id: str, current_user: dict = Depends(auth_dep)):
+async def get_sales_return(return_id: str, current_user: dict = Depends(get_current_user)):
     ret = await db.sales_returns.find_one({'id': return_id}, {'_id': 0})
     if not ret:
         raise HTTPException(status_code=404, detail="Sales return not found")
@@ -116,7 +97,7 @@ async def get_sales_return(return_id: str, current_user: dict = Depends(auth_dep
 
 
 @router.post("", response_model=SalesReturnResponse)
-async def create_sales_return(return_data: SalesReturnCreate, current_user: dict = Depends(auth_dep)):
+async def create_sales_return(return_data: SalesReturnCreate, current_user: dict = Depends(get_current_user)):
     if current_user['role'] not in ['super_admin', 'admin', 'accountant']:
         raise HTTPException(status_code=403, detail="Permission denied")
     count = await db.sales_returns.count_documents({'organization_id': return_data.organization_id})
@@ -143,7 +124,7 @@ async def create_sales_return(return_data: SalesReturnCreate, current_user: dict
 
 
 @router.put("/{return_id}", response_model=SalesReturnResponse)
-async def update_sales_return(return_id: str, return_data: SalesReturnUpdate, current_user: dict = Depends(auth_dep)):
+async def update_sales_return(return_id: str, return_data: SalesReturnUpdate, current_user: dict = Depends(get_current_user)):
     if current_user['role'] not in ['super_admin', 'admin', 'accountant']:
         raise HTTPException(status_code=403, detail="Permission denied")
     ret = await db.sales_returns.find_one({'id': return_id}, {'_id': 0})
@@ -160,7 +141,7 @@ async def update_sales_return(return_id: str, return_data: SalesReturnUpdate, cu
 
 
 @router.delete("/{return_id}")
-async def delete_sales_return(return_id: str, current_user: dict = Depends(auth_dep)):
+async def delete_sales_return(return_id: str, current_user: dict = Depends(get_current_user)):
     if current_user['role'] not in ['super_admin', 'admin']:
         raise HTTPException(status_code=403, detail="Permission denied")
     ret = await db.sales_returns.find_one({'id': return_id}, {'_id': 0})
@@ -173,7 +154,7 @@ async def delete_sales_return(return_id: str, current_user: dict = Depends(auth_
 
 
 @router.post("/{return_id}/post")
-async def post_sales_return(return_id: str, current_user: dict = Depends(auth_dep)):
+async def post_sales_return(return_id: str, current_user: dict = Depends(get_current_user)):
     """Post a sales return - creates reversed voucher and adds inventory back"""
     if current_user['role'] not in ['super_admin', 'admin', 'accountant']:
         raise HTTPException(status_code=403, detail="Permission denied")
@@ -277,7 +258,7 @@ async def post_sales_return(return_id: str, current_user: dict = Depends(auth_de
 
 
 @router.post("/{return_id}/unpost")
-async def unpost_sales_return(return_id: str, current_user: dict = Depends(auth_dep)):
+async def unpost_sales_return(return_id: str, current_user: dict = Depends(get_current_user)):
     if current_user['role'] != 'super_admin':
         raise HTTPException(status_code=403, detail="Only super admin can unpost returns")
     ret = await db.sales_returns.find_one({'id': return_id}, {'_id': 0})
