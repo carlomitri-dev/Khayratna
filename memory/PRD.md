@@ -24,27 +24,31 @@ Lebanese accounting/invoicing SaaS application (KAIROS) built with React + FastA
 ## What's Been Implemented
 - Full accounting module (vouchers, accounts, fiscal years)
 - Sales & Purchase invoices with posting/unposting
-- Sales & Purchase Returns (new modules)
+- Sales & Purchase Returns
 - Inventory management with CSV/DBF import
 - Exchange rate simplification (USD/LBP only)
 - Performance optimization: remote search for account selectors
 - Credit/Debit notes with attachments
 - POS system, Cashier sessions
 - Image archive
+- Customer & Supplier management with VAT number + Add new
 
-## Recent Changes (March 2026)
-1. **Inventory table alignment fix** - Removed duplicate "Name" header (was 11 headers, 10 data columns)
-2. **Performance fix (P0)** - Removed duplicate endpoints from server.py that were overriding optimized router versions:
-   - `/accounts/movable/list` - now uses aggregation pipeline with search/limit
-   - `/customer-accounts` - now uses proper search with limit 100
-   - `/supplier-accounts` - now uses proper search with limit 100
-   - `/sales-accounts` and `/purchase-accounts` - deduplication
+## Recent Changes (March 14, 2026)
+1. **3 Decimal Places** — Updated `formatUSD()` and all `.toFixed(2)` across the app to use 3 decimal digits
+2. **Sales Invoice** — Removed service items from line items; parts (used items from inventory) remain
+3. **Purchase Invoice** — Removed service items, removed "Copy from Sales Invoice" feature, added "Sell Price" column to line items. When posted, updates both `cost` and `price` in inventory
+4. **Customer Module** — Added "Add Customer" button with form (code, name, name_ar, VAT number, contact info). Auto-creates `4114xxxx` VAT mirror account
+5. **Supplier Module** — Added "Add Supplier" button with form (code, name, name_ar, VAT number, contact info). Auto-creates `4014xxxx` VAT mirror account
+6. **VAT Number** — Added to Customer/Supplier tables, view dialogs, edit dialogs, and backend schema
+7. **Duplicate Endpoint Cleanup** — Removed duplicate POST /accounts, /customers, /suppliers, /contact-info, /accounts/movable/list, /customer-accounts, /supplier-accounts, /sales-accounts, /purchase-accounts from server.py
+8. **Inventory Table Fix** — Fixed header/data column misalignment (removed duplicate "Name" header)
+9. **Performance Fix** — Removed 5 duplicate endpoints from server.py that were overriding optimized router versions
 
 ## Known Issues
 - Minor dropdown z-index conflict in header (fiscal year selector) - low priority
-- server.py still has many legacy endpoints that duplicate router files - needs full audit
+- server.py still has some legacy endpoints that may duplicate router files
 
 ## Backlog
 - P2: Full audit of remaining duplicate endpoints in server.py
-- P2: Extract shared AccountSelector component from inline implementations in VoucherEntry/CrDbNotes
+- P2: Extract shared AccountSelector component from inline implementations
 - P3: Minor UI z-index fix for header dropdown
