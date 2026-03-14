@@ -18,7 +18,7 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 - POS Terminal (barcode scanner, quick items, cart, receipt print)
 - Cashier System (sessions, PIN login, admin management)
 - POS Daily Closing Report (admin-only, per-session breakdown, print)
-- POS Sales Analytics Dashboard (sales trends, top items, cashier performance charts)
+- POS Sales Analytics Dashboard (trends, top items, cashier performance charts)
 - Customer & Supplier Management (with VAT number, mirror account creation)
 - Exchange Rates (USD/LBP simplified)
 - Reports: Trial Balance, Income Statement, General Ledger
@@ -26,25 +26,18 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 
 ## Changes Log
 
-### March 14, 2026 (Session 4)
-- **POS Sales Analytics Dashboard** — New admin-only page at `/pos-analytics` with:
-  - 3 backend endpoints: sales-trends, top-items, cashier-performance
-  - Recharts visualizations: Area chart for sales trends, stacked bar for payment methods, horizontal bars for top items, grouped bars for cashier comparison
-  - Date range picker & daily/weekly/monthly period selector
-  - Summary stat cards, cashier performance table
-- **POS Daily Closing Report Tested** — Comprehensive testing via testing_agent (iteration_6), 100% pass
-- **AccountSelector Refactored** — Extracted shared `RemoteAccountSelector` from VoucherEntryPage and CrDbNotesPage
-- **Fixed Layout.jsx duplicate import** — Removed duplicate `FileBarChart` import
+### March 14, 2026 (Session 4 - Bug Fix + Analytics)
+- **CRITICAL BUG FIX: POS Transaction Posting** — Fixed `UnboundLocalError: uuid` caused by shadowed `import uuid` inside if-block in pos.py. POS transactions now post correctly for all payment methods (cash, card, on account).
+- **VAT Accounting in POS** — Voucher now properly splits VAT into a separate Credit line to VAT Payable (442*) instead of including it in the sales total.
+- **Discount Accounting in POS** — Invoice-level discounts create a separate Debit line to Sales Discount (721*). Payment adjustments at register also properly accounted.
+- **Auto-account creation** — If VAT Payable (44210001) or Sales Discount (72110001) accounts don't exist, they're auto-created on first use.
+- **POS Sales Analytics Dashboard** — New admin-only page at `/pos-analytics` with 3 backend endpoints, Recharts charts (trends, payment breakdown, top items, cashier performance), date range filter, period selector.
+- **AccountSelector Refactored** — Extracted shared `RemoteAccountSelector` component.
 
-### March 14, 2026 (Session 3)
-- POS Module Connected, POS Router Included, POS Endpoint Cleanup
-- POS Daily Closing Report Created
-
-### March 14, 2026 (Session 2)
-- Invoice pages rewrite, print for returns, selling_price in purchase invoice
-
-### March 14, 2026 (Session 1)
-- 3 decimal places, service removal, customer/supplier add with VAT, inventory fix, performance fix
+### Prior Sessions
+- Performance overhaul, Invoice pages rewrite, POS module integration
+- Customer/Supplier creation with VAT & mirror accounts
+- 3 decimal places, print for returns, selling_price in purchase invoice
 
 ## Known Issues
 - Minor: React hydration warning in Dashboard (not blocking)
