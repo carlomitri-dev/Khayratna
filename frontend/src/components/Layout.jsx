@@ -34,7 +34,8 @@ import {
   Upload,
   RotateCcw,
   Monitor,
-  UserCheck
+  UserCheck,
+  ClipboardList
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -79,6 +80,7 @@ const Sidebar = ({ isOpen, onClose, collapsed, onToggleCollapse }) => {
     { path: '/sales-invoices', icon: ShoppingCart, label: 'Sales Invoices', requiresEdit: true },
     { path: '/sales-returns', icon: RotateCcw, label: 'Sales Returns', requiresEdit: true },
     { path: '/purchase-invoices', icon: Truck, label: 'Purchase Invoices', requiresEdit: true },
+    { path: '/purchase-orders', icon: ClipboardList, label: 'Purchase Orders', requiresEdit: true },
     { path: '/purchase-returns', icon: RotateCcw, label: 'Purchase Returns', requiresEdit: true },
     { path: '/customers', icon: Users, label: 'Customers' },
     { path: '/suppliers', icon: Truck, label: 'Suppliers' },

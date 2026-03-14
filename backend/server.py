@@ -6697,6 +6697,12 @@ receipt_settings_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(receipt_settings_module)
 api_router.include_router(receipt_settings_module.router)
 
+# Purchase Orders router - ENABLED
+spec = importlib.util.spec_from_file_location("purchase_orders_router", "/app/backend/routers/purchase_orders.py")
+purchase_orders_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(purchase_orders_module)
+api_router.include_router(purchase_orders_module.router)
+
 app.include_router(api_router)
 
 app.add_middleware(

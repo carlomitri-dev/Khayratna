@@ -1034,3 +1034,96 @@ class PurchaseReturnResponse(BaseModel):
     posted_at: Optional[str] = None
     posted_by: Optional[str] = None
     created_by: Optional[str] = None
+
+
+# ================== PURCHASE ORDER MODELS ==================
+
+class PurchaseOrderLineItem(BaseModel):
+    inventory_item_id: Optional[str] = None
+    item_name: str
+    item_name_ar: Optional[str] = None
+    barcode: Optional[str] = None
+    quantity: float
+    unit: str = 'piece'
+    unit_price: float = 0
+    selling_price: Optional[float] = None
+    currency: str = 'USD'
+    exchange_rate: float = 1
+    discount_percent: float = 0
+    line_total: float = 0
+    line_total_usd: Optional[float] = None
+    batch_number: Optional[str] = None
+    expiry_date: Optional[str] = None
+    is_taxable: bool = True
+    notes: Optional[str] = None
+
+class PurchaseOrderCreate(BaseModel):
+    date: str
+    expected_delivery_date: Optional[str] = None
+    order_type: str = 'supplier'  # supplier | daily_sales
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
+    supplier_code: Optional[str] = None
+    lines: List[PurchaseOrderLineItem]
+    subtotal: float = 0
+    discount_percent: float = 0
+    discount_amount: float = 0
+    tax_percent: float = 0
+    tax_amount: float = 0
+    total: float = 0
+    total_usd: float = 0
+    currency: str = 'USD'
+    notes: Optional[str] = None
+    organization_id: str
+
+class PurchaseOrderUpdate(BaseModel):
+    date: Optional[str] = None
+    expected_delivery_date: Optional[str] = None
+    order_type: Optional[str] = None
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
+    supplier_code: Optional[str] = None
+    lines: Optional[List[PurchaseOrderLineItem]] = None
+    subtotal: Optional[float] = None
+    discount_percent: Optional[float] = None
+    discount_amount: Optional[float] = None
+    tax_percent: Optional[float] = None
+    tax_amount: Optional[float] = None
+    total: Optional[float] = None
+    total_usd: Optional[float] = None
+    currency: Optional[str] = None
+    notes: Optional[str] = None
+
+class PurchaseOrderResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    order_number: str
+    date: str
+    expected_delivery_date: Optional[str] = None
+    order_type: str = 'supplier'
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
+    supplier_code: Optional[str] = None
+    lines: List[dict]
+    subtotal: float
+    discount_percent: float = 0
+    discount_amount: float = 0
+    tax_percent: float = 0
+    tax_amount: float = 0
+    total: float
+    total_usd: float
+    currency: str = 'USD'
+    notes: Optional[str] = None
+    status: str  # draft, approved, sent, received, posted
+    purchase_invoice_id: Optional[str] = None
+    purchase_invoice_number: Optional[str] = None
+    organization_id: str
+    created_at: str
+    updated_at: Optional[str] = None
+    created_by: Optional[str] = None
+    created_by_name: Optional[str] = None
+    approved_at: Optional[str] = None
+    approved_by: Optional[str] = None
+    sent_at: Optional[str] = None
+    received_at: Optional[str] = None
+    posted_at: Optional[str] = None
