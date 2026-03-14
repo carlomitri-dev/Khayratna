@@ -34,8 +34,7 @@ import {
   Upload,
   RotateCcw,
   Monitor,
-  UserCheck,
-  FileBarChart
+  UserCheck
 } from 'lucide-react';
 import {
   DropdownMenu,
