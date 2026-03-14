@@ -475,6 +475,7 @@ class PurchaseInvoiceLineItem(BaseModel):
     quantity: float
     unit: str = 'piece'
     unit_price: float
+    selling_price: Optional[float] = None
     currency: str = 'USD'
     exchange_rate: float = 1
     discount_percent: float = 0
