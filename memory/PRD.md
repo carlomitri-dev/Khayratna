@@ -16,7 +16,7 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 - Purchase Orders (full workflow, post as invoice, print, mobile-friendly)
 - Credit/Debit Notes
 - Inventory Management (CSV/DBF import, batch/expiry)
-- POS Terminal (barcode scanner, quick items, cart, receipt print, delete transactions)
+- POS Terminal (barcode scanner, quick items, cart, receipt print, void/delete transactions)
 - POS Receipt Customization (logo, header/footer, printer width, live preview)
 - Cashier System (sessions, PIN login, admin management)
 - POS Daily Closing Report + POS Sales Analytics Dashboard
@@ -27,7 +27,8 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 ## Changes Log
 
 ### March 14, 2026 (Session 4)
-- **BUG FIX: POS Transaction Delete** — Added missing `DELETE /api/pos/invoices/{id}` endpoint. Properly reverses account balances from voucher, restores inventory quantities, deletes both the transaction and the linked voucher.
+- **POS Transaction Void (Soft Delete)** — New PUT /api/pos/invoices/{id}/void endpoint. Voids transaction with reason, reverses account balances and inventory, marks voucher as voided. Frontend: void dialog with reason input, "Show voided" filter in history, VOIDED badge with strikethrough, separate hard delete option.
+- **POS Transaction Delete Fix** — Added missing DELETE endpoint
 - **Purchase Orders Module** — Full CRUD + workflow + post as invoice
 - **POS Transaction Bug Fix** — Fixed uuid error + VAT/discount accounting
 - **POS Receipt Customization** — Settings dialog with logo, header, footer, printer width
