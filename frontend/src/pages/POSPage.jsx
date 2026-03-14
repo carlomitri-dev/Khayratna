@@ -30,12 +30,13 @@ import {
 import { 
   Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, 
   Package, DollarSign, Percent, X, Check, UserCheck,
-  History, Printer, Clock, User, BarChart3, ChevronsUpDown, Building2, AlertTriangle, WifiOff
+  History, Printer, Clock, User, BarChart3, ChevronsUpDown, Building2, AlertTriangle, WifiOff, Settings
 } from 'lucide-react';
 import axios from 'axios';
 import { formatUSD, formatDate } from '../lib/utils';
 import db from '../lib/db';
 import { addToSyncQueue, OPERATION_TYPES, ACTION_TYPES } from '../lib/syncService';
+import ReceiptSettingsDialog from '../components/shared/ReceiptSettingsDialog';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -291,6 +292,8 @@ const POSPage = () => {
   const [selectedBankAccount, setSelectedBankAccount] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null); // Transaction to delete
   const [paymentAdjustment, setPaymentAdjustment] = useState(0); // Adjustment discount/premium based on payment amount
+  const [receiptSettings, setReceiptSettings] = useState(null);
+  const [showReceiptSettings, setShowReceiptSettings] = useState(false);
 
   // Calculate totals in multiple currencies
   // Tax is only applied to items marked as is_taxable
@@ -434,6 +437,14 @@ const POSPage = () => {
         
         // Get exchange rate from org settings
         if (currentOrg.base_exchange_rate) setLbpRate(currentOrg.base_exchange_rate);
+        
+        // Load receipt settings
+        if (isOnline) {
+          try {
+            const rcptRes = await axios.get(`${API}/receipt-settings?organization_id=${currentOrg.id}`);
+            setReceiptSettings(rcptRes.data);
+          } catch { /* use defaults */ }
+        }
         
         // Get tax rate from org settings
         if (currentOrg.tax_percent !== undefined && currentOrg.tax_percent !== null) {
@@ -800,8 +811,23 @@ const POSPage = () => {
     setProcessing(false);
   };
 
-  // Print thermal receipt (80mm POS printer format)
+  // Print thermal receipt (POS printer format)
   const printThermalReceipt = (transaction) => {
+    const rs = receiptSettings || {};
+    const pw = rs.printer_width || '80mm';
+    const fs = rs.font_size || '12px';
+    const storeName = rs.store_name || currentOrg?.name || 'KAIROS POS';
+    const storeNameAr = rs.store_name_ar || '';
+    const addr1 = rs.address_line1 || currentOrg?.address || '';
+    const addr2 = rs.address_line2 || '';
+    const phone = rs.phone || currentOrg?.phone || '';
+    const vatNum = rs.vat_number || '';
+    const footerMsg = rs.footer_message || 'Thank you for your business!';
+    const footerMsgAr = rs.footer_message_ar || '';
+    const showLogo = rs.show_logo !== false && rs.logo_url;
+    const showVat = rs.show_vat_number !== false && vatNum;
+    const showBarcode = rs.show_barcode !== false;
+
     const receiptHtml = `
       <!DOCTYPE html>
       <html>
@@ -811,35 +837,42 @@ const POSPage = () => {
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { 
             font-family: 'Courier New', monospace; 
-            font-size: 12px; 
-            width: 80mm; 
+            font-size: ${fs}; 
+            width: ${pw}; 
             padding: 5mm;
             background: white;
             color: black;
           }
           .header { text-align: center; margin-bottom: 3mm; }
-          .header h1 { font-size: 16px; font-weight: bold; margin-bottom: 2mm; }
-          .header p { font-size: 10px; }
+          .header h1 { font-size: 1.3em; font-weight: bold; margin-bottom: 1mm; }
+          .header h2 { font-size: 1.1em; font-weight: bold; margin-bottom: 1mm; }
+          .header p { font-size: 0.85em; }
+          .logo { text-align: center; margin-bottom: 2mm; }
+          .logo img { max-height: 50px; max-width: 80%; }
           .divider { border-top: 1px dashed #000; margin: 3mm 0; }
           .divider-double { border-top: 2px solid #000; margin: 3mm 0; }
-          .info-row { display: flex; justify-content: space-between; font-size: 11px; margin: 1mm 0; }
+          .info-row { display: flex; justify-content: space-between; font-size: 0.9em; margin: 1mm 0; }
           .item { margin: 2mm 0; }
-          .item-name { font-size: 11px; }
-          .item-details { display: flex; justify-content: space-between; font-size: 10px; color: #333; }
+          .item-name { font-size: 0.9em; }
+          .item-details { display: flex; justify-content: space-between; font-size: 0.85em; color: #333; }
           .total-section { margin-top: 2mm; }
-          .total-row { display: flex; justify-content: space-between; font-size: 11px; margin: 1mm 0; }
-          .grand-total { font-size: 14px; font-weight: bold; }
+          .total-row { display: flex; justify-content: space-between; font-size: 0.9em; margin: 1mm 0; }
+          .grand-total { font-size: 1.2em; font-weight: bold; }
           .payment-info { background: #f0f0f0; padding: 2mm; margin: 2mm 0; }
-          .footer { text-align: center; margin-top: 3mm; font-size: 10px; }
-          .barcode { text-align: center; font-family: 'Libre Barcode 39', cursive; font-size: 32px; margin: 2mm 0; }
-          .qr-placeholder { text-align: center; padding: 3mm; border: 1px dashed #999; margin: 2mm 0; font-size: 10px; }
+          .footer { text-align: center; margin-top: 3mm; font-size: 0.85em; }
+          .barcode-area { text-align: center; padding: 2mm; border: 1px dashed #999; margin: 2mm 0; font-size: 0.8em; }
         </style>
       </head>
       <body>
+        ${showLogo ? `<div class="logo"><img src="${rs.logo_url}" alt="Logo" /></div>` : ''}
+        
         <div class="header">
-          <h1>${currentOrg?.name || 'KAIROS POS'}</h1>
-          <p>${currentOrg?.address || ''}</p>
-          <p>Tel: ${currentOrg?.phone || ''}</p>
+          <h1>${storeName}</h1>
+          ${storeNameAr ? `<h2 dir="rtl">${storeNameAr}</h2>` : ''}
+          ${addr1 ? `<p>${addr1}</p>` : ''}
+          ${addr2 ? `<p>${addr2}</p>` : ''}
+          ${phone ? `<p>Tel: ${phone}</p>` : ''}
+          ${showVat ? `<p>VAT: ${vatNum}</p>` : ''}
         </div>
         
         <div class="divider-double"></div>
@@ -890,7 +923,7 @@ const POSPage = () => {
           ` : ''}
           ${transaction.tax_amount > 0 ? `
           <div class="total-row">
-            <span>Tax (${transaction.tax_percent}%):</span>
+            <span>VAT (${transaction.tax_percent}%):</span>
             <span>+$${transaction.tax_amount.toFixed(3)}</span>
           </div>
           ` : ''}
@@ -928,13 +961,15 @@ const POSPage = () => {
         
         <div class="footer">
           <p>Voucher: ${transaction.voucher_number || 'N/A'}</p>
-          <p style="margin-top: 2mm;">Thank you for your business!</p>
-          <p style="margin-top: 1mm;">www.kairos-pos.com</p>
+          ${footerMsg ? `<p style="margin-top: 2mm;">${footerMsg}</p>` : ''}
+          ${footerMsgAr ? `<p dir="rtl" style="margin-top: 1mm;">${footerMsgAr}</p>` : ''}
         </div>
         
-        <div class="qr-placeholder">
-          [QR Code: ${transaction.receipt_number}]
+        ${showBarcode ? `
+        <div class="barcode-area">
+          [Barcode: ${transaction.receipt_number}]
         </div>
+        ` : ''}
       </body>
       </html>
     `;
@@ -1090,6 +1125,16 @@ const POSPage = () => {
                 >
                   <History className="w-3 h-3 mr-1" />
                   History
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 px-2 text-xs"
+                  onClick={() => setShowReceiptSettings(true)}
+                  data-testid="receipt-settings-btn"
+                >
+                  <Settings className="w-3 h-3 mr-1" />
+                  Receipt
                 </Button>
               </div>
             </CardContent>
@@ -2082,6 +2127,20 @@ const POSPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Receipt Settings Dialog */}
+      <ReceiptSettingsDialog
+        open={showReceiptSettings}
+        onOpenChange={(open) => {
+          setShowReceiptSettings(open);
+          if (!open && currentOrg) {
+            axios.get(`${API}/receipt-settings?organization_id=${currentOrg.id}`)
+              .then(res => setReceiptSettings(res.data))
+              .catch(() => {});
+          }
+        }}
+        organizationId={currentOrg?.id}
+      />
     </div>
   );
 };

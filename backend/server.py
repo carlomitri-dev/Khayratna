@@ -6691,6 +6691,12 @@ pos_analytics_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pos_analytics_module)
 api_router.include_router(pos_analytics_module.router)
 
+# Receipt Settings router - ENABLED
+spec = importlib.util.spec_from_file_location("receipt_settings_router", "/app/backend/routers/receipt_settings.py")
+receipt_settings_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(receipt_settings_module)
+api_router.include_router(receipt_settings_module.router)
+
 app.include_router(api_router)
 
 app.add_middleware(
