@@ -23,7 +23,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '../components/ui/dialog';
-import { Plus, Trash2, AlertCircle, Save, Send, RefreshCw, Pencil, Undo2, ChevronDown, Filter, WifiOff, Loader2 } from 'lucide-react';
+import { Plus, Trash2, AlertCircle, Save, Send, RefreshCw, Pencil, Undo2, ChevronDown, Filter, WifiOff, Loader2, Check, Search } from 'lucide-react';
 import axios from 'axios';
 import { formatLBP, formatUSD, getTodayForInput, getVoucherTypeName, formatDate } from '../lib/utils';
 import db from '../lib/db';

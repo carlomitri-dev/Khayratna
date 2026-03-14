@@ -6685,6 +6685,12 @@ purchase_returns_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(purchase_returns_module)
 api_router.include_router(purchase_returns_module.router)
 
+# POS Analytics router - ENABLED
+spec = importlib.util.spec_from_file_location("pos_analytics_router", "/app/backend/routers/pos_analytics.py")
+pos_analytics_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(pos_analytics_module)
+api_router.include_router(pos_analytics_module.router)
+
 app.include_router(api_router)
 
 app.add_middleware(

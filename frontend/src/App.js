@@ -30,6 +30,7 @@ import CashierPOSPage from './pages/CashierPOSPage';
 import CashierSessionsPage from './pages/CashierSessionsPage';
 import CashierLoginPage from './pages/CashierLoginPage';
 import POSClosingReportPage from './pages/POSClosingReportPage';
+import POSAnalyticsPage from './pages/POSAnalyticsPage';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -244,6 +245,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <POSClosingReportPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pos-analytics"
+        element={
+          <ProtectedRoute>
+            <POSAnalyticsPage />
           </ProtectedRoute>
         }
       />
