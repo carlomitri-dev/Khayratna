@@ -629,6 +629,12 @@ class POSTransactionResponse(BaseModel):
     created_at: str
     created_by: Optional[str] = None
     cashier_name: Optional[str] = None
+    # Void fields for soft-delete functionality
+    is_voided: Optional[bool] = False
+    voided_at: Optional[str] = None
+    voided_by: Optional[str] = None
+    voided_by_name: Optional[str] = None
+    void_reason: Optional[str] = None
 
 # ================== CURRENCY MODELS ==================
 

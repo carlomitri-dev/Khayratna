@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { formatUSD, formatDate } from '../lib/utils';
+import { toast } from 'sonner';
 import db from '../lib/db';
 import { addToSyncQueue, OPERATION_TYPES, ACTION_TYPES } from '../lib/syncService';
 import ReceiptSettingsDialog from '../components/shared/ReceiptSettingsDialog';
@@ -294,6 +295,9 @@ const POSPage = () => {
   const [paymentAdjustment, setPaymentAdjustment] = useState(0); // Adjustment discount/premium based on payment amount
   const [receiptSettings, setReceiptSettings] = useState(null);
   const [showReceiptSettings, setShowReceiptSettings] = useState(false);
+  const [voidConfirm, setVoidConfirm] = useState(null);
+  const [voidReason, setVoidReason] = useState('');
+  const [showVoided, setShowVoided] = useState(false);
 
   // Calculate totals in multiple currencies
   // Tax is only applied to items marked as is_taxable
@@ -533,24 +537,36 @@ const POSPage = () => {
   const handleDeleteTransaction = async (transaction) => {
     try {
       setProcessing(true);
-      
-      // Delete the POS invoice (backend should handle voucher deletion and inventory restoration)
       await axios.delete(`${API}/pos/invoices/${transaction.id}?restore_inventory=true`);
-      
-      alert(`Transaction ${transaction.receipt_number} and voucher ${transaction.voucher_number} deleted successfully!`);
+      toast.success(`Transaction ${transaction.receipt_number} permanently deleted`);
       setDeleteConfirm(null);
       fetchTransactions();
     } catch (error) {
       const detail = error.response?.data?.detail;
-      let errorMsg = 'Failed to delete transaction';
-      if (detail) {
-        if (Array.isArray(detail)) {
-          errorMsg = detail.map(e => e.msg).join(', ');
-        } else if (typeof detail === 'string') {
-          errorMsg = detail;
-        }
-      }
-      alert(errorMsg);
+      toast.error(typeof detail === 'string' ? detail : 'Failed to delete transaction');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleVoidTransaction = async () => {
+    if (!voidConfirm) return;
+    if (!voidReason.trim()) {
+      toast.error('Please enter a reason for voiding');
+      return;
+    }
+    try {
+      setProcessing(true);
+      await axios.put(
+        `${API}/pos/invoices/${voidConfirm.id}/void?reason=${encodeURIComponent(voidReason.trim())}`
+      );
+      toast.success(`Transaction ${voidConfirm.receipt_number} voided`);
+      setVoidConfirm(null);
+      setVoidReason('');
+      fetchTransactions();
+    } catch (error) {
+      const detail = error.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : 'Failed to void transaction');
     } finally {
       setProcessing(false);
     }
@@ -1965,15 +1981,27 @@ const POSPage = () => {
               <History className="w-5 h-5" />
               Transaction History
             </DialogTitle>
+            <DialogDescription className="flex items-center gap-3">
+              <span>{transactions.filter(t => !t.is_voided).length} active transactions</span>
+              <label className="flex items-center gap-1.5 cursor-pointer text-xs">
+                <input
+                  type="checkbox"
+                  checked={showVoided}
+                  onChange={e => setShowVoided(e.target.checked)}
+                  className="rounded border-border"
+                />
+                Show voided ({transactions.filter(t => t.is_voided).length})
+              </label>
+            </DialogDescription>
           </DialogHeader>
           
           <div className="overflow-y-auto max-h-[60vh]">
-            {transactions.length === 0 ? (
+            {transactions.filter(t => showVoided || !t.is_voided).length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No transactions found
               </div>
             ) : (
-              <table className="data-table text-sm">
+              <table className="data-table text-sm" data-testid="history-table">
                 <thead>
                   <tr>
                     <th>Receipt #</th>
@@ -1982,33 +2010,57 @@ const POSPage = () => {
                     <th>Items</th>
                     <th className="text-right">Total</th>
                     <th>Payment</th>
-                    <th>Voucher</th>
+                    <th>Status</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map(t => (
-                    <tr key={t.id}>
-                      <td className="font-mono text-xs">{t.receipt_number}</td>
+                  {transactions.filter(t => showVoided || !t.is_voided).map(t => (
+                    <tr key={t.id} className={t.is_voided ? 'opacity-50' : ''}>
+                      <td className={`font-mono text-xs ${t.is_voided ? 'line-through' : ''}`}>{t.receipt_number}</td>
                       <td className="text-muted-foreground text-xs">{formatDate(t.date)} {t.time}</td>
                       <td className="text-xs">{t.customer_name || '-'}</td>
                       <td>{t.lines.length}</td>
-                      <td className="text-right font-mono font-bold text-green-400">
+                      <td className={`text-right font-mono font-bold ${t.is_voided ? 'text-red-400 line-through' : 'text-green-400'}`}>
                         ${formatUSD(t.total_usd)}
                       </td>
                       <td className="capitalize text-xs">{t.payment_method}</td>
-                      <td className="font-mono text-xs">{t.voucher_number}</td>
+                      <td>
+                        {t.is_voided ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-500/20 text-red-400 border border-red-500/30" title={`Reason: ${t.void_reason || 'N/A'}\nBy: ${t.voided_by_name || 'Admin'}\nAt: ${t.voided_at || ''}`}>
+                            VOIDED
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            Active
+                          </span>
+                        )}
+                      </td>
                       <td>
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => printThermalReceipt(t)} title="Print Receipt">
-                            <Printer className="w-3 h-3" />
-                          </Button>
+                          {!t.is_voided && (
+                            <>
+                              <Button variant="ghost" size="sm" onClick={() => printThermalReceipt(t)} title="Print Receipt">
+                                <Printer className="w-3 h-3" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/20" 
+                                onClick={() => { setVoidConfirm(t); setVoidReason(''); }}
+                                title="Void Transaction"
+                                data-testid="void-btn"
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </>
+                          )}
                           <Button 
                             variant="ghost" 
                             size="sm" 
                             className="text-red-400 hover:text-red-300 hover:bg-red-500/20" 
                             onClick={() => setDeleteConfirm(t)}
-                            title="Delete Transaction"
+                            title={t.is_voided ? "Permanently Delete" : "Delete Transaction"}
                           >
                             <Trash2 className="w-3 h-3" />
                           </Button>
@@ -2029,10 +2081,10 @@ const POSPage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-400">
               <AlertTriangle className="w-5 h-5" />
-              Delete Transaction
+              Permanently Delete
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this transaction? This action cannot be undone.
+              This will permanently remove this transaction from the system. This cannot be undone. Use "Void" instead to keep an audit trail.
             </DialogDescription>
           </DialogHeader>
           
@@ -2059,7 +2111,7 @@ const POSPage = () => {
               
               <div className="text-sm text-amber-400 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>This will also delete the connected voucher and restore inventory quantities.</span>
+                <span>This will permanently delete the transaction, voucher, and restore inventory.</span>
               </div>
             </div>
           )}
@@ -2072,8 +2124,68 @@ const POSPage = () => {
               variant="destructive" 
               onClick={() => handleDeleteTransaction(deleteConfirm)}
               disabled={processing}
+              data-testid="confirm-delete-btn"
             >
-              {processing ? 'Deleting...' : 'Delete Transaction'}
+              {processing ? 'Deleting...' : 'Permanently Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Void Transaction Dialog */}
+      <Dialog open={!!voidConfirm} onOpenChange={() => { setVoidConfirm(null); setVoidReason(''); }}>
+        <DialogContent className="max-w-md" data-testid="void-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-400">
+              <X className="w-5 h-5" />
+              Void Transaction
+            </DialogTitle>
+            <DialogDescription>
+              Void this transaction to reverse its accounting entries and restore inventory. The transaction will remain visible in history for audit purposes.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {voidConfirm && (
+            <div className="space-y-3 py-2">
+              <div className="bg-muted/30 p-3 rounded-lg space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Receipt:</span>
+                  <span className="font-mono font-medium">{voidConfirm.receipt_number}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total:</span>
+                  <span className="font-mono font-bold text-green-400">${formatUSD(voidConfirm.total_usd)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Voucher:</span>
+                  <span className="font-mono">{voidConfirm.voucher_number}</span>
+                </div>
+              </div>
+              
+              <div className="space-y-1.5">
+                <Label className="text-xs">Reason for Voiding *</Label>
+                <Input
+                  value={voidReason}
+                  onChange={e => setVoidReason(e.target.value)}
+                  placeholder="e.g., Customer returned items, wrong order, duplicate entry..."
+                  data-testid="void-reason-input"
+                  autoFocus
+                />
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setVoidConfirm(null); setVoidReason(''); }} disabled={processing}>
+              Cancel
+            </Button>
+            <Button 
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={handleVoidTransaction}
+              disabled={processing || !voidReason.trim()}
+              data-testid="confirm-void-btn"
+            >
+              {processing ? 'Voiding...' : 'Void Transaction'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -690,3 +690,67 @@ async def delete_pos_transaction(
         'voucher_deleted': voucher_id is not None,
         'inventory_restored': restore_inventory
     }
+
+
+@router.put("/invoices/{transaction_id}/void")
+async def void_pos_transaction(
+    transaction_id: str,
+    reason: str = "Voided by admin",
+    current_user: dict = Depends(get_current_user)
+):
+    """Void a POS transaction (soft-delete). Reverses account balances and inventory but keeps audit trail."""
+    if current_user['role'] not in ['super_admin', 'admin']:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    transaction = await db.pos_transactions.find_one({'id': transaction_id})
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    if transaction.get('is_voided'):
+        raise HTTPException(status_code=400, detail="Transaction is already voided")
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # 1. Reverse account balances from the linked voucher
+    voucher_id = transaction.get('voucher_id')
+    if voucher_id:
+        voucher = await db.vouchers.find_one({'id': voucher_id})
+        if voucher:
+            for line in voucher.get('lines', []):
+                net = line.get('debit_usd', 0) - line.get('credit_usd', 0)
+                if net != 0:
+                    await db.accounts.update_one(
+                        {'id': line['account_id']},
+                        {'$inc': {'balance_usd': -net}}
+                    )
+            # Mark voucher as voided too
+            await db.vouchers.update_one(
+                {'id': voucher_id},
+                {'$set': {'is_voided': True, 'voided_at': now, 'voided_by': current_user['id'], 'void_reason': reason}}
+            )
+
+    # 2. Restore inventory quantities
+    for line in transaction.get('lines', []):
+        inv_id = line.get('inventory_item_id')
+        if inv_id:
+            qty = line.get('quantity', 0)
+            if qty > 0:
+                await db.inventory_items.update_one(
+                    {'id': inv_id},
+                    {'$inc': {'on_hand_qty': qty}}
+                )
+
+    # 3. Mark POS transaction as voided (soft-delete)
+    await db.pos_transactions.update_one(
+        {'id': transaction_id},
+        {'$set': {
+            'is_voided': True,
+            'voided_at': now,
+            'voided_by': current_user['id'],
+            'voided_by_name': current_user.get('name', 'Admin'),
+            'void_reason': reason
+        }}
+    )
+
+    updated = await db.pos_transactions.find_one({'id': transaction_id}, {'_id': 0})
+    enriched = await enrich_pos_transaction(updated)
+    return enriched
