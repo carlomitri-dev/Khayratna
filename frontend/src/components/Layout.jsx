@@ -32,7 +32,9 @@ import {
   Lock,
   Unlock,
   Upload,
-  RotateCcw
+  RotateCcw,
+  Monitor,
+  UserCheck
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -81,6 +83,8 @@ const Sidebar = ({ isOpen, onClose, collapsed, onToggleCollapse }) => {
     { path: '/customers', icon: Users, label: 'Customers' },
     { path: '/suppliers', icon: Truck, label: 'Suppliers' },
     { path: '/inventory', icon: Package, label: 'Inventory' },
+    { path: '/pos', icon: Monitor, label: 'POS Terminal', requiresEdit: true },
+    { path: '/cashier-sessions', icon: UserCheck, label: 'Cashier Sessions', requiresAdmin: true },
     { path: '/exchange-rates', icon: DollarSign, label: 'Exchange Rates' },
     { path: '/trial-balance', icon: FileBarChart, label: 'Trial Balance' },
     { path: '/income-statement', icon: TrendingUp, label: 'Income Statement' },

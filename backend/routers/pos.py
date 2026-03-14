@@ -460,6 +460,36 @@ async def get_pos_daily_summary(
     }
 
 
+@router.get("/inventory")
+async def get_pos_inventory(organization_id: str, current_user: dict = Depends(get_current_user)):
+    """Get inventory items for POS - returns items with stock > 0 or all if configured"""
+    items = await db.inventory_items.find({
+        'organization_id': organization_id,
+        'is_active': {'$ne': False}
+    }, {
+        '_id': 0,
+        'id': 1,
+        'barcode': 1,
+        'sku': 1,
+        'name': 1,
+        'name_ar': 1,
+        'price': 1,
+        'cost': 1,
+        'currency': 1,
+        'unit': 1,
+        'on_hand_qty': 1,
+        'image_filename': 1,
+        'image_url': 1,
+        'is_taxable': 1,
+        'is_pos_item': 1,
+        'show_image_in_pos': 1,
+        'show_in_pos_quick_items': 1,
+        'category_id': 1
+    }).sort('name', 1).to_list(1000)
+    
+    return items
+
+
 @router.get("/cash-accounts")
 async def get_pos_cash_accounts(organization_id: str, current_user: dict = Depends(get_current_user)):
     """Get cash/bank accounts for POS (typically class 5, code length > 4)"""

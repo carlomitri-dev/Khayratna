@@ -25,6 +25,10 @@ import PurchaseInvoicePage from './pages/PurchaseInvoicePage';
 import SalesReturnPage from './pages/SalesReturnPage';
 import PurchaseReturnPage from './pages/PurchaseReturnPage';
 import ImportDataPage from './pages/ImportDataPage';
+import POSPage from './pages/POSPage';
+import CashierPOSPage from './pages/CashierPOSPage';
+import CashierSessionsPage from './pages/CashierSessionsPage';
+import CashierLoginPage from './pages/CashierLoginPage';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -218,6 +222,24 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/pos"
+        element={
+          <ProtectedRoute>
+            <POSPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cashier-sessions"
+        element={
+          <ProtectedRoute>
+            <CashierSessionsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/cashier-login" element={<CashierLoginPage />} />
+      <Route path="/cashier-pos" element={<CashierPOSPage />} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
