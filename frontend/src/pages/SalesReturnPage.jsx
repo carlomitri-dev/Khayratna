@@ -102,13 +102,11 @@ const SalesReturnPage = () => {
   
   const fetchData = async () => {
     try {
-      const [customersRes, salesRes, inventoryRes, rateRes] = await Promise.all([
-        axios.get(`${API}/customer-accounts?organization_id=${currentOrg.id}`),
+      const [salesRes, inventoryRes, rateRes] = await Promise.all([
         axios.get(`${API}/sales-accounts?organization_id=${currentOrg.id}`),
         axios.get(`${API}/inventory?organization_id=${currentOrg.id}&page_size=1000`),
         axios.get(`${API}/exchange-rates/latest?organization_id=${currentOrg.id}`).catch(() => ({ data: { rate: 89500 } }))
       ]);
-      setCustomers(customersRes.data);
       setSalesAccounts(salesRes.data);
       const items = inventoryRes.data?.items || inventoryRes.data || [];
       setInventoryItems(Array.isArray(items) ? items : []);
@@ -467,17 +465,18 @@ const SalesReturnPage = () => {
                   value={formData.debit_account_id}
                   onChange={(val) => setFormData({ ...formData, debit_account_id: val })}
                   placeholder="Select sales return account..."
-                  data-testid="debit-account-selector"
+                  accountType="account"
                 />
               </div>
               <div>
                 <Label>Customer Account (Credit)</Label>
                 <AccountSelector
-                  accounts={customers}
+                  fetchUrl="/customer-accounts"
+                  fetchParams={{ organization_id: currentOrg.id }}
                   value={formData.credit_account_id}
                   onChange={(val) => setFormData({ ...formData, credit_account_id: val })}
-                  placeholder="Select customer account..."
-                  data-testid="credit-account-selector"
+                  placeholder="Search customer account..."
+                  accountType="customer"
                 />
               </div>
             </div>

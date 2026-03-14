@@ -98,13 +98,11 @@ const PurchaseReturnPage = () => {
   
   const fetchData = async () => {
     try {
-      const [suppliersRes, purchaseRes, inventoryRes, rateRes] = await Promise.all([
-        axios.get(`${API}/supplier-accounts?organization_id=${currentOrg.id}`),
+      const [purchaseRes, inventoryRes, rateRes] = await Promise.all([
         axios.get(`${API}/purchase-accounts?organization_id=${currentOrg.id}`),
         axios.get(`${API}/inventory?organization_id=${currentOrg.id}&page_size=1000`),
         axios.get(`${API}/exchange-rates/latest?organization_id=${currentOrg.id}`).catch(() => ({ data: { rate: 89500 } }))
       ]);
-      setSuppliers(suppliersRes.data);
       setPurchaseAccounts(purchaseRes.data);
       const items = inventoryRes.data?.items || inventoryRes.data || [];
       setInventoryItems(Array.isArray(items) ? items : []);
@@ -451,11 +449,12 @@ const PurchaseReturnPage = () => {
               <div>
                 <Label>Supplier Account (Debit)</Label>
                 <AccountSelector
-                  accounts={suppliers}
+                  fetchUrl="/supplier-accounts"
+                  fetchParams={{ organization_id: currentOrg.id }}
                   value={formData.debit_account_id}
                   onChange={(val) => setFormData({ ...formData, debit_account_id: val })}
-                  placeholder="Select supplier account..."
-                  data-testid="debit-account-selector"
+                  placeholder="Search supplier account..."
+                  accountType="supplier"
                 />
               </div>
               <div>
@@ -465,7 +464,7 @@ const PurchaseReturnPage = () => {
                   value={formData.credit_account_id}
                   onChange={(val) => setFormData({ ...formData, credit_account_id: val })}
                   placeholder="Select purchase return account..."
-                  data-testid="credit-account-selector"
+                  accountType="account"
                 />
               </div>
             </div>

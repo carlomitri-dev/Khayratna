@@ -728,7 +728,7 @@ async def get_customer_accounts(organization_id: str, search: Optional[str] = No
     accounts = await db.accounts.find(
         query,
         {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1, 'address': 1, 'mobile': 1, 'contact_person': 1, 'registration_number': 1, 'region_id': 1}
-    ).sort('code', 1).to_list(1000)
+    ).sort('code', 1).to_list(100)
     return accounts
 
 
@@ -755,7 +755,7 @@ async def get_supplier_accounts(organization_id: str, search: Optional[str] = No
     accounts = await db.accounts.find(
         query,
         {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1, 'address': 1, 'mobile': 1, 'contact_person': 1, 'registration_number': 1}
-    ).sort('code', 1).to_list(1000)
+    ).sort('code', 1).to_list(100)
     return accounts
 
 

@@ -134,10 +134,9 @@ const PurchaseInvoicePage = () => {
     setLoading(true);
     try {
       if (isOnline) {
-        const [suppliersRes, purchaseRes, inventoryRes, servicesRes] = await Promise.all([
-          axios.get(`${API}/supplier-accounts?organization_id=${currentOrg.id}`),
+        const [purchaseRes, inventoryRes, servicesRes] = await Promise.all([
           axios.get(`${API}/purchase-accounts?organization_id=${currentOrg.id}`),
-          axios.get(`${API}/inventory?organization_id=${currentOrg.id}&page_size=1000`),  // Load first 1000, search for more
+          axios.get(`${API}/inventory?organization_id=${currentOrg.id}&page_size=1000`),
           axios.get(`${API}/service-items?organization_id=${currentOrg.id}`).catch(() => ({ data: [] }))
         ]);
         
@@ -153,11 +152,6 @@ const PurchaseInvoicePage = () => {
         
         // Cache data in IndexedDB
         try {
-          // Cache suppliers
-          const supplierData = suppliersRes.data.map(s => ({ ...s, organization_id: currentOrg.id }));
-          await db.suppliers.where('organization_id').equals(currentOrg.id).delete();
-          if (supplierData.length > 0) await db.suppliers.bulkPut(supplierData);
-          
           // Cache inventory
           await db.inventoryItems.where('organization_id').equals(currentOrg.id).delete();
           if (inventoryData.length > 0) await db.inventoryItems.bulkPut(inventoryData);
@@ -169,7 +163,6 @@ const PurchaseInvoicePage = () => {
           console.warn('[PurchaseInvoice] Error caching data:', cacheError);
         }
         
-        setSuppliers(suppliersRes.data);
         setPurchaseAccounts(purchaseRes.data);
         setInventoryItems(inventoryData);
         setServiceItems(serviceData);
@@ -1255,7 +1248,8 @@ const PurchaseInvoicePage = () => {
                     required
                   />
                   <AccountSelector
-                    accounts={suppliers}
+                    fetchUrl="/supplier-accounts"
+                    fetchParams={{ organization_id: currentOrg.id }}
                     value={formData.credit_account_id}
                     onChange={(v) => setFormData({ ...formData, credit_account_id: v })}
                     label="Credit Account (Supplier Payable)"

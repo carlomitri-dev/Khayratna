@@ -296,10 +296,9 @@ const SalesInvoicePage = () => {
     setLoading(true);
     try {
       if (isOnline) {
-        const [customersRes, salesRes, inventoryRes, serviceRes, rateRes] = await Promise.all([
-          axios.get(`${API}/customer-accounts?organization_id=${currentOrg.id}`),
+        const [salesRes, inventoryRes, serviceRes, rateRes] = await Promise.all([
           axios.get(`${API}/sales-accounts?organization_id=${currentOrg.id}`),
-          axios.get(`${API}/inventory?organization_id=${currentOrg.id}&page_size=1000`),  // Load first 1000, search for more
+          axios.get(`${API}/inventory?organization_id=${currentOrg.id}&page_size=1000`),
           axios.get(`${API}/service-items?organization_id=${currentOrg.id}`).catch(() => ({ data: [] })),
           axios.get(`${API}/exchange-rates/latest?organization_id=${currentOrg.id}`).catch(() => ({ data: { rate: 89500 } }))
         ]);
@@ -332,7 +331,6 @@ const SalesInvoicePage = () => {
           console.warn('[SalesInvoice] Error caching data:', cacheError);
         }
         
-        setCustomers(customersRes.data);
         setSalesAccounts(salesRes.data);
         setInventoryItems(inventoryData);
         setServiceItems(serviceData);
@@ -1739,13 +1737,15 @@ const SalesInvoicePage = () => {
               ) : (
                 <>
                   <AccountSelector
-                    accounts={customers}
+                    fetchUrl="/customer-accounts"
+                    fetchParams={{ organization_id: currentOrg.id }}
                     value={formData.debit_account_id}
                     onChange={(v) => setFormData({ ...formData, debit_account_id: v })}
                     label="Debit Account (Receivable) *"
                     labelIcon={DollarSign}
                     labelColor="text-red-400"
                     placeholder="Search customer account..."
+                    accountType="customer"
                   />
                   <AccountSelector
                     accounts={salesAccounts}
@@ -1755,6 +1755,7 @@ const SalesInvoicePage = () => {
                     labelIcon={DollarSign}
                     labelColor="text-green-400"
                     placeholder="Search sales account..."
+                    accountType="account"
                   />
                 </>
               )}

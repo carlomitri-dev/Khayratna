@@ -210,7 +210,6 @@ async def get_accounts(
 @router.get("/accounts/movable/list", response_model=List[AccountResponse])
 async def get_movable_accounts(organization_id: str, search: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Get movable accounts (leaf accounts with 5+ digit codes) for voucher entry"""
-    # Use aggregation pipeline for efficient search + code length filtering
     pipeline = [
         {'$match': {
             'organization_id': organization_id,
@@ -227,9 +226,12 @@ async def get_movable_accounts(organization_id: str, search: Optional[str] = Non
             {'name_ar': {'$regex': search}}
         ]}})
     
+    # Return max 100 items for fast loading; user types to narrow
+    result_limit = 200 if search else 100
+    
     pipeline.extend([
         {'$sort': {'code': 1}},
-        {'$limit': 5000},
+        {'$limit': result_limit},
         {'$project': {
             '_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1,
             'account_type': 1, 'account_class': 1, 'is_active': 1,
@@ -237,7 +239,7 @@ async def get_movable_accounts(organization_id: str, search: Optional[str] = Non
         }}
     ])
     
-    accounts = await db.accounts.aggregate(pipeline).to_list(5000)
+    accounts = await db.accounts.aggregate(pipeline).to_list(result_limit)
     
     for acc in accounts:
         acc.setdefault('balance_lbp', 0)

@@ -1,17 +1,21 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Search, ChevronsUpDown, User, Building2 } from 'lucide-react';
+import { Search, ChevronsUpDown, User, Building2, Loader2 } from 'lucide-react';
 import { formatUSD } from '../../lib/utils';
+import axios from 'axios';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 /**
- * Reusable Account Selector Component
- * Used for selecting customers, suppliers, or any account type
+ * Reusable Account Selector Component with Remote Search
+ * When fetchUrl is provided, it fetches accounts from API on search (true remote search).
+ * When accounts array is provided, it filters locally (legacy mode).
  */
 const AccountSelector = ({
-  accounts = [],
+  accounts: localAccounts = [],
   value,
   onChange,
   label,
@@ -20,33 +24,110 @@ const AccountSelector = ({
   placeholder = 'Select account...',
   showBalance = true,
   showCode = true,
-  accountType = 'customer', // 'customer', 'supplier', 'account'
+  accountType = 'customer',
   disabled = false,
   className = '',
-  required = false
+  required = false,
+  fetchUrl = null,       // e.g., '/customer-accounts' or '/accounts/movable/list'
+  fetchParams = {},      // e.g., { organization_id: '...' }
+  minSearchLength = 1,   // minimum chars before searching remotely
 }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [remoteAccounts, setRemoteAccounts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(false);
+  const [selectedCache, setSelectedCache] = useState(null);
+  const debounceRef = useRef(null);
+  const abortRef = useRef(null);
 
-  const filteredAccounts = useMemo(() => {
-    if (!search) return accounts;
-    const searchLower = search.toLowerCase();
-    return accounts.filter(acc =>
-      acc.name?.toLowerCase().includes(searchLower) ||
-      acc.code?.toLowerCase().includes(searchLower) ||
-      (acc.name_ar && acc.name_ar.includes(search))
-    );
-  }, [accounts, search]);
+  const isRemote = !!fetchUrl;
 
-  // Limit rendered items for performance - show max 100 at a time
-  const MAX_VISIBLE = 100;
-  const displayAccounts = filteredAccounts.slice(0, MAX_VISIBLE);
-  const hasMoreAccounts = filteredAccounts.length > MAX_VISIBLE;
+  // For remote mode: fetch initial small set when opening dropdown
+  const fetchAccounts = useCallback(async (searchTerm = '') => {
+    if (!fetchUrl) return;
+    
+    // Cancel previous request
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    abortRef.current = new AbortController();
+    
+    setLoading(true);
+    try {
+      const params = new URLSearchParams(fetchParams);
+      if (searchTerm) {
+        params.set('search', searchTerm);
+      }
+      const res = await axios.get(`${API}${fetchUrl}?${params.toString()}`, {
+        signal: abortRef.current.signal
+      });
+      const data = Array.isArray(res.data) ? res.data : (res.data?.accounts || res.data?.data || []);
+      setRemoteAccounts(data);
+      if (!initialLoaded) setInitialLoaded(true);
+    } catch (error) {
+      if (error.name !== 'CanceledError' && error.name !== 'AbortError') {
+        console.error('Failed to fetch accounts:', error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchUrl, fetchParams]);
 
-  const selectedAccount = accounts.find(acc => acc.id === value);
+  // When dropdown opens, load initial set
+  useEffect(() => {
+    if (open && isRemote && !initialLoaded) {
+      fetchAccounts('');
+    }
+  }, [open, isRemote, initialLoaded, fetchAccounts]);
 
+  // Debounced remote search
+  useEffect(() => {
+    if (!isRemote || !open) return;
+    
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    
+    debounceRef.current = setTimeout(() => {
+      if (search.length >= minSearchLength || search.length === 0) {
+        fetchAccounts(search);
+      }
+    }, 300);
+    
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [search, isRemote, open, minSearchLength, fetchAccounts]);
+
+  // Determine which accounts to show
+  const accounts = isRemote ? remoteAccounts : localAccounts;
+
+  // For local mode, filter client-side
+  const displayAccounts = isRemote
+    ? accounts
+    : (() => {
+        let filtered = accounts;
+        if (search) {
+          const searchLower = search.toLowerCase();
+          filtered = accounts.filter(acc =>
+            acc.name?.toLowerCase().includes(searchLower) ||
+            acc.code?.toLowerCase().includes(searchLower) ||
+            (acc.name_ar && acc.name_ar.includes(search))
+          );
+        }
+        return filtered.slice(0, 100);
+      })();
+
+  // Find selected account - check local, remote, and cache
+  const selectedAccount = accounts.find(acc => acc.id === value)
+    || localAccounts.find(acc => acc.id === value)
+    || selectedCache;
+
+  // When selecting remotely, cache the selected account info for display
   const handleSelect = (account) => {
     onChange(account.id);
+    setSelectedCache(account);
     setOpen(false);
     setSearch('');
   };
@@ -79,6 +160,7 @@ const AccountSelector = ({
             role="combobox"
             className="w-full justify-between h-9 text-sm"
             disabled={disabled}
+            data-testid="account-selector-trigger"
           >
             <span className="truncate flex items-center gap-2">
               {selectedAccount ? (
@@ -98,31 +180,44 @@ const AccountSelector = ({
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[350px] p-0" align="start">
+        <PopoverContent className="w-[400px] p-0" align="start">
           <div className="p-2 border-b">
             <div className="flex items-center gap-2">
-              <Search className="w-4 h-4 text-muted-foreground" />
+              {loading ? (
+                <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
+              ) : (
+                <Search className="w-4 h-4 text-muted-foreground" />
+              )}
               <Input
-                placeholder={`Search ${accountType}s...`}
+                placeholder={isRemote ? `Type to search ${accountType}s...` : `Search ${accountType}s...`}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="border-0 focus-visible:ring-0 h-8"
                 autoFocus
+                data-testid="account-selector-search"
               />
             </div>
           </div>
           <div className="max-h-[300px] overflow-y-auto">
-            {displayAccounts.length === 0 ? (
+            {loading && displayAccounts.length === 0 ? (
+              <div className="p-4 text-center text-muted-foreground text-sm flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Loading...
+              </div>
+            ) : displayAccounts.length === 0 ? (
               <div className="p-4 text-center text-muted-foreground text-sm">
-                No {accountType}s found
+                {isRemote && search.length < minSearchLength
+                  ? `Type ${minSearchLength}+ chars to search`
+                  : `No ${accountType}s found`}
               </div>
             ) : (
               <>
                 {displayAccounts.map((acc) => (
                   <div
                     key={acc.id}
-                    className={`flex items-center p-2 cursor-pointer hover:bg-muted border-b border-border/50 ${value === acc.id ? 'bg-muted' : ''}`}
+                    className={`flex items-center p-2 cursor-pointer hover:bg-muted border-b border-border/50 transition-colors ${value === acc.id ? 'bg-muted' : ''}`}
                     onClick={() => handleSelect(acc)}
+                    data-testid={`account-option-${acc.code}`}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -131,15 +226,15 @@ const AccountSelector = ({
                       </div>
                     </div>
                     {showBalance && acc.balance_usd !== undefined && (
-                      <span className={`text-xs px-1.5 py-0.5 rounded ml-2 ${(acc.balance_usd || 0) >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ml-2 whitespace-nowrap ${(acc.balance_usd || 0) >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                         ${formatUSD(Math.abs(acc.balance_usd || 0))}
                       </span>
                     )}
                   </div>
                 ))}
-                {hasMoreAccounts && (
+                {displayAccounts.length >= 100 && (
                   <div className="p-2 text-center text-xs text-muted-foreground bg-muted/30">
-                    Showing {MAX_VISIBLE} of {filteredAccounts.length} accounts. Type to search for more.
+                    {isRemote ? 'Type more to narrow results' : 'Type to search for more'}
                   </div>
                 )}
               </>

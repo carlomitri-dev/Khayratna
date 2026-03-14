@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useFiscalYear } from '../context/FiscalYearContext';
 import { useSync } from '../context/SyncContext';
@@ -28,7 +28,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../components/ui/popover';
-import { Plus, Trash2, Check, AlertCircle, Save, Send, RefreshCw, Pencil, Undo2, Search, ChevronsUpDown, ChevronDown, Filter, WifiOff } from 'lucide-react';
+import { Plus, Trash2, Check, AlertCircle, Save, Send, RefreshCw, Pencil, Undo2, Search, ChevronsUpDown, ChevronDown, Filter, WifiOff, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import { formatLBP, formatUSD, getTodayForInput, getVoucherTypeName, formatDate } from '../lib/utils';
 import db from '../lib/db';
@@ -36,29 +36,57 @@ import { addToSyncQueue, OPERATION_TYPES, ACTION_TYPES } from '../lib/syncServic
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// Account search/select component
-const AccountSelector = ({ accounts, value, onChange, placeholder = "Select account" }) => {
+// Account search/select component with remote search
+const AccountSelector = ({ value, onChange, placeholder = "Select account", organizationId }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState(null);
+  const debounceRef = useRef(null);
+  const abortRef = useRef(null);
 
-  // Filter for movable accounts (5+ digit codes) and search
-  const filteredAccounts = useMemo(() => {
-    return accounts.filter(acc => {
-      // Only show movable accounts (5+ digit codes)
-      if (acc.code.length < 5) return false;
-      
-      // Apply search filter
-      if (!search) return true;
-      const searchLower = search.toLowerCase();
-      return acc.code.toLowerCase().includes(searchLower) ||
-             acc.name.toLowerCase().includes(searchLower) ||
-             (acc.name_ar && acc.name_ar.includes(search));
-    });
-  }, [accounts, search]);
+  const fetchAccounts = useCallback(async (searchTerm = '') => {
+    if (!organizationId) return;
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = new AbortController();
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ organization_id: organizationId });
+      if (searchTerm) params.set('search', searchTerm);
+      const res = await axios.get(`${API}/accounts/movable/list?${params.toString()}`, {
+        signal: abortRef.current.signal
+      });
+      setAccounts(Array.isArray(res.data) ? res.data : []);
+    } catch (error) {
+      if (error.name !== 'CanceledError' && error.name !== 'AbortError') {
+        console.error('Failed to fetch accounts:', error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [organizationId]);
 
-  const selectedAccount = accounts.find(a => a.code === value);
+  // Load initial set when opening
+  useEffect(() => {
+    if (open && accounts.length === 0) {
+      fetchAccounts('');
+    }
+  }, [open]);
 
-  // Format balance display
+  // Debounced search
+  useEffect(() => {
+    if (!open) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchAccounts(search);
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [search, open]);
+
+  // Find selected account from current results or cached
+  const displaySelected = accounts.find(a => a.code === value) || selectedAccount;
+
   const formatBalance = (acc) => {
     const bal = acc.balance_usd || 0;
     if (bal === 0) return '$0.00';
@@ -75,11 +103,11 @@ const AccountSelector = ({ accounts, value, onChange, placeholder = "Select acco
           className="w-full justify-between h-8 text-xs font-mono"
           data-testid="account-selector"
         >
-          {selectedAccount ? (
+          {displaySelected ? (
             <span className="truncate flex items-center gap-2">
-              <span>{selectedAccount.code} - {selectedAccount.name}</span>
-              <span className={`text-[10px] px-1 rounded ${(selectedAccount.balance_usd || 0) >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                {formatBalance(selectedAccount)}
+              <span>{displaySelected.code} - {displaySelected.name}</span>
+              <span className={`text-[10px] px-1 rounded ${(displaySelected.balance_usd || 0) >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                {formatBalance(displaySelected)}
               </span>
             </span>
           ) : (
@@ -91,9 +119,13 @@ const AccountSelector = ({ accounts, value, onChange, placeholder = "Select acco
       <PopoverContent className="w-[380px] p-0" align="start">
         <div className="p-2 border-b border-border">
           <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            {loading ? (
+              <Loader2 className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
+            ) : (
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            )}
             <Input
-              placeholder="Search by code or name..."
+              placeholder="Type to search accounts..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8 h-8 text-xs"
@@ -102,17 +134,22 @@ const AccountSelector = ({ accounts, value, onChange, placeholder = "Select acco
           </div>
         </div>
         <div className="max-h-[250px] overflow-y-auto">
-          {filteredAccounts.length === 0 ? (
+          {loading && accounts.length === 0 ? (
+            <div className="p-4 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading...
+            </div>
+          ) : accounts.length === 0 ? (
             <div className="p-4 text-center text-sm text-muted-foreground">
-              No movable accounts found
+              Type to search accounts
             </div>
           ) : (
-            filteredAccounts.map(acc => (
+            accounts.map(acc => (
               <div
                 key={acc.id}
-                className={`flex items-center px-2 py-1.5 cursor-pointer hover:bg-muted text-xs ${value === acc.code ? 'bg-muted' : ''}`}
+                className={`flex items-center px-2 py-1.5 cursor-pointer hover:bg-muted text-xs transition-colors ${value === acc.code ? 'bg-muted' : ''}`}
                 onClick={() => {
                   onChange(acc.code, acc.name);
+                  setSelectedAccount(acc);
                   setOpen(false);
                   setSearch('');
                 }}
@@ -127,11 +164,13 @@ const AccountSelector = ({ accounts, value, onChange, placeholder = "Select acco
             ))
           )}
         </div>
-        <div className="p-2 border-t border-border bg-muted/30">
-          <p className="text-xs text-muted-foreground">
-            Showing {filteredAccounts.length} movable accounts (5+ digits)
-          </p>
-        </div>
+        {accounts.length > 0 && (
+          <div className="p-2 border-t border-border bg-muted/30">
+            <p className="text-xs text-muted-foreground">
+              Showing {accounts.length} accounts{search ? ` matching "${search}"` : ''}
+            </p>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );
@@ -220,21 +259,7 @@ const VoucherEntryPage = () => {
     setLoading(true);
     try {
       if (isOnline) {
-        const [accountsRes, rateRes] = await Promise.all([
-          axios.get(`${API}/accounts/movable/list?organization_id=${currentOrg.id}`),
-          axios.get(`${API}/exchange-rates/latest?organization_id=${currentOrg.id}`).catch(() => ({ data: { rate: 89500 } }))
-        ]);
-        
-        // Cache accounts in IndexedDB
-        try {
-          const accountsToCache = accountsRes.data.map(a => ({ ...a, organization_id: currentOrg.id }));
-          await db.chartOfAccounts.where('organization_id').equals(currentOrg.id).delete();
-          if (accountsToCache.length > 0) await db.chartOfAccounts.bulkPut(accountsToCache);
-        } catch (cacheError) {
-          console.warn('[Voucher] Error caching accounts:', cacheError);
-        }
-        
-        setAccounts(accountsRes.data);
+        const rateRes = await axios.get(`${API}/exchange-rates/latest?organization_id=${currentOrg.id}`).catch(() => ({ data: { rate: 89500 } }));
         
         // Set currencies - only USD and LBP
         const currencyData = [
@@ -755,7 +780,7 @@ const VoucherEntryPage = () => {
                     </Button>
                   </div>
                   <AccountSelector
-                    accounts={accounts}
+                    organizationId={currentOrg?.id}
                     value={line.account_code}
                     onChange={(code, name) => handleAccountSelect(index, code, name)}
                     placeholder="Search account..."
@@ -832,7 +857,7 @@ const VoucherEntryPage = () => {
                     <tr key={index} className="border-t border-border" data-testid={`voucher-line-${index}`}>
                       <td className="px-2 py-1">
                         <AccountSelector
-                          accounts={accounts}
+                          organizationId={currentOrg?.id}
                           value={line.account_code}
                           onChange={(code, name) => handleAccountSelect(index, code, name)}
                           placeholder="Search account..."
