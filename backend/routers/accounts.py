@@ -235,7 +235,8 @@ async def get_movable_accounts(organization_id: str, search: Optional[str] = Non
         {'$project': {
             '_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1,
             'account_type': 1, 'account_class': 1, 'is_active': 1,
-            'balance_usd': 1, 'balance_lbp': 1, 'parent_code': 1
+            'balance_usd': 1, 'balance_lbp': 1, 'parent_code': 1,
+            'organization_id': 1
         }}
     ])
     

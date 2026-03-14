@@ -861,29 +861,7 @@ async def get_accounts(organization_id: str, fy_id: Optional[str] = None, curren
     
     return [AccountResponse(**acc) for acc in accounts]
 
-@api_router.get("/accounts/movable/list", response_model=List[AccountResponse])
-async def get_movable_accounts(organization_id: str, search: Optional[str] = None, current_user: dict = Depends(get_current_user)):
-    """Get movable accounts (5+ digit codes) for voucher entry with optional search"""
-    # Build query for movable accounts (code length >= 5)
-    query = {
-        'organization_id': organization_id,
-        'is_active': True,
-        '$expr': {'$gte': [{'$strLenCP': '$code'}, 5]}
-    }
-    
-    accounts = await db.accounts.find(query, {'_id': 0}).sort('code', 1).to_list(1000)
-    
-    # Filter by search term if provided
-    if search:
-        search_lower = search.lower()
-        accounts = [
-            acc for acc in accounts 
-            if search_lower in acc['code'].lower() or 
-               search_lower in acc['name'].lower() or
-               (acc.get('name_ar') and search_lower in acc['name_ar'])
-        ]
-    
-    return [AccountResponse(**acc) for acc in accounts]
+# NOTE: /accounts/movable/list endpoint moved to routers/accounts.py (with proper search/limit optimization)
 
 @api_router.get("/accounts/template-csv")
 async def get_csv_template(current_user: dict = Depends(get_current_user)):
@@ -7294,66 +7272,9 @@ async def unpost_sales_invoice(invoice_id: str, current_user: dict = Depends(get
     
     return {"message": "Invoice unposted successfully"}
 
-@api_router.get("/sales-accounts")
-async def get_sales_accounts(organization_id: str, current_user: dict = Depends(get_current_user)):
-    """Get accounts suitable for sales (revenue accounts - class 7, only leaf accounts)"""
-    # Get all class 7 accounts
-    all_accounts = await db.accounts.find({
-        'organization_id': organization_id,
-        'code': {'$regex': '^7'},  # Revenue accounts start with 7
-        'is_active': True
-    }, {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1}).sort('code', 1).to_list(1000)
-    
-    # Filter to only leaf accounts (accounts without children)
-    all_codes = {a['code'] for a in all_accounts}
-    
-    def is_leaf(code):
-        for other_code in all_codes:
-            if other_code != code and other_code.startswith(code) and len(other_code) > len(code):
-                return False
-        return True
-    
-    return [a for a in all_accounts if is_leaf(a['code'])]
+# NOTE: /sales-accounts endpoint moved to routers/invoices.py
 
-@api_router.get("/customer-accounts")
-async def get_customer_accounts(organization_id: str, search: Optional[str] = None, skip: int = 0, limit: int = 500, current_user: dict = Depends(get_current_user)):
-    """Get customer receivable accounts (starting with 41, only leaf accounts) with server-side search"""
-    query = {
-        'organization_id': organization_id,
-        'code': {'$regex': '^41'},
-        'is_active': True
-    }
-    
-    # If search provided, add search filter
-    if search:
-        search_regex = {'$regex': search, '$options': 'i'}
-        query['$or'] = [
-            {'code': search_regex},
-            {'name': search_regex},
-            {'name_ar': {'$regex': search}}
-        ]
-    
-    all_accounts = await db.accounts.find(
-        query,
-        {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1, 'address': 1, 'mobile': 1}
-    ).sort('code', 1).to_list(500)
-    
-    # Filter to only leaf accounts
-    all_codes = {a['code'] for a in all_accounts}
-    
-    def is_leaf(code):
-        for other_code in all_codes:
-            if other_code != code and other_code.startswith(code) and len(other_code) > len(code):
-                return False
-        return True
-    
-    leaf_accounts = [a for a in all_accounts if is_leaf(a['code'])]
-    
-    # Apply pagination
-    total = len(leaf_accounts)
-    paginated = leaf_accounts[skip:skip + limit]
-    
-    return paginated
+# NOTE: /customer-accounts endpoint moved to routers/invoices.py (with proper search/limit optimization)
 
 # ================== PURCHASE INVOICE ENDPOINTS ==================
 
@@ -7804,55 +7725,9 @@ async def unpost_purchase_invoice(invoice_id: str, current_user: dict = Depends(
     
     return {"message": "Purchase invoice unposted successfully"}
 
-@api_router.get("/supplier-accounts")
-async def get_supplier_accounts(organization_id: str, search: Optional[str] = None, skip: int = 0, limit: int = 500, current_user: dict = Depends(get_current_user)):
-    """Get supplier payable accounts (starting with 40 and code length > 4) with server-side search"""
-    query = {
-        'organization_id': organization_id,
-        'code': {'$regex': '^40'},
-        'is_active': True,
-        '$expr': {'$gt': [{'$strLenCP': '$code'}, 4]}
-    }
-    
-    if search:
-        # Can't combine $expr with $or easily, so use pipeline
-        pipeline = [
-            {'$match': {
-                'organization_id': organization_id,
-                'code': {'$regex': '^40'},
-                'is_active': True
-            }},
-            {'$match': {'$expr': {'$gt': [{'$strLenCP': '$code'}, 4]}}},
-            {'$match': {'$or': [
-                {'code': {'$regex': search, '$options': 'i'}},
-                {'name': {'$regex': search, '$options': 'i'}},
-                {'name_ar': {'$regex': search}}
-            ]}},
-            {'$sort': {'code': 1}},
-            {'$skip': skip},
-            {'$limit': limit},
-            {'$project': {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1, 'address': 1, 'mobile': 1}}
-        ]
-        accounts = await db.accounts.aggregate(pipeline).to_list(limit)
-    else:
-        accounts = await db.accounts.find(
-            query,
-            {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1, 'address': 1, 'mobile': 1}
-        ).sort('code', 1).skip(skip).limit(limit).to_list(limit)
-    
-    return accounts
+# NOTE: /supplier-accounts endpoint moved to routers/invoices.py (with proper search/limit optimization)
 
-@api_router.get("/purchase-accounts")
-async def get_purchase_accounts(organization_id: str, current_user: dict = Depends(get_current_user)):
-    """Get accounts suitable for purchases (expense accounts - typically class 6, code length > 4)"""
-    accounts = await db.accounts.find({
-        'organization_id': organization_id,
-        'code': {'$regex': '^6'},  # Expense accounts start with 6
-        'is_active': True,
-        '$expr': {'$gt': [{'$strLenCP': '$code'}, 4]}
-    }, {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1}).sort('code', 1).to_list(None)  # Get ALL
-    
-    return accounts
+# NOTE: /purchase-accounts endpoint moved to routers/invoices.py
 
 '''
 # ================== POS ENDPOINTS ==================

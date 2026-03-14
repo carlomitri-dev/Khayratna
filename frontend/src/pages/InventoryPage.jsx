@@ -1429,7 +1429,6 @@ const InventoryPage = () => {
                       <th className="w-14">Image</th>
                       <th>Code</th>
                       <th>Name</th>
-                      <th>Name</th>
                       <th>Category</th>
                       <th>Supplier</th>
                       <th className="text-right">Cost</th>
