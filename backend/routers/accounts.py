@@ -71,6 +71,11 @@ async def create_account(account_data: AccountCreate, current_user: dict = Depen
         'balance_lbp': 0,
         'balance_usd': 0
     }
+    # Add optional contact fields if provided
+    for field in ['mobile', 'address', 'contact_person', 'email', 'notes', 'vat_number']:
+        val = getattr(account_data, field, None)
+        if val:
+            account_doc[field] = val
     await db.accounts.insert_one(account_doc)
     
     # Auto-create VAT mirror account for customers and suppliers
@@ -500,7 +505,7 @@ async def update_account_contact_info(
     
     # Build update document from contact data
     update_doc = {}
-    allowed_fields = ['mobile', 'phone', 'email', 'address', 'contact_person', 'notes', 'tax_id']
+    allowed_fields = ['mobile', 'phone', 'email', 'address', 'contact_person', 'notes', 'tax_id', 'vat_number']
     
     for field in allowed_fields:
         if field in contact_data and contact_data[field] is not None:

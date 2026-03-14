@@ -83,7 +83,7 @@ const InvoiceLineItem = ({
             className="w-full text-right text-sm bg-background border rounded p-1"
           />
         ) : (
-          <span className="text-sm text-right block">${(line.unit_price || 0).toFixed(2)}</span>
+          <span className="text-sm text-right block">${(line.unit_price || 0).toFixed(3)}</span>
         )}
       </div>
 
@@ -106,7 +106,7 @@ const InvoiceLineItem = ({
       {/* Line Total */}
       <div className="col-span-2">
         <span className="text-sm text-right block font-medium text-green-400">
-          ${(line.line_total || 0).toFixed(2)}
+          ${(line.line_total || 0).toFixed(3)}
         </span>
       </div>
 

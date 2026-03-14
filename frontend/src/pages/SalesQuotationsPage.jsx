@@ -209,7 +209,7 @@ const ItemServiceSearch = ({ inventory, services, onSelect, placeholder = "Searc
                       </div>
                     </div>
                     <div className="text-sm font-medium text-primary">
-                      {item.currency || 'USD'} {(item.price || 0).toFixed(2)}
+                      {item.currency || 'USD'} {(item.price || 0).toFixed(3)}
                     </div>
                   </div>
                 ))
@@ -229,7 +229,7 @@ const ItemServiceSearch = ({ inventory, services, onSelect, placeholder = "Searc
                       <div className="text-xs text-muted-foreground">{service.code}</div>
                     </div>
                     <div className="text-sm font-medium text-primary">
-                      {service.currency || 'USD'} {(service.price || 0).toFixed(2)}
+                      {service.currency || 'USD'} {(service.price || 0).toFixed(3)}
                     </div>
                   </div>
                 ))

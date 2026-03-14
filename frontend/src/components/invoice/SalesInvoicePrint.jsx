@@ -38,9 +38,9 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
           </td>
           <td style="text-align:center;padding:4px;border:1px solid #ccc;">${line.pack_description || line.package || '-'}</td>
           <td style="text-align:center;padding:4px;border:1px solid #ccc;">${line.quantity || 0}</td>
-          <td style="text-align:right;padding:4px;border:1px solid #ccc;">${(line.unit_price || line.price || 0).toFixed(2)}</td>
+          <td style="text-align:right;padding:4px;border:1px solid #ccc;">${(line.unit_price || line.price || 0).toFixed(3)}</td>
           <td style="text-align:right;padding:4px;border:1px solid #ccc;">${line.discount_percent ? line.discount_percent + '%' : '-'}</td>
-          <td style="text-align:right;padding:4px;border:1px solid #ccc;font-weight:bold;">${lineTotal.toFixed(2)}</td>
+          <td style="text-align:right;padding:4px;border:1px solid #ccc;font-weight:bold;">${lineTotal.toFixed(3)}</td>
         </tr>
       `;
     }).join('');
@@ -166,15 +166,15 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
     <table class="totals-table">
       <tr>
         <td class="label">المجموع / Subtotal</td>
-        <td class="value">${subtotal.toFixed(2)}</td>
+        <td class="value">${subtotal.toFixed(3)}</td>
       </tr>
       <tr>
         <td class="label">الضريبة على القيمة المضافة ${taxPercent}% / VAT</td>
-        <td class="value">${taxAmount.toFixed(2)}</td>
+        <td class="value">${taxAmount.toFixed(3)}</td>
       </tr>
       <tr class="grand-total">
         <td class="label" style="background:#1a2744;color:white;">المجموع العام / General Total</td>
-        <td class="value" style="font-size:14px;font-weight:bold;">${total.toFixed(2)}</td>
+        <td class="value" style="font-size:14px;font-weight:bold;">${total.toFixed(3)}</td>
       </tr>
     </table>
   </div>

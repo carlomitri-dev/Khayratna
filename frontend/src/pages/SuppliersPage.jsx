@@ -18,7 +18,7 @@ import {
 } from '../components/ui/dialog';
 import { 
   Truck, Search, Edit, Eye, Phone, MapPin, User, Mail, FileText,
-  DollarSign, Building, List, WifiOff
+  DollarSign, Building, List, WifiOff, Plus, Hash
 } from 'lucide-react';
 import axios from 'axios';
 import { formatLBP, formatUSD } from '../lib/utils';
@@ -38,6 +38,12 @@ const SuppliersPage = () => {
   const [viewSupplier, setViewSupplier] = useState(null);
   const [editSupplier, setEditSupplier] = useState(null);
   const [ledgerAccount, setLedgerAccount] = useState(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newSupplier, setNewSupplier] = useState({
+    code: '', name: '', name_ar: '', vat_number: '',
+    mobile: '', email: '', address: '', contact_person: '', notes: ''
+  });
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
   const PAGE_SIZE = 50;
@@ -78,7 +84,7 @@ const SuppliersPage = () => {
         
         // Cache in IndexedDB
         try {
-          const suppliersToCache = response.data.map(s => ({ ...s, organization_id: currentOrg.id }));
+          const suppliersToCache = dataRes.data.map(s => ({ ...s, organization_id: currentOrg.id }));
           await db.suppliers.where('organization_id').equals(currentOrg.id).delete();
           if (suppliersToCache.length > 0) {
             await db.suppliers.bulkPut(suppliersToCache);
@@ -121,7 +127,8 @@ const SuppliersPage = () => {
         address: editSupplier.address || '',
         contact_person: editSupplier.contact_person || '',
         email: editSupplier.email || '',
-        notes: editSupplier.notes || ''
+        notes: editSupplier.notes || '',
+        vat_number: editSupplier.vat_number || ''
       });
       
       alert('Supplier information updated successfully!');
@@ -129,6 +136,44 @@ const SuppliersPage = () => {
       fetchSuppliers(true);
     } catch (error) {
       alert(error.response?.data?.detail || 'Failed to update supplier');
+    }
+  };
+
+  const handleCreateSupplier = async () => {
+    if (!newSupplier.code || !newSupplier.name) {
+      alert('Code and Name are required');
+      return;
+    }
+    if (!newSupplier.code.startsWith('4011') || newSupplier.code.length <= 4) {
+      alert('Supplier code must start with "4011" and have more than 4 digits');
+      return;
+    }
+    setSaving(true);
+    try {
+      await axios.post(`${API}/accounts`, {
+        code: newSupplier.code,
+        name: newSupplier.name,
+        name_ar: newSupplier.name_ar || null,
+        account_class: 4,
+        account_type: 'liability',
+        parent_code: null,
+        is_active: true,
+        organization_id: currentOrg.id,
+        mobile: newSupplier.mobile || null,
+        email: newSupplier.email || null,
+        address: newSupplier.address || null,
+        contact_person: newSupplier.contact_person || null,
+        notes: newSupplier.notes || null,
+        vat_number: newSupplier.vat_number || null
+      });
+      alert(`Supplier "${newSupplier.name}" created successfully! VAT mirror account 4014${newSupplier.code.substring(4)} was also created.`);
+      setAddDialogOpen(false);
+      setNewSupplier({ code: '', name: '', name_ar: '', vat_number: '', mobile: '', email: '', address: '', contact_person: '', notes: '' });
+      fetchSuppliers(true);
+    } catch (error) {
+      alert(error.response?.data?.detail || 'Failed to create supplier');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -159,6 +204,12 @@ const SuppliersPage = () => {
             Manage supplier accounts and contact information (Account codes starting with 40)
           </p>
         </div>
+        {canEdit && (
+          <Button onClick={() => setAddDialogOpen(true)} className="gap-2" data-testid="add-supplier-btn">
+            <Plus className="w-4 h-4" />
+            Add Supplier
+          </Button>
+        )}
       </div>
 
       {/* Search */}
@@ -262,6 +313,7 @@ const SuppliersPage = () => {
                     <tr>
                       <th>Code</th>
                       <th>Name</th>
+                      <th>VAT Number</th>
                       <th>Contact Person</th>
                       <th>Mobile</th>
                       <th>Email</th>
@@ -282,6 +334,7 @@ const SuppliersPage = () => {
                             )}
                           </div>
                         </td>
+                        <td className="text-muted-foreground font-mono text-sm">{supplier.vat_number || '-'}</td>
                         <td className="text-muted-foreground">{supplier.contact_person || '-'}</td>
                         <td className="text-muted-foreground">{supplier.mobile || '-'}</td>
                         <td className="text-muted-foreground text-sm">{supplier.email || '-'}</td>
@@ -371,6 +424,15 @@ const SuppliersPage = () => {
                 <h4 className="font-medium text-sm border-b border-border pb-2">Contact Information</h4>
                 
                 <div className="grid gap-3">
+                  {viewSupplier.vat_number && (
+                    <div className="flex items-center gap-3">
+                      <Hash className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">VAT Number</p>
+                        <span className="text-sm font-mono">{viewSupplier.vat_number}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-3">
                     <User className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm">{viewSupplier.contact_person || 'Not specified'}</span>
@@ -430,6 +492,18 @@ const SuppliersPage = () => {
               <div className="p-3 bg-muted/30 rounded-sm">
                 <p className="font-mono text-sm text-amber-400">{editSupplier.code}</p>
                 <p className="font-medium">{editSupplier.name}</p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Hash className="w-4 h-4" />
+                  VAT Number
+                </Label>
+                <Input
+                  placeholder="Enter VAT number..."
+                  value={editSupplier.vat_number || ''}
+                  onChange={(e) => setEditSupplier({ ...editSupplier, vat_number: e.target.value })}
+                />
               </div>
               
               <div className="space-y-2">
@@ -504,6 +578,123 @@ const SuppliersPage = () => {
             </Button>
             <Button onClick={handleUpdateContact}>
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Supplier Dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-amber-400" />
+              Add New Supplier
+            </DialogTitle>
+            <DialogDescription>
+              Create a new supplier account (4011xxxx). A VAT mirror account (4014xxxx) will be auto-created.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Account Code *</Label>
+                <Input
+                  placeholder="e.g. 401101"
+                  value={newSupplier.code}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, code: e.target.value })}
+                  className="font-mono"
+                  data-testid="new-supplier-code"
+                />
+                <p className="text-[10px] text-muted-foreground">Must start with 4011 + digits</p>
+              </div>
+              <div className="space-y-2">
+                <Label>VAT Number</Label>
+                <Input
+                  placeholder="VAT number..."
+                  value={newSupplier.vat_number}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, vat_number: e.target.value })}
+                  data-testid="new-supplier-vat"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Name (English) *</Label>
+                <Input
+                  placeholder="Supplier name..."
+                  value={newSupplier.name}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, name: e.target.value })}
+                  data-testid="new-supplier-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Name (Arabic)</Label>
+                <Input
+                  placeholder="اسم المورد..."
+                  value={newSupplier.name_ar}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, name_ar: e.target.value })}
+                  dir="rtl"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Contact Person</Label>
+                <Input
+                  placeholder="Contact person..."
+                  value={newSupplier.contact_person}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, contact_person: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Mobile</Label>
+                <Input
+                  placeholder="Phone number..."
+                  value={newSupplier.mobile}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, mobile: e.target.value })}
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  placeholder="Email..."
+                  value={newSupplier.email}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Address</Label>
+                <Input
+                  placeholder="Address..."
+                  value={newSupplier.address}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, address: e.target.value })}
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                placeholder="Additional notes..."
+                value={newSupplier.notes}
+                onChange={(e) => setNewSupplier({ ...newSupplier, notes: e.target.value })}
+                rows={2}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateSupplier} disabled={saving} data-testid="save-new-supplier-btn">
+              {saving ? 'Creating...' : 'Create Supplier'}
             </Button>
           </DialogFooter>
         </DialogContent>

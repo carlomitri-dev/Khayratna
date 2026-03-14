@@ -15,13 +15,13 @@ export function formatLBP(value) {
   }).format(value);
 }
 
-// Format USD with 2 decimal places
+// Format USD with 3 decimal places
 export function formatUSD(value) {
-  if (value === 0 || value === null || value === undefined) return '0.00';
+  if (value === 0 || value === null || value === undefined) return '0.000';
   return new Intl.NumberFormat('en-US', {
     style: 'decimal',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
   }).format(value);
 }
 
@@ -30,7 +30,7 @@ export function formatCurrency(value, currency) {
   if (currency === 'LBP') {
     return `${formatLBP(value)} LBP`;
   }
-  return `$${formatUSD(value)}`;
+  return `${formatUSD(value)}`;
 }
 
 // Get number class for styling

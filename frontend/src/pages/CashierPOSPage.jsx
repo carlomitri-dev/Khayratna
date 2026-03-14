@@ -915,7 +915,7 @@ const CashierPOSPage = () => {
                     </div>
                     <div className="flex-1 text-left">
                       <span className={`text-xl font-bold ${paymentAmountUSD ? 'text-gray-900' : 'text-gray-400'}`}>
-                        ${paymentAmountUSD || totals.totalUsd.toFixed(2)}
+                        ${paymentAmountUSD || totals.totalUsd.toFixed(3)}
                       </span>
                     </div>
                     <Calculator className="w-5 h-5 text-gray-400" />
@@ -939,7 +939,7 @@ const CashierPOSPage = () => {
                   {/* Quick Buttons */}
                   <div className="grid grid-cols-3 gap-2">
                     <button
-                      onClick={() => setPaymentAmountUSD(totals.totalUsd.toFixed(2))}
+                      onClick={() => setPaymentAmountUSD(totals.totalUsd.toFixed(3))}
                       className="p-2 text-xs bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 active:scale-95"
                     >
                       Exact USD
@@ -1415,7 +1415,7 @@ const CashierPOSPage = () => {
                     type="number"
                     value={paymentAmountUSD}
                     onChange={(e) => setPaymentAmountUSD(e.target.value)}
-                    placeholder={totals.totalUsd.toFixed(2)}
+                    placeholder={totals.totalUsd.toFixed(3)}
                     className="flex-1 h-11 lg:h-12 text-lg font-medium text-gray-900 bg-white"
                   />
                   <button
@@ -1454,7 +1454,7 @@ const CashierPOSPage = () => {
                 <div className="grid grid-cols-3 gap-1">
                   <button
                     type="button"
-                    onClick={() => setPaymentAmountUSD(totals.totalUsd.toFixed(2))}
+                    onClick={() => setPaymentAmountUSD(totals.totalUsd.toFixed(3))}
                     className="p-2 text-xs bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700"
                   >
                     Exact USD

@@ -2729,7 +2729,7 @@ const InventoryPage = () => {
                                 ) : '-'}
                               </td>
                               <td className="p-2 text-right font-mono">{batch.quantity}</td>
-                              <td className="p-2 text-right font-mono">${batch.cost?.toFixed(2) || '-'}</td>
+                              <td className="p-2 text-right font-mono">${batch.cost?.toFixed(3) || '-'}</td>
                               <td className="p-2 text-muted-foreground truncate max-w-[100px]">{batch.notes || '-'}</td>
                               <td className="p-2 text-right">
                                 <Button

@@ -526,7 +526,7 @@ const PurchaseReturnPage = () => {
                         <td className="p-2">
                           <Input type="number" value={line.discount_percent} onChange={(e) => handleLineChange(index, 'discount_percent', e.target.value)} min="0" max="100" className="h-9" />
                         </td>
-                        <td className="p-2 text-right font-mono">{(line.line_total || 0).toFixed(2)}</td>
+                        <td className="p-2 text-right font-mono">{(line.line_total || 0).toFixed(3)}</td>
                         <td className="p-2 text-right font-mono text-primary">{formatUSD(line.line_total_usd || 0)}</td>
                         <td className="p-2">
                           {formData.lines.length > 1 && (

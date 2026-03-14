@@ -34,7 +34,7 @@ import {
 import { 
   FileText, Search, Plus, Edit, Trash2, Send, Printer, Eye,
   Package, Users, DollarSign, Calendar, ChevronDown, Filter,
-  Undo2, Check, X, ShoppingCart, ChevronsUpDown, Save, WifiOff
+  Undo2, Check, X, ShoppingCart, ChevronsUpDown, WifiOff
 } from 'lucide-react';
 import axios from 'axios';
 import { formatUSD, formatDate } from '../lib/utils';
@@ -153,7 +153,6 @@ const SalesInvoicePage = () => {
   const [customers, setCustomers] = useState([]);
   const [salesAccounts, setSalesAccounts] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
-  const [serviceItems, setServiceItems] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   
   // Filters
@@ -296,10 +295,9 @@ const SalesInvoicePage = () => {
     setLoading(true);
     try {
       if (isOnline) {
-        const [salesRes, inventoryRes, serviceRes, rateRes] = await Promise.all([
+        const [salesRes, inventoryRes, rateRes] = await Promise.all([
           axios.get(`${API}/sales-accounts?organization_id=${currentOrg.id}`),
           axios.get(`${API}/inventory?organization_id=${currentOrg.id}&page_size=1000`),
-          axios.get(`${API}/service-items?organization_id=${currentOrg.id}`).catch(() => ({ data: [] })),
           axios.get(`${API}/exchange-rates/latest?organization_id=${currentOrg.id}`).catch(() => ({ data: { rate: 89500 } }))
         ]);
         
@@ -308,18 +306,8 @@ const SalesInvoicePage = () => {
           ? inventoryRes.data 
           : (inventoryRes.data?.items || []);
         
-        // Handle service items response
-        const serviceData = Array.isArray(serviceRes.data) 
-          ? serviceRes.data 
-          : (serviceRes.data?.items || []);
-        
         // Cache data in IndexedDB
         try {
-          // Cache customers
-          const customerData = customersRes.data.map(c => ({ ...c, organization_id: currentOrg.id }));
-          await db.customers.where('organization_id').equals(currentOrg.id).delete();
-          if (customerData.length > 0) await db.customers.bulkPut(customerData);
-          
           // Cache inventory
           await db.inventoryItems.where('organization_id').equals(currentOrg.id).delete();
           if (inventoryData.length > 0) await db.inventoryItems.bulkPut(inventoryData);
@@ -333,7 +321,6 @@ const SalesInvoicePage = () => {
         
         setSalesAccounts(salesRes.data);
         setInventoryItems(inventoryData);
-        setServiceItems(serviceData);
         setCurrencies([
           { code: 'USD', name: 'US Dollar', symbol: '$' },
           { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل' }
@@ -343,9 +330,6 @@ const SalesInvoicePage = () => {
         // The rate is available via the exchange-rates/latest endpoint when needed
         
         // Set default accounts if available
-        if (customersRes.data.length > 0 && !formData.debit_account_id) {
-          setFormData(prev => ({ ...prev, debit_account_id: customersRes.data[0].id }));
-        }
         if (salesRes.data.length > 0 && !formData.credit_account_id) {
           setFormData(prev => ({ ...prev, credit_account_id: salesRes.data[0].id }));
         }
@@ -597,77 +581,6 @@ const SalesInvoicePage = () => {
     }
     
     setFormData({ ...formData, lines: newLines });
-  };
-
-  // Handle selecting a service item
-  const handleSelectService = (index, service) => {
-    const newLines = [...formData.lines];
-    newLines[index] = {
-      ...newLines[index],
-      inventory_item_id: '',  // Clear inventory selection
-      item_name: service.name,
-      item_name_ar: service.name_ar || '',
-      barcode: '',
-      unit: service.unit || 'service',
-      unit_price: service.price,
-      currency: service.currency || 'USD',
-      exchange_rate: service.currency === 'LBP' ? (currentOrg?.base_exchange_rate || 89500) : 1,
-      is_taxable: service.is_taxable !== false
-    };
-    
-    // Recalculate line total
-    const { lineTotal, lineTotalUsd } = calculateLineTotal(newLines[index]);
-    newLines[index].line_total = lineTotal;
-    newLines[index].line_total_usd = lineTotalUsd;
-    
-    // Recalculate invoice totals
-    const totals = recalculateTotals(newLines, formData.discount_percent, formData.tax_percent);
-    
-    setFormData({
-      ...formData,
-      lines: newLines,
-      subtotal: totals.subtotal,
-      discount_amount: totals.discountAmount,
-      tax_amount: totals.taxAmount,
-      total: totals.total,
-      total_usd: totals.totalUsd
-    });
-  };
-
-  // Save line item as a reusable service
-  const saveLineAsService = async (index) => {
-    const line = formData.lines[index];
-    if (!line.item_name) {
-      alert('Please enter an item name first');
-      return;
-    }
-    
-    try {
-      const serviceData = {
-        name: line.item_name,
-        name_ar: line.item_name_ar || null,
-        price: parseFloat(line.unit_price) || 0,
-        currency: line.currency || 'USD',
-        unit: line.unit || 'service',
-        is_taxable: line.is_taxable !== false,
-        organization_id: currentOrg.id
-      };
-      
-      await axios.post(`${API}/service-items`, serviceData);
-      
-      // Refresh service items list
-      const res = await axios.get(`${API}/service-items?organization_id=${currentOrg.id}`);
-      setServiceItems(res.data);
-      
-      alert(`"${line.item_name}" saved as a reusable service!`);
-    } catch (error) {
-      if (error.response?.status === 400) {
-        alert('A service with this name already exists');
-      } else {
-        console.error('Failed to save service:', error);
-        alert('Failed to save service');
-      }
-    }
   };
 
   // Create new inventory item from search
@@ -1399,9 +1312,9 @@ const SalesInvoicePage = () => {
         + '<td style="text-align:right;padding:5px 6px;border:1px solid #666;direction:rtl;">' + (line.name_ar || line.item_name || line.name || '') + (isTaxed ? ' <b>*</b>' : '') + '</td>'
         + '<td style="text-align:center;padding:5px 3px;border:1px solid #666;">' + (line.pack_description || line.package || '-') + '</td>'
         + '<td style="text-align:center;padding:5px 3px;border:1px solid #666;">' + (line.quantity || 0) + '</td>'
-        + '<td style="text-align:right;padding:5px 4px;border:1px solid #666;font-family:monospace;">' + up.toFixed(2) + '</td>'
+        + '<td style="text-align:right;padding:5px 4px;border:1px solid #666;font-family:monospace;">' + up.toFixed(3) + '</td>'
         + '<td style="text-align:center;padding:5px 3px;border:1px solid #666;">' + (ld ? ld + '%' : '-') + '</td>'
-        + '<td style="text-align:right;padding:5px 4px;border:1px solid #666;font-family:monospace;font-weight:bold;">' + dt.toFixed(2) + '</td></tr>';
+        + '<td style="text-align:right;padding:5px 4px;border:1px solid #666;font-family:monospace;font-weight:bold;">' + dt.toFixed(3) + '</td></tr>';
     }).join('');
     const ec = Math.max(0, 18 - lines.length);
     const er = Array(ec).fill('<tr>' + '<td style="padding:5px 3px;border:1px solid #666;">&nbsp;</td>'.repeat(7) + '</tr>').join('');
@@ -1444,10 +1357,10 @@ const SalesInvoicePage = () => {
       + itemRows + er + '</tbody></table>'
       + '<p class="st"><b>*</b> = خاضع للضريبة على القيمة المضافة / Subject to VAT</p>'
       + '<div class="tot"><table>'
-      + '<tr><td class="lb">المجموع / Subtotal</td><td class="vl">' + currSymbol + ' ' + subtotal.toFixed(2) + '</td></tr>'
-      + (discountAmt > 0 ? '<tr><td class="lb">حسم / Discount</td><td class="vl">' + currSymbol + ' ' + discountAmt.toFixed(2) + '</td></tr>' : '')
-      + '<tr><td class="lb">ض.ق.م. ' + taxPercent + '% / VAT</td><td class="vl">' + currSymbol + ' ' + taxAmount.toFixed(2) + '</td></tr>'
-      + '<tr class="gt"><td class="lb">المجموع العام / Total</td><td class="vl">' + currSymbol + ' ' + total.toFixed(2) + '</td></tr>'
+      + '<tr><td class="lb">المجموع / Subtotal</td><td class="vl">' + currSymbol + ' ' + subtotal.toFixed(3) + '</td></tr>'
+      + (discountAmt > 0 ? '<tr><td class="lb">حسم / Discount</td><td class="vl">' + currSymbol + ' ' + discountAmt.toFixed(3) + '</td></tr>' : '')
+      + '<tr><td class="lb">ض.ق.م. ' + taxPercent + '% / VAT</td><td class="vl">' + currSymbol + ' ' + taxAmount.toFixed(3) + '</td></tr>'
+      + '<tr class="gt"><td class="lb">المجموع العام / Total</td><td class="vl">' + currSymbol + ' ' + total.toFixed(3) + '</td></tr>'
       + '</table></div>'
       + '<div class="rc">استلمت البضاعة طبقاً للمبين في الفاتورة أعلاه بحالة جيدة وتأكدت من سلامتها ونوعيتها ومن صلاحية تاريخ الصنع</div>'
       + '<div class="sg"><div class="sb"><div class="sl">الإدارة / Administration</div></div><div class="sb"><div class="sl">إمضاء الزبون / Customer</div></div></div>'
@@ -1800,12 +1713,8 @@ const SalesInvoicePage = () => {
                           <td className="p-2">
                             <InventorySelector
                               items={inventoryItems}
-                              serviceItems={serviceItems}
                               value={line.inventory_item_id}
                               onChange={(v) => handleLineChange(idx, 'inventory_item_id', v)}
-                              currencies={currencies}
-                              lineCurrency={line.currency}
-                              onSelectService={(service) => handleSelectService(idx, service)}
                               organizationId={currentOrg?.id}
                               apiUrl={API}
                               onItemSelect={handleItemSelectedFromSearch}
@@ -1819,18 +1728,6 @@ const SalesInvoicePage = () => {
                                   onChange={(e) => handleLineChange(idx, 'item_name', e.target.value)}
                                   className="h-8 text-xs flex-1"
                                 />
-                                {line.item_name && (
-                                  <Button 
-                                    type="button" 
-                                    variant="outline" 
-                                    size="sm"
-                                    className="h-8 px-2 text-purple-400 hover:text-purple-300 hover:border-purple-500"
-                                    onClick={() => saveLineAsService(idx)}
-                                    title="Save as reusable service"
-                                  >
-                                    <Save className="w-3 h-3" />
-                                  </Button>
-                                )}
                               </div>
                             )}
                           </td>
@@ -2502,7 +2399,6 @@ const SalesInvoicePage = () => {
                         <SelectItem value="m">Meter</SelectItem>
                         <SelectItem value="box">Box</SelectItem>
                         <SelectItem value="pack">Pack</SelectItem>
-                        <SelectItem value="service">Service</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

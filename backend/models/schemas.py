@@ -120,6 +120,7 @@ class AccountCreate(BaseModel):
     contact_person: Optional[str] = None
     email: Optional[str] = None
     notes: Optional[str] = None
+    vat_number: Optional[str] = None
 
 class AccountResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -139,6 +140,7 @@ class AccountResponse(BaseModel):
     contact_person: Optional[str] = None
     email: Optional[str] = None
     notes: Optional[str] = None
+    vat_number: Optional[str] = None
     created_at: Optional[str] = None  # Allow created_at field
 
 class ContactInfoUpdate(BaseModel):
@@ -147,6 +149,7 @@ class ContactInfoUpdate(BaseModel):
     contact_person: Optional[str] = None
     email: Optional[str] = None
     notes: Optional[str] = None
+    vat_number: Optional[str] = None
 
 # ================== INVENTORY MODELS ==================
 

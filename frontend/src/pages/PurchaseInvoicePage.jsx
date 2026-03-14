@@ -34,7 +34,7 @@ import {
 import { 
   FileText, Search, Plus, Edit, Trash2, Send, Printer, Eye,
   Package, Users, DollarSign, Calendar, ChevronDown, Filter,
-  Undo2, Check, X, ShoppingCart, ChevronsUpDown, ClipboardCopy, Loader2, WifiOff
+  Undo2, Check, X, ShoppingCart, ChevronsUpDown, Loader2, WifiOff
 } from 'lucide-react';
 import axios from 'axios';
 import { formatUSD, formatDate } from '../lib/utils';
@@ -56,7 +56,6 @@ const PurchaseInvoicePage = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [purchaseAccounts, setPurchaseAccounts] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
-  const [serviceItems, setServiceItems] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   const [searchItemsCache, setSearchItemsCache] = useState({}); // Cache items from search { itemId: item }
   
@@ -75,17 +74,12 @@ const PurchaseInvoicePage = () => {
   const [newItemDialog, setNewItemDialog] = useState(null); // { name: string, lineIndex: number }
   const [newItemSaving, setNewItemSaving] = useState(false);
   
-  // Copy from Sales Invoice state
-  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
-  const [salesInvoices, setSalesInvoices] = useState([]);
-  const [loadingSalesInvoices, setLoadingSalesInvoices] = useState(false);
-  const [salesInvoiceSearch, setSalesInvoiceSearch] = useState('');
   // Print state
   const [printDialog, setPrintDialog] = useState(null); // Invoice to print
   const [printWithBackground, setPrintWithBackground] = useState(true);
   
   // Form state
-  const emptyLine = { inventory_item_id: '', service_item_id: '', item_name: '', item_name_ar: '', barcode: '', quantity: 1, unit: 'piece', unit_price: 0, currency: 'USD', exchange_rate: 1, discount_percent: 0, line_total: 0, line_total_usd: 0, is_taxable: true, is_service: false, batch_number: '', expiry_date: '' };
+  const emptyLine = { inventory_item_id: '', item_name: '', item_name_ar: '', barcode: '', quantity: 1, unit: 'piece', unit_price: 0, selling_price: 0, currency: 'USD', exchange_rate: 1, discount_percent: 0, line_total: 0, line_total_usd: 0, is_taxable: true, batch_number: '', expiry_date: '' };
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     due_date: '',
@@ -134,21 +128,15 @@ const PurchaseInvoicePage = () => {
     setLoading(true);
     try {
       if (isOnline) {
-        const [purchaseRes, inventoryRes, servicesRes] = await Promise.all([
+        const [purchaseRes, inventoryRes] = await Promise.all([
           axios.get(`${API}/purchase-accounts?organization_id=${currentOrg.id}`),
-          axios.get(`${API}/inventory?organization_id=${currentOrg.id}&page_size=1000`),
-          axios.get(`${API}/service-items?organization_id=${currentOrg.id}`).catch(() => ({ data: [] }))
+          axios.get(`${API}/inventory?organization_id=${currentOrg.id}&page_size=1000`)
         ]);
         
         // Handle paginated inventory response - extract items array
         const inventoryData = Array.isArray(inventoryRes.data) 
           ? inventoryRes.data 
           : (inventoryRes.data?.items || []);
-        
-        // Handle service items response
-        const serviceData = Array.isArray(servicesRes.data) 
-          ? servicesRes.data 
-          : (servicesRes.data?.items || []);
         
         // Cache data in IndexedDB
         try {
@@ -165,7 +153,6 @@ const PurchaseInvoicePage = () => {
         
         setPurchaseAccounts(purchaseRes.data);
         setInventoryItems(inventoryData);
-        setServiceItems(serviceData);
         setCurrencies([
           { code: 'USD', name: 'US Dollar', symbol: '$' },
           { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل' }
@@ -175,9 +162,6 @@ const PurchaseInvoicePage = () => {
         // Debit = Purchase/Expense account, Credit = Supplier Payable
         if (purchaseRes.data.length > 0 && !formData.debit_account_id) {
           setFormData(prev => ({ ...prev, debit_account_id: purchaseRes.data[0].id }));
-        }
-        if (suppliersRes.data.length > 0 && !formData.credit_account_id) {
-          setFormData(prev => ({ ...prev, credit_account_id: suppliersRes.data[0].id }));
         }
         
         await fetchInvoices(true);
@@ -344,70 +328,21 @@ const PurchaseInvoicePage = () => {
         newLines[index] = {
           ...newLines[index],
           inventory_item_id: value,
-          service_item_id: '',  // Clear service reference
-          is_service: false,    // Clear service flag
           item_name: item.name,
           item_name_ar: item.name_ar || '',
           barcode: item.barcode || '',
           unit: item.unit || 'piece',
-          quantity: newLines[index].quantity || 1,  // Default quantity to 1 if not set
-          unit_price: item.cost || item.price || 0,  // Use cost for purchase invoices
+          quantity: newLines[index].quantity || 1,
+          unit_price: item.cost || item.price || 0,
+          selling_price: item.price || 0,
           currency: item.currency || 'USD',
           exchange_rate: item.currency === 'LBP' ? (currentOrg?.base_exchange_rate || 89500) : 1,
-          is_taxable: item.is_taxable !== false  // Include taxable flag
+          is_taxable: item.is_taxable !== false
         };
       } else {
-        // Item not found in local cache - this shouldn't happen with searchItemsCache
         console.warn(`Item ${value} not found in allInventoryItems`);
       }
     }
-    
-    // If cleared to manual entry, reset service flags too
-    if (field === 'inventory_item_id' && !value) {
-      newLines[index] = {
-        ...newLines[index],
-        service_item_id: '',
-        is_service: false
-      };
-    }
-    
-    // Recalculate line total
-    const { lineTotal, lineTotalUsd } = calculateLineTotal(newLines[index]);
-    newLines[index].line_total = lineTotal;
-    newLines[index].line_total_usd = lineTotalUsd;
-    
-    // Recalculate invoice totals
-    const totals = recalculateTotals(newLines, formData.discount_percent, formData.tax_percent);
-    
-    setFormData({
-      ...formData,
-      lines: newLines,
-      subtotal: totals.subtotal,
-      discount_amount: totals.discountAmount,
-      tax_amount: totals.taxAmount,
-      total: totals.total,
-      total_usd: totals.totalUsd
-    });
-  };
-
-  // Handle service item selection
-  const handleSelectService = (index, service) => {
-    const newLines = [...formData.lines];
-    newLines[index] = {
-      ...newLines[index],
-      inventory_item_id: '',  // Clear inventory item reference
-      service_item_id: service.id,
-      item_name: service.name,
-      item_name_ar: service.name_ar || '',
-      barcode: '',
-      quantity: 1,
-      unit: service.unit || 'service',
-      unit_price: service.price,
-      currency: service.currency || 'USD',
-      exchange_rate: service.currency === 'LBP' ? (currentOrg?.base_exchange_rate || 89500) : 1,
-      is_taxable: service.is_taxable !== false,
-      is_service: true  // Flag to indicate this is a service
-    };
     
     // Recalculate line total
     const { lineTotal, lineTotalUsd } = calculateLineTotal(newLines[index]);
@@ -545,79 +480,6 @@ const PurchaseInvoicePage = () => {
     });
     setEditingInvoice(null);
   };
-
-  // Fetch sales invoices for copy feature
-  const fetchSalesInvoices = async () => {
-    setLoadingSalesInvoices(true);
-    try {
-      const response = await axios.get(`${API}/sales-invoices?organization_id=${currentOrg.id}&limit=50`);
-      setSalesInvoices(response.data.invoices || response.data || []);
-    } catch (error) {
-      console.error('Error fetching sales invoices:', error);
-    } finally {
-      setLoadingSalesInvoices(false);
-    }
-  };
-
-  // Open copy dialog
-  const openCopyDialog = () => {
-    setCopyDialogOpen(true);
-    fetchSalesInvoices();
-  };
-
-  // Copy lines from a sales invoice
-  const copyFromSalesInvoice = (salesInvoice) => {
-    if (!salesInvoice.lines || salesInvoice.lines.length === 0) {
-      alert('Selected invoice has no line items to copy');
-      return;
-    }
-
-    // Map sales invoice lines to purchase invoice format
-    const copiedLines = salesInvoice.lines.map(line => ({
-      inventory_item_id: line.inventory_item_id || '',
-      service_item_id: line.service_item_id || '',
-      item_name: line.item_name || '',
-      item_name_ar: line.item_name_ar || '',
-      barcode: line.barcode || '',
-      quantity: line.quantity || 1,
-      unit: line.unit || 'piece',
-      unit_price: line.unit_price || 0,  // Keep the same price, user can adjust
-      currency: line.currency || 'USD',
-      exchange_rate: line.exchange_rate || 1,
-      discount_percent: line.discount_percent || 0,
-      line_total: line.line_total || 0,
-      line_total_usd: line.line_total_usd || line.line_total || 0,
-      is_taxable: line.is_taxable !== false,
-      is_service: line.is_service || false
-    }));
-
-    // Update form with copied lines
-    const totals = recalculateTotals(copiedLines, formData.discount_percent, formData.tax_percent);
-    
-    setFormData({
-      ...formData,
-      lines: copiedLines,
-      subtotal: totals.subtotal,
-      discount_amount: totals.discountAmount,
-      tax_amount: totals.taxAmount,
-      total: totals.total,
-      total_usd: totals.totalUsd
-    });
-
-    setCopyDialogOpen(false);
-    setSalesInvoiceSearch('');
-  };
-
-  // Filter sales invoices for search
-  const filteredSalesInvoices = useMemo(() => {
-    if (!salesInvoiceSearch) return salesInvoices;
-    const searchLower = salesInvoiceSearch.toLowerCase();
-    return salesInvoices.filter(inv => 
-      inv.invoice_number?.toLowerCase().includes(searchLower) ||
-      inv.debit_account_name?.toLowerCase().includes(searchLower) ||
-      inv.notes?.toLowerCase().includes(searchLower)
-    );
-  }, [salesInvoices, salesInvoiceSearch]);
 
   const openForm = (invoice = null) => {
     if (invoice) {
@@ -881,9 +743,9 @@ const PurchaseInvoicePage = () => {
                 <td>${line.item_name}${line.item_name_ar ? `<br><small>${line.item_name_ar}</small>` : ''}</td>
                 <td>${line.barcode || '-'}</td>
                 <td class="number">${line.quantity}${line.unit && line.unit !== 'piece' ? ' ' + line.unit : ''}</td>
-                <td class="number">${invoice.currency} ${parseFloat(line.unit_price).toFixed(2)}</td>
+                <td class="number">${invoice.currency} ${parseFloat(line.unit_price).toFixed(3)}</td>
                 <td class="number">${line.discount_percent || 0}%</td>
-                <td class="number">${invoice.currency} ${parseFloat(line.line_total).toFixed(2)}</td>
+                <td class="number">${invoice.currency} ${parseFloat(line.line_total).toFixed(3)}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -892,28 +754,28 @@ const PurchaseInvoicePage = () => {
         <div class="totals">
           <div class="totals-row">
             <span>Subtotal:</span>
-            <span>${invoice.currency} ${parseFloat(invoice.subtotal).toFixed(2)}</span>
+            <span>${invoice.currency} ${parseFloat(invoice.subtotal).toFixed(3)}</span>
           </div>
           ${invoice.discount_amount > 0 ? `
             <div class="totals-row">
               <span>Discount (${invoice.discount_percent}%):</span>
-              <span>-${invoice.currency} ${parseFloat(invoice.discount_amount).toFixed(2)}</span>
+              <span>-${invoice.currency} ${parseFloat(invoice.discount_amount).toFixed(3)}</span>
             </div>
           ` : ''}
           ${invoice.tax_amount > 0 ? `
             <div class="totals-row">
               <span>Tax (${invoice.tax_percent}%):</span>
-              <span>${invoice.currency} ${parseFloat(invoice.tax_amount).toFixed(2)}</span>
+              <span>${invoice.currency} ${parseFloat(invoice.tax_amount).toFixed(3)}</span>
             </div>
           ` : ''}
           <div class="totals-row total">
             <span>TOTAL:</span>
-            <span>${invoice.currency} ${parseFloat(invoice.total).toFixed(2)}</span>
+            <span>${invoice.currency} ${parseFloat(invoice.total).toFixed(3)}</span>
           </div>
           ${invoice.currency !== 'USD' ? `
             <div class="totals-row">
               <span>Total (USD):</span>
-              <span>$ ${parseFloat(invoice.total_usd).toFixed(2)}</span>
+              <span>$ ${parseFloat(invoice.total_usd).toFixed(3)}</span>
             </div>
           ` : ''}
         </div>
@@ -1271,10 +1133,6 @@ const PurchaseInvoicePage = () => {
                   Line Items (Multi-Currency)
                 </Label>
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={openCopyDialog} className="gap-1 text-purple-400 hover:text-purple-300 hover:border-purple-500">
-                    <ClipboardCopy className="w-4 h-4" />
-                    Copy from Sales
-                  </Button>
                   <Button type="button" variant="default" size="sm" onClick={addLine} className="gap-1">
                     <Plus className="w-4 h-4" />
                     Add Line
@@ -1308,6 +1166,7 @@ const PurchaseInvoicePage = () => {
                         <th className="p-2 text-center w-20 font-semibold text-xs">Curr.</th>
                         <th className="p-2 text-center w-20 font-semibold text-xs">Rate</th>
                         <th className="p-2 text-right w-24 font-semibold text-xs">Unit Cost</th>
+                        <th className="p-2 text-right w-24 font-semibold text-xs text-blue-400">Sell Price</th>
                         <th className="p-2 text-center w-14 font-semibold text-xs">Disc%</th>
                         <th className="p-2 text-right w-28 font-semibold text-xs">Line Total</th>
                         <th className="p-2 text-right w-24 font-semibold text-xs text-green-400">USD</th>
@@ -1320,27 +1179,20 @@ const PurchaseInvoicePage = () => {
                           <td className="p-1.5">
                             <InventorySelector
                               items={inventoryItems}
-                              serviceItems={serviceItems}
-                              value={line.is_service ? `service_${line.service_item_id}` : line.inventory_item_id}
+                              value={line.inventory_item_id}
                               onChange={(v) => handleLineChange(idx, 'inventory_item_id', v)}
-                              onSelectService={(service) => handleSelectService(idx, service)}
-                              currencies={currencies}
-                              lineCurrency={line.currency}
                               organizationId={currentOrg?.id}
                               apiUrl={API}
                               onItemSelect={handleItemSelectedFromSearch}
                               onCreateNewItem={(searchTerm) => setNewItemDialog({ name: searchTerm, lineIndex: idx })}
                             />
-                            {!line.inventory_item_id && !line.service_item_id && (
+                            {!line.inventory_item_id && (
                               <Input
                                 placeholder="Item name (manual)"
                                 value={line.item_name}
                                 onChange={(e) => handleLineChange(idx, 'item_name', e.target.value)}
                                 className="mt-1 h-8 text-xs"
                               />
-                            )}
-                            {line.is_service && (
-                              <div className="text-[10px] text-purple-400 mt-1">Service Item (No Stock)</div>
                             )}
                           </td>
                           <td className="p-1.5">
@@ -1361,7 +1213,6 @@ const PurchaseInvoicePage = () => {
                                   value={line.batch_number || ''}
                                   onChange={(e) => handleLineChange(idx, 'batch_number', e.target.value)}
                                   className="h-8 text-center text-xs border-amber-500/30 focus:border-amber-500 bg-amber-500/5 w-full"
-                                  disabled={line.is_service}
                                 />
                               </td>
                               <td className="p-1.5">
@@ -1370,7 +1221,6 @@ const PurchaseInvoicePage = () => {
                                   value={line.expiry_date || ''}
                                   onChange={(e) => handleLineChange(idx, 'expiry_date', e.target.value)}
                                   className="h-8 text-xs border-red-500/30 focus:border-red-500 bg-red-500/5 w-full"
-                                  disabled={line.is_service}
                                 />
                               </td>
                             </>
@@ -1418,6 +1268,18 @@ const PurchaseInvoicePage = () => {
                               value={line.unit_price}
                               onChange={(e) => handleLineChange(idx, 'unit_price', e.target.value)}
                               className="h-8 text-right font-mono text-xs w-full"
+                            />
+                          </td>
+                          <td className="p-1.5">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="Sell"
+                              value={line.selling_price || ''}
+                              onChange={(e) => handleLineChange(idx, 'selling_price', e.target.value)}
+                              className="h-8 text-right font-mono text-xs w-full border-blue-500/30 focus:border-blue-500"
+                              data-testid={`selling-price-${idx}`}
                             />
                           </td>
                           <td className="p-1.5">
@@ -1723,74 +1585,6 @@ const PurchaseInvoicePage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Copy from Sales Invoice Dialog */}
-      <Dialog open={copyDialogOpen} onOpenChange={(open) => { setCopyDialogOpen(open); if (!open) setSalesInvoiceSearch(''); }}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ClipboardCopy className="w-5 h-5 text-purple-400" />
-              Copy from Sales Invoice
-            </DialogTitle>
-            <DialogDescription>
-              Select a sales invoice to copy its line items to this purchase invoice
-            </DialogDescription>
-          </DialogHeader>
-          
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by invoice number or customer..."
-              value={salesInvoiceSearch}
-              onChange={(e) => setSalesInvoiceSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          
-          {/* Sales Invoices List */}
-          <div className="flex-1 overflow-auto mt-4 border rounded-lg">
-            {loadingSalesInvoices ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin" />
-              </div>
-            ) : filteredSalesInvoices.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <FileText className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                <p>No sales invoices found</p>
-              </div>
-            ) : (
-              <div className="divide-y">
-                {filteredSalesInvoices.map(inv => (
-                  <div
-                    key={inv.id}
-                    className="p-3 hover:bg-muted/50 cursor-pointer transition-colors"
-                    onClick={() => copyFromSalesInvoice(inv)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{inv.invoice_number}</p>
-                        <p className="text-sm text-muted-foreground">{inv.debit_account_name || 'Customer'}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-mono text-green-400">${formatUSD(inv.total_usd || inv.total)}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(inv.date)}</p>
-                      </div>
-                    </div>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      {inv.lines?.length || 0} line items • {inv.is_posted ? 'Posted' : 'Draft'}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setCopyDialogOpen(false)}>Cancel</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Create New Item Dialog */}
       <Dialog open={!!newItemDialog} onOpenChange={() => setNewItemDialog(null)}>
         <DialogContent className="max-w-md">
@@ -1911,7 +1705,6 @@ const PurchaseInvoicePage = () => {
                         <SelectItem value="m">Meter</SelectItem>
                         <SelectItem value="box">Box</SelectItem>
                         <SelectItem value="pack">Pack</SelectItem>
-                        <SelectItem value="service">Service</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

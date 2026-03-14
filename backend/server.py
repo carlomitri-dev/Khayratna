@@ -743,34 +743,7 @@ async def generate_document_number(
 
 # ================== CHART OF ACCOUNTS ROUTES (MOVED TO routers/accounts.py) ==================
 '''
-@api_router.post("/accounts", response_model=AccountResponse)
-async def create_account(account_data: AccountCreate, current_user: dict = Depends(get_current_user)):
-    if current_user['role'] not in ['super_admin', 'admin', 'accountant']:
-        raise HTTPException(status_code=403, detail="Permission denied")
-    
-    existing = await db.accounts.find_one({
-        'code': account_data.code,
-        'organization_id': account_data.organization_id
-    })
-    if existing:
-        raise HTTPException(status_code=400, detail="Account code already exists")
-    
-    account_id = str(uuid.uuid4())
-    account_doc = {
-        'id': account_id,
-        'code': account_data.code,
-        'name': account_data.name,
-        'name_ar': account_data.name_ar,
-        'account_class': account_data.account_class,
-        'account_type': account_data.account_type,
-        'parent_code': account_data.parent_code,
-        'is_active': account_data.is_active,
-        'organization_id': account_data.organization_id,
-        'balance_lbp': 0,
-        'balance_usd': 0
-    }
-    await db.accounts.insert_one(account_doc)
-    return AccountResponse(**account_doc)
+# NOTE: POST /accounts moved to routers/accounts.py (with VAT mirror auto-creation and contact fields)
 
 @api_router.get("/accounts", response_model=List[AccountResponse])
 async def get_accounts(organization_id: str, fy_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
@@ -963,76 +936,7 @@ async def delete_account(account_id: str, current_user: dict = Depends(get_curre
     return {"message": "Account deleted successfully"}
 
 # ================== CUSTOMERS & SUPPLIERS ==================
-
-@api_router.get("/customers", response_model=List[AccountResponse])
-async def get_customers(organization_id: str, current_user: dict = Depends(get_current_user)):
-    """Get all customer accounts (code starts with 41, length > 4)"""
-    accounts = await db.accounts.find(
-        {
-            'organization_id': organization_id,
-            'is_active': True
-        },
-        {'_id': 0}
-    ).sort('code', 1).to_list(1000)
-    
-    # Filter: code starts with "41" and length > 4
-    customers = [
-        acc for acc in accounts 
-        if acc['code'].startswith('41') and len(acc['code']) > 4
-    ]
-    
-    return [AccountResponse(**acc) for acc in customers]
-
-@api_router.get("/suppliers", response_model=List[AccountResponse])
-async def get_suppliers(organization_id: str, current_user: dict = Depends(get_current_user)):
-    """Get all supplier accounts (code starts with 40, length > 4)"""
-    accounts = await db.accounts.find(
-        {
-            'organization_id': organization_id,
-            'is_active': True
-        },
-        {'_id': 0}
-    ).sort('code', 1).to_list(1000)
-    
-    # Filter: code starts with "40" and length > 4
-    suppliers = [
-        acc for acc in accounts 
-        if acc['code'].startswith('40') and len(acc['code']) > 4
-    ]
-    
-    return [AccountResponse(**acc) for acc in suppliers]
-
-@api_router.put("/accounts/{account_id}/contact-info", response_model=AccountResponse)
-async def update_account_contact_info(
-    account_id: str, 
-    contact_data: ContactInfoUpdate, 
-    current_user: dict = Depends(get_current_user)
-):
-    """Update contact information for customer/supplier accounts"""
-    if current_user['role'] not in ['super_admin', 'admin', 'accountant']:
-        raise HTTPException(status_code=403, detail="Permission denied")
-    
-    account = await db.accounts.find_one({'id': account_id}, {'_id': 0})
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
-    
-    update_doc = {}
-    if contact_data.mobile is not None:
-        update_doc['mobile'] = contact_data.mobile
-    if contact_data.address is not None:
-        update_doc['address'] = contact_data.address
-    if contact_data.contact_person is not None:
-        update_doc['contact_person'] = contact_data.contact_person
-    if contact_data.email is not None:
-        update_doc['email'] = contact_data.email
-    if contact_data.notes is not None:
-        update_doc['notes'] = contact_data.notes
-    
-    if update_doc:
-        await db.accounts.update_one({'id': account_id}, {'$set': update_doc})
-    
-    updated = await db.accounts.find_one({'id': account_id}, {'_id': 0})
-    return AccountResponse(**updated)
+# NOTE: /customers, /suppliers, and /accounts/{account_id}/contact-info endpoints moved to routers/accounts.py
 
 @api_router.post("/accounts/seed-coa")
 async def seed_chart_of_accounts(organization_id: str, current_user: dict = Depends(get_current_user)):

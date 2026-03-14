@@ -10,18 +10,14 @@ import { Search, Check, ChevronsUpDown, Plus } from 'lucide-react';
 import { formatUSD } from '../../lib/utils';
 
 /**
- * InventorySelector - Reusable component for selecting inventory items and services
+ * InventorySelector - Reusable component for selecting inventory items
  * Used in Sales Invoice and Purchase Invoice pages
  */
 const InventorySelector = ({ 
   items = [], 
-  serviceItems = [], 
   value, 
   onChange, 
-  currencies, 
-  lineCurrency, 
   placeholder = "Select item", 
-  onSelectService, 
   organizationId, 
   apiUrl, 
   onItemSelect, 
@@ -33,14 +29,10 @@ const InventorySelector = ({
   const [searching, setSearching] = useState(false);
   const [selectedItemCache, setSelectedItemCache] = useState(null);
 
-  // Ensure items is always an array
   const safeItems = Array.isArray(items) ? items : [];
-  const safeServiceItems = Array.isArray(serviceItems) ? serviceItems : [];
   
-  // Use search results if available, otherwise filter local items
   const displayItems = searchResults !== null ? searchResults : safeItems;
   
-  // All items for lookup (combine local and search results)
   const allItems = useMemo(() => {
     const combined = [...safeItems];
     if (searchResults) {
@@ -57,24 +49,14 @@ const InventorySelector = ({
   }, [safeItems, searchResults, selectedItemCache]);
 
   const filteredItems = useMemo(() => {
-    if (!search) return displayItems.slice(0, 200); // Show first 200 when no search
+    if (!search) return displayItems.slice(0, 200);
     const searchLower = search.toLowerCase();
     return displayItems.filter(item => 
       (item.barcode && item.barcode.toLowerCase().includes(searchLower)) ||
       item.name.toLowerCase().includes(searchLower) ||
       (item.name_ar && item.name_ar.includes(search))
-    ).slice(0, 200); // Limit results for performance
+    ).slice(0, 200);
   }, [displayItems, search]);
-
-  const filteredServices = useMemo(() => {
-    if (!search) return safeServiceItems;
-    const searchLower = search.toLowerCase();
-    return safeServiceItems.filter(item => 
-      item.name.toLowerCase().includes(searchLower) ||
-      (item.name_ar && item.name_ar.includes(search)) ||
-      (item.description && item.description.toLowerCase().includes(searchLower))
-    );
-  }, [safeServiceItems, search]);
 
   // Server-side search for large datasets
   useEffect(() => {
@@ -83,7 +65,6 @@ const InventorySelector = ({
       return;
     }
     
-    // Only do server search if we have many items
     if (safeItems.length < 1000) {
       setSearchResults(null);
       return;
@@ -104,19 +85,18 @@ const InventorySelector = ({
       } finally {
         setSearching(false);
       }
-    }, 300); // Debounce
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [search, apiUrl, organizationId, safeItems.length]);
 
   const selectedItem = allItems.find(i => i.id === value) || selectedItemCache;
-  const selectedService = safeServiceItems.find(s => `service_${s.id}` === value);
   
   const handleSelectItem = (item) => {
-    setSelectedItemCache(item); // Cache the selected item
+    setSelectedItemCache(item);
     onChange(item.id);
     if (onItemSelect) {
-      onItemSelect(item); // Pass full item object to parent
+      onItemSelect(item);
     }
     setOpen(false);
     setSearch('');
@@ -136,10 +116,6 @@ const InventorySelector = ({
           {selectedItem ? (
             <span className="truncate">
               {selectedItem.barcode ? `[${selectedItem.barcode}] ` : ''}{selectedItem.name}
-            </span>
-          ) : selectedService ? (
-            <span className="truncate text-purple-400">
-              [Service] {selectedService.name}
             </span>
           ) : value === '' ? (
             <span className="text-muted-foreground">Manual Entry</span>
@@ -178,40 +154,6 @@ const InventorySelector = ({
             {value === '' && <Check className="ml-auto h-3 w-3" />}
           </div>
           
-          {/* Service Items Section */}
-          {filteredServices.length > 0 && (
-            <>
-              <div className="px-2 py-1 text-[10px] font-semibold text-purple-400 bg-purple-500/10 border-y border-purple-500/20">
-                Services (No Stock)
-              </div>
-              {filteredServices.map(service => (
-                <div
-                  key={`service_${service.id}`}
-                  className={`flex items-center px-2 py-1.5 cursor-pointer hover:bg-muted text-xs ${value === `service_${service.id}` ? 'bg-muted' : ''}`}
-                  onClick={() => {
-                    if (onSelectService) {
-                      onSelectService(service);
-                    }
-                    setOpen(false);
-                    setSearch('');
-                  }}
-                  data-testid={`service-item-${service.id}`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-purple-400">[Service]</span>
-                      <span className="truncate">{service.name}</span>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {service.currency || 'USD'} {formatUSD(service.price)}
-                    </div>
-                  </div>
-                  {value === `service_${service.id}` && <Check className="ml-2 h-3 w-3" />}
-                </div>
-              ))}
-            </>
-          )}
-          
           {/* Inventory Items Section */}
           {filteredItems.length > 0 && (
             <>
@@ -242,7 +184,7 @@ const InventorySelector = ({
             </>
           )}
           
-          {filteredItems.length === 0 && filteredServices.length === 0 && !searching && (
+          {filteredItems.length === 0 && !searching && (
             <div className="p-4 text-center">
               <p className="text-sm text-muted-foreground mb-3">
                 {search ? `No items found for "${search}"` : 'Type to search items...'}
@@ -273,7 +215,7 @@ const InventorySelector = ({
         </div>
         <div className="p-2 border-t border-border bg-muted/30">
           <p className="text-xs text-muted-foreground">
-            {filteredItems.length}{safeItems.length > 200 ? '+' : ''} inventory • {filteredServices.length} services {safeItems.length > 1000 && search.length < 2 ? '(type to search more)' : ''}
+            {filteredItems.length}{safeItems.length > 200 ? '+' : ''} inventory items {safeItems.length > 1000 && search.length < 2 ? '(type to search more)' : ''}
           </p>
         </div>
       </PopoverContent>

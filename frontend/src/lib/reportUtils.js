@@ -63,7 +63,7 @@ export const exportToCSV = (data, filename, columns) => {
     const values = columns.map(col => {
       let value = row[col.key];
       if (typeof value === 'number') {
-        value = value.toFixed(2);
+        value = value.toFixed(3);
       }
       // Escape quotes and wrap in quotes
       return `"${String(value || '').replace(/"/g, '""')}"`;

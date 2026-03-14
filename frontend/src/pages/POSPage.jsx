@@ -869,8 +869,8 @@ const POSPage = () => {
           <div class="item">
             <div class="item-name">${line.item_name}</div>
             <div class="item-details">
-              <span>${line.quantity} x ${line.currency} ${parseFloat(line.unit_price).toFixed(2)}${line.discount_percent > 0 ? ` (-${line.discount_percent}%)` : ''}</span>
-              <span>$${(line.line_total_usd || line.line_total).toFixed(2)}</span>
+              <span>${line.quantity} x ${line.currency} ${parseFloat(line.unit_price).toFixed(3)}${line.discount_percent > 0 ? ` (-${line.discount_percent}%)` : ''}</span>
+              <span>$${(line.line_total_usd || line.line_total).toFixed(3)}</span>
             </div>
           </div>
         `).join('')}
@@ -880,18 +880,18 @@ const POSPage = () => {
         <div class="total-section">
           <div class="total-row">
             <span>Subtotal:</span>
-            <span>$${transaction.subtotal_usd.toFixed(2)}</span>
+            <span>$${transaction.subtotal_usd.toFixed(3)}</span>
           </div>
           ${transaction.discount_amount > 0 ? `
           <div class="total-row">
             <span>Discount (${transaction.discount_percent}%):</span>
-            <span>-$${transaction.discount_amount.toFixed(2)}</span>
+            <span>-$${transaction.discount_amount.toFixed(3)}</span>
           </div>
           ` : ''}
           ${transaction.tax_amount > 0 ? `
           <div class="total-row">
             <span>Tax (${transaction.tax_percent}%):</span>
-            <span>+$${transaction.tax_amount.toFixed(2)}</span>
+            <span>+$${transaction.tax_amount.toFixed(3)}</span>
           </div>
           ` : ''}
         </div>
@@ -900,7 +900,7 @@ const POSPage = () => {
         
         <div class="total-row grand-total">
           <span>TOTAL USD:</span>
-          <span>$${transaction.total_usd.toFixed(2)}</span>
+          <span>$${transaction.total_usd.toFixed(3)}</span>
         </div>
         ${transaction.total_lbp ? `
         <div class="total-row">
@@ -914,12 +914,12 @@ const POSPage = () => {
         <div class="payment-info">
           <div class="total-row">
             <span>Payment (${transaction.payment_method.toUpperCase()}):</span>
-            <span>${transaction.payment_currency} ${parseFloat(transaction.payment_amount).toFixed(2)}</span>
+            <span>${transaction.payment_currency} ${parseFloat(transaction.payment_amount).toFixed(3)}</span>
           </div>
           ${transaction.change_amount > 0 ? `
           <div class="total-row">
             <span>Change:</span>
-            <span>$${transaction.change_amount.toFixed(2)}</span>
+            <span>$${transaction.change_amount.toFixed(3)}</span>
           </div>
           ` : ''}
         </div>
@@ -1303,7 +1303,7 @@ const POSPage = () => {
                 className="w-full h-14 text-lg font-bold"
                 disabled={cart.length === 0}
                 onClick={() => {
-                  setPaymentAmount(totals.totalUsd.toFixed(2));
+                  setPaymentAmount(totals.totalUsd.toFixed(3));
                   setShowPayment(true);
                 }}
               >
@@ -1575,7 +1575,7 @@ const POSPage = () => {
                   className="w-full h-12 text-base font-bold"
                   disabled={cart.length === 0}
                   onClick={() => {
-                    setPaymentAmount(totals.totalUsd.toFixed(2));
+                    setPaymentAmount(totals.totalUsd.toFixed(3));
                     setShowPayment(true);
                   }}
                 >
@@ -1712,7 +1712,7 @@ const POSPage = () => {
                       if (v === 'LBP') {
                         setPaymentAmount(Math.round(totals.totalUsd * lbpRate).toString());
                       } else {
-                        setPaymentAmount(totals.totalUsd.toFixed(2));
+                        setPaymentAmount(totals.totalUsd.toFixed(3));
                       }
                     }}>
                       <SelectTrigger className="h-9">

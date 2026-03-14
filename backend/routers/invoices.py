@@ -1144,6 +1144,10 @@ async def post_purchase_invoice(invoice_id: str, current_user: dict = Depends(ge
                 if line.get('unit_price'):
                     set_ops['cost'] = line['unit_price']
                 
+                # Update selling price if provided in purchase line
+                if line.get('selling_price'):
+                    set_ops['price'] = line['selling_price']
+                
                 # If batch number is provided, add to batches array
                 if line.get('batch_number'):
                     batches = item.get('batches', [])

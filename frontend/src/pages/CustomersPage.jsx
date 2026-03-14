@@ -18,7 +18,7 @@ import {
 } from '../components/ui/dialog';
 import { 
   Users, Search, Edit, Eye, Phone, MapPin, User, Mail, FileText,
-  DollarSign, Building, List, WifiOff
+  DollarSign, Building, List, WifiOff, Plus, Hash
 } from 'lucide-react';
 import axios from 'axios';
 import { formatLBP, formatUSD } from '../lib/utils';
@@ -38,6 +38,12 @@ const CustomersPage = () => {
   const [viewCustomer, setViewCustomer] = useState(null);
   const [ledgerAccount, setLedgerAccount] = useState(null);
   const [editCustomer, setEditCustomer] = useState(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({
+    code: '', name: '', name_ar: '', vat_number: '',
+    mobile: '', email: '', address: '', contact_person: '', notes: ''
+  });
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
   const PAGE_SIZE = 50;
@@ -78,7 +84,7 @@ const CustomersPage = () => {
         
         // Cache in IndexedDB
         try {
-          const customersToCache = response.data.map(c => ({ ...c, organization_id: currentOrg.id }));
+          const customersToCache = dataRes.data.map(c => ({ ...c, organization_id: currentOrg.id }));
           await db.customers.where('organization_id').equals(currentOrg.id).delete();
           if (customersToCache.length > 0) {
             await db.customers.bulkPut(customersToCache);
@@ -121,7 +127,8 @@ const CustomersPage = () => {
         address: editCustomer.address || '',
         contact_person: editCustomer.contact_person || '',
         email: editCustomer.email || '',
-        notes: editCustomer.notes || ''
+        notes: editCustomer.notes || '',
+        vat_number: editCustomer.vat_number || ''
       });
       
       alert('Customer information updated successfully!');
@@ -129,6 +136,44 @@ const CustomersPage = () => {
       fetchCustomers(true);
     } catch (error) {
       alert(error.response?.data?.detail || 'Failed to update customer');
+    }
+  };
+
+  const handleCreateCustomer = async () => {
+    if (!newCustomer.code || !newCustomer.name) {
+      alert('Code and Name are required');
+      return;
+    }
+    if (!newCustomer.code.startsWith('4111') || newCustomer.code.length <= 4) {
+      alert('Customer code must start with "4111" and have more than 4 digits');
+      return;
+    }
+    setSaving(true);
+    try {
+      await axios.post(`${API}/accounts`, {
+        code: newCustomer.code,
+        name: newCustomer.name,
+        name_ar: newCustomer.name_ar || null,
+        account_class: 4,
+        account_type: 'asset',
+        parent_code: null,
+        is_active: true,
+        organization_id: currentOrg.id,
+        mobile: newCustomer.mobile || null,
+        email: newCustomer.email || null,
+        address: newCustomer.address || null,
+        contact_person: newCustomer.contact_person || null,
+        notes: newCustomer.notes || null,
+        vat_number: newCustomer.vat_number || null
+      });
+      alert(`Customer "${newCustomer.name}" created successfully! VAT mirror account 4114${newCustomer.code.substring(4)} was also created.`);
+      setAddDialogOpen(false);
+      setNewCustomer({ code: '', name: '', name_ar: '', vat_number: '', mobile: '', email: '', address: '', contact_person: '', notes: '' });
+      fetchCustomers(true);
+    } catch (error) {
+      alert(error.response?.data?.detail || 'Failed to create customer');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -160,6 +205,12 @@ const CustomersPage = () => {
             Manage customer accounts and contact information (Account codes starting with 41)
           </p>
         </div>
+        {canEdit && (
+          <Button onClick={() => setAddDialogOpen(true)} className="gap-2" data-testid="add-customer-btn">
+            <Plus className="w-4 h-4" />
+            Add Customer
+          </Button>
+        )}
       </div>
 
       {/* Search */}
@@ -263,6 +314,7 @@ const CustomersPage = () => {
                     <tr>
                       <th>Code</th>
                       <th>Name</th>
+                      <th>VAT Number</th>
                       <th>Contact Person</th>
                       <th>Mobile</th>
                       <th>Email</th>
@@ -283,6 +335,7 @@ const CustomersPage = () => {
                             )}
                           </div>
                         </td>
+                        <td className="text-muted-foreground font-mono text-sm">{customer.vat_number || '-'}</td>
                         <td className="text-muted-foreground">{customer.contact_person || '-'}</td>
                         <td className="text-muted-foreground">{customer.mobile || '-'}</td>
                         <td className="text-muted-foreground text-sm">{customer.email || '-'}</td>
@@ -373,6 +426,15 @@ const CustomersPage = () => {
                 <h4 className="font-medium text-sm border-b border-border pb-2">Contact Information</h4>
                 
                 <div className="grid gap-3">
+                  {viewCustomer.vat_number && (
+                    <div className="flex items-center gap-3">
+                      <Hash className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">VAT Number</p>
+                        <span className="text-sm font-mono">{viewCustomer.vat_number}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-3">
                     <User className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm">{viewCustomer.contact_person || 'Not specified'}</span>
@@ -432,6 +494,18 @@ const CustomersPage = () => {
               <div className="p-3 bg-muted/30 rounded-sm">
                 <p className="font-mono text-sm text-primary">{editCustomer.code}</p>
                 <p className="font-medium">{editCustomer.name}</p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Hash className="w-4 h-4" />
+                  VAT Number
+                </Label>
+                <Input
+                  placeholder="Enter VAT number..."
+                  value={editCustomer.vat_number || ''}
+                  onChange={(e) => setEditCustomer({ ...editCustomer, vat_number: e.target.value })}
+                />
               </div>
               
               <div className="space-y-2">
@@ -506,6 +580,123 @@ const CustomersPage = () => {
             </Button>
             <Button onClick={handleUpdateContact}>
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Customer Dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" />
+              Add New Customer
+            </DialogTitle>
+            <DialogDescription>
+              Create a new customer account (4111xxxx). A VAT mirror account (4114xxxx) will be auto-created.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Account Code *</Label>
+                <Input
+                  placeholder="e.g. 411101"
+                  value={newCustomer.code}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, code: e.target.value })}
+                  className="font-mono"
+                  data-testid="new-customer-code"
+                />
+                <p className="text-[10px] text-muted-foreground">Must start with 4111 + digits</p>
+              </div>
+              <div className="space-y-2">
+                <Label>VAT Number</Label>
+                <Input
+                  placeholder="VAT number..."
+                  value={newCustomer.vat_number}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, vat_number: e.target.value })}
+                  data-testid="new-customer-vat"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Name (English) *</Label>
+                <Input
+                  placeholder="Customer name..."
+                  value={newCustomer.name}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                  data-testid="new-customer-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Name (Arabic)</Label>
+                <Input
+                  placeholder="اسم الزبون..."
+                  value={newCustomer.name_ar}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, name_ar: e.target.value })}
+                  dir="rtl"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Contact Person</Label>
+                <Input
+                  placeholder="Contact person..."
+                  value={newCustomer.contact_person}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, contact_person: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Mobile</Label>
+                <Input
+                  placeholder="Phone number..."
+                  value={newCustomer.mobile}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, mobile: e.target.value })}
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  placeholder="Email..."
+                  value={newCustomer.email}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Address</Label>
+                <Input
+                  placeholder="Address..."
+                  value={newCustomer.address}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                placeholder="Additional notes..."
+                value={newCustomer.notes}
+                onChange={(e) => setNewCustomer({ ...newCustomer, notes: e.target.value })}
+                rows={2}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateCustomer} disabled={saving} data-testid="save-new-customer-btn">
+              {saving ? 'Creating...' : 'Create Customer'}
             </Button>
           </DialogFooter>
         </DialogContent>
