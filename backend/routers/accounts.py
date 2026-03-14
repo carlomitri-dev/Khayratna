@@ -208,32 +208,42 @@ async def get_accounts(
 
 
 @router.get("/accounts/movable/list", response_model=List[AccountResponse])
-async def get_movable_accounts(organization_id: str, current_user: dict = Depends(get_current_user)):
-    """Get accounts that can have transactions (non-parent accounts)"""
-    accounts = await db.accounts.find(
-        {
+async def get_movable_accounts(organization_id: str, search: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Get movable accounts (leaf accounts with 5+ digit codes) for voucher entry"""
+    # Use aggregation pipeline for efficient search + code length filtering
+    pipeline = [
+        {'$match': {
             'organization_id': organization_id,
-            '$or': [
-                {'account_type': 'detail'},
-                {'account_type': {'$exists': False}}
-            ]
-        },
-        {'_id': 0}
-    ).sort('code', 1).to_list(None)
+            'is_active': True
+        }},
+        {'$addFields': {'code_len': {'$strLenCP': '$code'}}},
+        {'$match': {'code_len': {'$gte': 5}}}
+    ]
+    
+    if search:
+        pipeline.append({'$match': {'$or': [
+            {'code': {'$regex': search, '$options': 'i'}},
+            {'name': {'$regex': search, '$options': 'i'}},
+            {'name_ar': {'$regex': search}}
+        ]}})
+    
+    pipeline.extend([
+        {'$sort': {'code': 1}},
+        {'$limit': 5000},
+        {'$project': {
+            '_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1,
+            'account_type': 1, 'account_class': 1, 'is_active': 1,
+            'balance_usd': 1, 'balance_lbp': 1, 'parent_code': 1
+        }}
+    ])
+    
+    accounts = await db.accounts.aggregate(pipeline).to_list(5000)
     
     for acc in accounts:
-        if 'balance_lbp' not in acc:
-            acc['balance_lbp'] = 0
-        if 'balance_usd' not in acc:
-            acc['balance_usd'] = 0
-        if 'is_active' not in acc:
-            acc['is_active'] = True
-        if 'name_ar' not in acc:
-            acc['name_ar'] = ''
-        if 'account_type' not in acc:
-            acc['account_type'] = 'detail'
-        if 'parent_code' not in acc:
-            acc['parent_code'] = None
+        acc.setdefault('balance_lbp', 0)
+        acc.setdefault('balance_usd', 0)
+        acc.setdefault('name_ar', '')
+        acc.setdefault('parent_code', None)
         if not acc.get('account_class'):
             try:
                 acc['account_class'] = int(acc.get('code', '0')[0])

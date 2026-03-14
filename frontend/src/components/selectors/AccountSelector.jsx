@@ -38,6 +38,11 @@ const AccountSelector = ({
     );
   }, [accounts, search]);
 
+  // Limit rendered items for performance - show max 100 at a time
+  const MAX_VISIBLE = 100;
+  const displayAccounts = filteredAccounts.slice(0, MAX_VISIBLE);
+  const hasMoreAccounts = filteredAccounts.length > MAX_VISIBLE;
+
   const selectedAccount = accounts.find(acc => acc.id === value);
 
   const handleSelect = (account) => {
@@ -107,30 +112,37 @@ const AccountSelector = ({
             </div>
           </div>
           <div className="max-h-[300px] overflow-y-auto">
-            {filteredAccounts.length === 0 ? (
+            {displayAccounts.length === 0 ? (
               <div className="p-4 text-center text-muted-foreground text-sm">
                 No {accountType}s found
               </div>
             ) : (
-              filteredAccounts.map((acc) => (
-                <div
-                  key={acc.id}
-                  className={`flex items-center p-2 cursor-pointer hover:bg-muted border-b border-border/50 ${value === acc.id ? 'bg-muted' : ''}`}
-                  onClick={() => handleSelect(acc)}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      {showCode && <span className="font-mono text-sm text-cyan-400">{acc.code}</span>}
-                      <span className="font-medium text-sm truncate">{acc.name}</span>
+              <>
+                {displayAccounts.map((acc) => (
+                  <div
+                    key={acc.id}
+                    className={`flex items-center p-2 cursor-pointer hover:bg-muted border-b border-border/50 ${value === acc.id ? 'bg-muted' : ''}`}
+                    onClick={() => handleSelect(acc)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {showCode && <span className="font-mono text-sm text-cyan-400">{acc.code}</span>}
+                        <span className="font-medium text-sm truncate">{acc.name}</span>
+                      </div>
                     </div>
+                    {showBalance && acc.balance_usd !== undefined && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded ml-2 ${(acc.balance_usd || 0) >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                        ${formatUSD(Math.abs(acc.balance_usd || 0))}
+                      </span>
+                    )}
                   </div>
-                  {showBalance && acc.balance_usd !== undefined && (
-                    <span className={`text-xs px-1.5 py-0.5 rounded ml-2 ${(acc.balance_usd || 0) >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                      ${formatUSD(Math.abs(acc.balance_usd || 0))}
-                    </span>
-                  )}
-                </div>
-              ))
+                ))}
+                {hasMoreAccounts && (
+                  <div className="p-2 text-center text-xs text-muted-foreground bg-muted/30">
+                    Showing {MAX_VISIBLE} of {filteredAccounts.length} accounts. Type to search for more.
+                  </div>
+                )}
+              </>
             )}
           </div>
         </PopoverContent>

@@ -706,30 +706,54 @@ async def get_sales_accounts(organization_id: str, current_user: dict = Depends(
 
 
 @router.get("/customer-accounts")
-async def get_customer_accounts(organization_id: str, current_user: dict = Depends(get_current_user)):
+async def get_customer_accounts(organization_id: str, search: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Get customer accounts (codes starting with '41' and length > 4, for debit on sales invoices)"""
+    query = {
+        'organization_id': organization_id, 
+        'code': {'$regex': '^41'},
+        'account_type': {'$ne': 'header'},
+        '$expr': {'$gt': [{'$strLenCP': '$code'}, 4]}
+    }
+    if search:
+        query = {
+            '$and': [
+                query,
+                {'$or': [
+                    {'code': {'$regex': search, '$options': 'i'}},
+                    {'name': {'$regex': search, '$options': 'i'}},
+                    {'name_ar': {'$regex': search}}
+                ]}
+            ]
+        }
     accounts = await db.accounts.find(
-        {
-            'organization_id': organization_id, 
-            'code': {'$regex': '^41'},
-            'account_type': {'$ne': 'header'},
-            '$expr': {'$gt': [{'$strLenCP': '$code'}, 4]}
-        },
+        query,
         {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1, 'address': 1, 'mobile': 1, 'contact_person': 1, 'registration_number': 1, 'region_id': 1}
     ).sort('code', 1).to_list(1000)
     return accounts
 
 
 @router.get("/supplier-accounts")
-async def get_supplier_accounts(organization_id: str, current_user: dict = Depends(get_current_user)):
+async def get_supplier_accounts(organization_id: str, search: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Get supplier accounts (codes starting with '40' and length > 4, for credit on purchase invoices)"""
+    query = {
+        'organization_id': organization_id, 
+        'code': {'$regex': '^40'},
+        'account_type': {'$ne': 'header'},
+        '$expr': {'$gt': [{'$strLenCP': '$code'}, 4]}
+    }
+    if search:
+        query = {
+            '$and': [
+                query,
+                {'$or': [
+                    {'code': {'$regex': search, '$options': 'i'}},
+                    {'name': {'$regex': search, '$options': 'i'}},
+                    {'name_ar': {'$regex': search}}
+                ]}
+            ]
+        }
     accounts = await db.accounts.find(
-        {
-            'organization_id': organization_id, 
-            'code': {'$regex': '^40'},
-            'account_type': {'$ne': 'header'},
-            '$expr': {'$gt': [{'$strLenCP': '$code'}, 4]}
-        },
+        query,
         {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1, 'address': 1, 'mobile': 1, 'contact_person': 1, 'registration_number': 1}
     ).sort('code', 1).to_list(1000)
     return accounts
