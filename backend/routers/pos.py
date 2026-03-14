@@ -349,9 +349,7 @@ async def create_pos_transaction(
     actual_received = transaction_data.total_usd - payment_adjustment
     actual_received_lbp = (transaction_data.total_lbp or 0) - (payment_adjustment * transaction_data.lbp_rate)
     
-    # Net sales = subtotal - discount (before tax)
-    net_sales = transaction_data.subtotal_usd - invoice_discount
-    net_sales_lbp = net_sales * transaction_data.lbp_rate
+    # Net sales = subtotal - discount (before tax) — used for reference only
     
     # Build voucher lines
     # Proper accounting:
@@ -641,3 +639,54 @@ async def get_pos_customer_history(
         enriched.append(await enrich_pos_transaction(t))
     
     return enriched
+
+
+@router.delete("/invoices/{transaction_id}")
+async def delete_pos_transaction(
+    transaction_id: str,
+    restore_inventory: bool = True,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a POS transaction, its linked voucher, and optionally restore inventory."""
+    if current_user['role'] not in ['super_admin', 'admin']:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    transaction = await db.pos_transactions.find_one({'id': transaction_id})
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # 1. Reverse account balances from the linked voucher
+    voucher_id = transaction.get('voucher_id')
+    if voucher_id:
+        voucher = await db.vouchers.find_one({'id': voucher_id})
+        if voucher:
+            for line in voucher.get('lines', []):
+                net = line.get('debit_usd', 0) - line.get('credit_usd', 0)
+                if net != 0:
+                    await db.accounts.update_one(
+                        {'id': line['account_id']},
+                        {'$inc': {'balance_usd': -net}}
+                    )
+            # Delete the voucher
+            await db.vouchers.delete_one({'id': voucher_id})
+
+    # 2. Restore inventory quantities if requested
+    if restore_inventory:
+        for line in transaction.get('lines', []):
+            inv_id = line.get('inventory_item_id')
+            if inv_id:
+                qty = line.get('quantity', 0)
+                if qty > 0:
+                    await db.inventory_items.update_one(
+                        {'id': inv_id},
+                        {'$inc': {'on_hand_qty': qty}}  # Add back qty that was sold
+                    )
+
+    # 3. Delete the POS transaction
+    await db.pos_transactions.delete_one({'id': transaction_id})
+
+    return {
+        'message': f'Transaction {transaction.get("receipt_number", transaction_id)} deleted',
+        'voucher_deleted': voucher_id is not None,
+        'inventory_restored': restore_inventory
+    }
