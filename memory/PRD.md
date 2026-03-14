@@ -4,7 +4,7 @@
 Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full accounting, invoicing, inventory, POS, exchange rates.
 
 ## Architecture
-- **Frontend**: React (port 3000), Shadcn/UI
+- **Frontend**: React (port 3000), Shadcn/UI, Recharts
 - **Backend**: FastAPI (port 8001), MongoDB, routers in `/app/backend/routers/`
 - **Auth**: JWT-based, role-based (super_admin, admin, accountant, cashier)
 
@@ -18,6 +18,7 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 - POS Terminal (barcode scanner, quick items, cart, receipt print)
 - Cashier System (sessions, PIN login, admin management)
 - POS Daily Closing Report (admin-only, per-session breakdown, print)
+- POS Sales Analytics Dashboard (sales trends, top items, cashier performance charts)
 - Customer & Supplier Management (with VAT number, mirror account creation)
 - Exchange Rates (USD/LBP simplified)
 - Reports: Trial Balance, Income Statement, General Ledger
@@ -26,17 +27,18 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 ## Changes Log
 
 ### March 14, 2026 (Session 4)
-- **POS Daily Closing Report Tested** — Comprehensive testing via testing_agent (iteration_6), 100% pass rate backend and frontend
-- **AccountSelector Refactored** — Extracted duplicated remote-search AccountSelector from VoucherEntryPage and CrDbNotesPage into shared `RemoteAccountSelector` component at `/app/frontend/src/components/shared/RemoteAccountSelector.jsx`
+- **POS Sales Analytics Dashboard** — New admin-only page at `/pos-analytics` with:
+  - 3 backend endpoints: sales-trends, top-items, cashier-performance
+  - Recharts visualizations: Area chart for sales trends, stacked bar for payment methods, horizontal bars for top items, grouped bars for cashier comparison
+  - Date range picker & daily/weekly/monthly period selector
+  - Summary stat cards, cashier performance table
+- **POS Daily Closing Report Tested** — Comprehensive testing via testing_agent (iteration_6), 100% pass
+- **AccountSelector Refactored** — Extracted shared `RemoteAccountSelector` from VoucherEntryPage and CrDbNotesPage
 - **Fixed Layout.jsx duplicate import** — Removed duplicate `FileBarChart` import
-- **Cleaned unused imports** — Removed unused Popover, useCallback, Check, ChevronsUpDown imports from both pages
 
 ### March 14, 2026 (Session 3)
-- **POS Module Connected** — Wired up 4 existing POS pages (POSPage, CashierPOSPage, CashierSessionsPage, CashierLoginPage) with routes in App.js and sidebar navigation
-- **POS Router Included** — Added POS router to server.py (was missing)
-- **POS Endpoint Cleanup** — Removed ~605 lines of duplicate POS endpoints from server.py
-- **POS Inventory Endpoint** — Added missing GET /api/pos/inventory to routers/pos.py
-- **POS Daily Closing Report Created** — New backend endpoint and frontend page
+- POS Module Connected, POS Router Included, POS Endpoint Cleanup
+- POS Daily Closing Report Created
 
 ### March 14, 2026 (Session 2)
 - Invoice pages rewrite, print for returns, selling_price in purchase invoice
