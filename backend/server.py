@@ -3376,24 +3376,19 @@ async def get_crdb_notes(
         else:
             query['date'] = {'$lte': date_to}
     
-    notes = await db.crdb_notes.find(query, {'_id': 0}).sort('created_at', -1).to_list(10000)
-    
-    # Apply search filter
+    # Server-side search using MongoDB $regex
     if search:
-        search_lower = search.lower()
-        notes = [
-            n for n in notes
-            if search_lower in n.get('note_number', '').lower()
-            or search_lower in n.get('description', '').lower()
-            or search_lower in n.get('debit_account_code', '').lower()
-            or search_lower in n.get('debit_account_name', '').lower()
-            or search_lower in n.get('credit_account_code', '').lower()
-            or search_lower in n.get('credit_account_name', '').lower()
+        search_regex = {'$regex': search, '$options': 'i'}
+        query['$or'] = [
+            {'note_number': search_regex},
+            {'description': search_regex},
+            {'debit_account_code': search_regex},
+            {'debit_account_name': search_regex},
+            {'credit_account_code': search_regex},
+            {'credit_account_name': search_regex}
         ]
     
-    # Apply pagination
-    total = len(notes)
-    notes = notes[skip:skip + limit]
+    notes = await db.crdb_notes.find(query, {'_id': 0}).sort('created_at', -1).skip(skip).limit(limit).to_list(limit)
     
     # Convert notes to response format, handling missing fields
     result = []
@@ -3449,19 +3444,16 @@ async def get_crdb_notes_count(
             query['date'] = {'$lte': date_to}
     
     if search:
-        notes = await db.crdb_notes.find(query, {'_id': 0}).to_list(10000)
-        search_lower = search.lower()
-        notes = [
-            n for n in notes
-            if search_lower in n.get('note_number', '').lower()
-            or search_lower in n.get('description', '').lower()
-            or search_lower in n.get('debit_account_code', '').lower()
-            or search_lower in n.get('credit_account_code', '').lower()
+        search_regex = {'$regex': search, '$options': 'i'}
+        query['$or'] = [
+            {'note_number': search_regex},
+            {'description': search_regex},
+            {'debit_account_code': search_regex},
+            {'credit_account_code': search_regex}
         ]
-        return {"count": len(notes)}
-    else:
-        count = await db.crdb_notes.count_documents(query)
-        return {"count": count}
+    
+    count = await db.crdb_notes.count_documents(query)
+    return {"count": count}
 
 @api_router.post("/crdb-notes", response_model=CrDbNoteResponse)
 async def create_crdb_note(note_data: CrDbNoteCreate, current_user: dict = Depends(get_current_user)):
@@ -7324,14 +7316,27 @@ async def get_sales_accounts(organization_id: str, current_user: dict = Depends(
     return [a for a in all_accounts if is_leaf(a['code'])]
 
 @api_router.get("/customer-accounts")
-async def get_customer_accounts(organization_id: str, current_user: dict = Depends(get_current_user)):
-    """Get customer receivable accounts (starting with 41, only leaf accounts)"""
-    # Get all customer accounts (41xxx)
-    all_accounts = await db.accounts.find({
+async def get_customer_accounts(organization_id: str, search: Optional[str] = None, skip: int = 0, limit: int = 500, current_user: dict = Depends(get_current_user)):
+    """Get customer receivable accounts (starting with 41, only leaf accounts) with server-side search"""
+    query = {
         'organization_id': organization_id,
         'code': {'$regex': '^41'},
         'is_active': True
-    }, {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1}).sort('code', 1).to_list(1000)
+    }
+    
+    # If search provided, add search filter
+    if search:
+        search_regex = {'$regex': search, '$options': 'i'}
+        query['$or'] = [
+            {'code': search_regex},
+            {'name': search_regex},
+            {'name_ar': {'$regex': search}}
+        ]
+    
+    all_accounts = await db.accounts.find(
+        query,
+        {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1, 'address': 1, 'mobile': 1}
+    ).sort('code', 1).to_list(500)
     
     # Filter to only leaf accounts
     all_codes = {a['code'] for a in all_accounts}
@@ -7342,7 +7347,13 @@ async def get_customer_accounts(organization_id: str, current_user: dict = Depen
                 return False
         return True
     
-    return [a for a in all_accounts if is_leaf(a['code'])]
+    leaf_accounts = [a for a in all_accounts if is_leaf(a['code'])]
+    
+    # Apply pagination
+    total = len(leaf_accounts)
+    paginated = leaf_accounts[skip:skip + limit]
+    
+    return paginated
 
 # ================== PURCHASE INVOICE ENDPOINTS ==================
 
@@ -7794,14 +7805,40 @@ async def unpost_purchase_invoice(invoice_id: str, current_user: dict = Depends(
     return {"message": "Purchase invoice unposted successfully"}
 
 @api_router.get("/supplier-accounts")
-async def get_supplier_accounts(organization_id: str, current_user: dict = Depends(get_current_user)):
-    """Get supplier payable accounts (starting with 40 and code length > 4)"""
-    accounts = await db.accounts.find({
+async def get_supplier_accounts(organization_id: str, search: Optional[str] = None, skip: int = 0, limit: int = 500, current_user: dict = Depends(get_current_user)):
+    """Get supplier payable accounts (starting with 40 and code length > 4) with server-side search"""
+    query = {
         'organization_id': organization_id,
         'code': {'$regex': '^40'},
         'is_active': True,
         '$expr': {'$gt': [{'$strLenCP': '$code'}, 4]}
-    }, {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1}).sort('code', 1).to_list(None)  # Get ALL
+    }
+    
+    if search:
+        # Can't combine $expr with $or easily, so use pipeline
+        pipeline = [
+            {'$match': {
+                'organization_id': organization_id,
+                'code': {'$regex': '^40'},
+                'is_active': True
+            }},
+            {'$match': {'$expr': {'$gt': [{'$strLenCP': '$code'}, 4]}}},
+            {'$match': {'$or': [
+                {'code': {'$regex': search, '$options': 'i'}},
+                {'name': {'$regex': search, '$options': 'i'}},
+                {'name_ar': {'$regex': search}}
+            ]}},
+            {'$sort': {'code': 1}},
+            {'$skip': skip},
+            {'$limit': limit},
+            {'$project': {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1, 'address': 1, 'mobile': 1}}
+        ]
+        accounts = await db.accounts.aggregate(pipeline).to_list(limit)
+    else:
+        accounts = await db.accounts.find(
+            query,
+            {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1, 'address': 1, 'mobile': 1}
+        ).sort('code', 1).skip(skip).limit(limit).to_list(limit)
     
     return accounts
 
@@ -8487,6 +8524,21 @@ spec.loader.exec_module(quotations_module)
 app.include_router(quotations_module.router)
 
 # Include router and configure app
+
+# Sales Returns router - ENABLED
+spec = importlib.util.spec_from_file_location("sales_returns_router", "/app/backend/routers/sales_returns.py")
+sales_returns_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(sales_returns_module)
+sales_returns_module.init_router(db, get_current_user)
+api_router.include_router(sales_returns_module.router)
+
+# Purchase Returns router - ENABLED
+spec = importlib.util.spec_from_file_location("purchase_returns_router", "/app/backend/routers/purchase_returns.py")
+purchase_returns_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(purchase_returns_module)
+purchase_returns_module.init_router(db, get_current_user)
+api_router.include_router(purchase_returns_module.router)
+
 app.include_router(api_router)
 
 app.add_middleware(
@@ -8553,6 +8605,16 @@ async def create_indexes():
         
         # Voucher source_id for duplicate detection on reimport
         await db.vouchers.create_index([("organization_id", 1), ("source_id", 1)])
+        
+        # Sales Returns indexes
+        await db.sales_returns.create_index([("organization_id", 1), ("date", -1)])
+        await db.sales_returns.create_index([("organization_id", 1), ("status", 1)])
+        await db.sales_returns.create_index("return_number")
+        
+        # Purchase Returns indexes
+        await db.purchase_returns.create_index([("organization_id", 1), ("date", -1)])
+        await db.purchase_returns.create_index([("organization_id", 1), ("status", 1)])
+        await db.purchase_returns.create_index("return_number")
         
         logger.info("Database indexes created successfully")
     except Exception as e:

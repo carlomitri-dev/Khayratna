@@ -220,9 +220,8 @@ const VoucherEntryPage = () => {
     setLoading(true);
     try {
       if (isOnline) {
-        const [accountsRes, currenciesRes, rateRes] = await Promise.all([
-          axios.get(`${API}/accounts?organization_id=${currentOrg.id}`),
-          axios.get(`${API}/currencies/active`).catch(() => ({ data: [] })),
+        const [accountsRes, rateRes] = await Promise.all([
+          axios.get(`${API}/accounts/movable/list?organization_id=${currentOrg.id}`),
           axios.get(`${API}/exchange-rates/latest?organization_id=${currentOrg.id}`).catch(() => ({ data: { rate: 89500 } }))
         ]);
         
@@ -237,15 +236,13 @@ const VoucherEntryPage = () => {
         
         setAccounts(accountsRes.data);
         
-        // Set currencies - fallback to USD/LBP if no currencies seeded
-        const currencyData = currenciesRes.data.length > 0 
-          ? currenciesRes.data 
-          : [
-              { code: 'USD', name: 'US Dollar', symbol: '$', rate_to_usd: 1, rate_to_lbp: 89500 },
-              { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل', rate_to_usd: 1/89500, rate_to_lbp: 1 }
+        // Set currencies - only USD and LBP
+        const currencyData = [
+              { code: 'USD', name: 'US Dollar', symbol: '$', rate_to_usd: 1, rate_to_lbp: rateRes.data.rate || 89500 },
+              { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل', rate_to_usd: 1/(rateRes.data.rate || 89500), rate_to_lbp: 1 }
             ];
         setCurrencies(currencyData);
-        setBaseExchangeRate(rateRes.data.rate);
+        setBaseExchangeRate(rateRes.data.rate || 89500);
         
         // Fetch vouchers with initial filters
         await fetchVouchers(true);

@@ -401,9 +401,8 @@ const CrDbNotesPage = () => {
     setLoading(true);
     try {
       if (isOnline) {
-        const [accountsRes, currenciesRes] = await Promise.all([
-          axios.get(`${API}/accounts?organization_id=${currentOrg.id}`),
-          axios.get(`${API}/currencies/active`).catch(() => ({ data: [] }))
+        const [accountsRes] = await Promise.all([
+          axios.get(`${API}/accounts/movable/list?organization_id=${currentOrg.id}`)
         ]);
         
         // Cache accounts in IndexedDB
@@ -416,7 +415,7 @@ const CrDbNotesPage = () => {
         }
         
         setAccounts(accountsRes.data);
-        setCurrencies(currenciesRes.data.length > 0 ? currenciesRes.data : [
+        setCurrencies([
           { code: 'USD', name: 'US Dollar', symbol: '$' },
           { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل' }
         ]);

@@ -31,7 +31,8 @@ import {
   Calendar,
   Lock,
   Unlock,
-  Upload
+  Upload,
+  RotateCcw
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -74,7 +75,9 @@ const Sidebar = ({ isOpen, onClose, collapsed, onToggleCollapse }) => {
     { path: '/cr-db-notes', icon: FileText, label: 'Cr/Db Notes', requiresEdit: true },
     { path: '/sales-quotations', icon: FileText, label: 'Sales Quotations', requiresEdit: true },
     { path: '/sales-invoices', icon: ShoppingCart, label: 'Sales Invoices', requiresEdit: true },
+    { path: '/sales-returns', icon: RotateCcw, label: 'Sales Returns', requiresEdit: true },
     { path: '/purchase-invoices', icon: Truck, label: 'Purchase Invoices', requiresEdit: true },
+    { path: '/purchase-returns', icon: RotateCcw, label: 'Purchase Returns', requiresEdit: true },
     { path: '/customers', icon: Users, label: 'Customers' },
     { path: '/suppliers', icon: Truck, label: 'Suppliers' },
     { path: '/inventory', icon: Package, label: 'Inventory' },

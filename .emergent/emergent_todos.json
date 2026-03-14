@@ -1,18 +1,42 @@
 [
   {
-    "content": "Auto-create VAT accounts (4114/4014) when adding customers/suppliers",
+    "content": "Phase 1: Fix voucher backend - MongoDB search + proper pagination",
     "status": "completed"
   },
   {
-    "content": "Update Sales Invoice posting to 4-line pattern (customer + VAT + VAT payable + revenue)",
+    "content": "Phase 1: Fix CrDb Notes backend - same optimization",
     "status": "completed"
   },
   {
-    "content": "Update Purchase Invoice posting to 4-line pattern (supplier + VAT + VAT input + expense)",
+    "content": "Phase 1: Optimize customer/supplier endpoints with search support",
     "status": "completed"
   },
   {
-    "content": "Remove Image Archive module from sidebar and routes",
+    "content": "Phase 1: Update frontend to use movable/list for voucher + crdb pages",
     "status": "completed"
+  },
+  {
+    "content": "Phase 2: Simplify exchange rate to USD/LBP only, auto-fetch latest rate",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 3: Sales Return backend (CRUD + post/unpost + inventory)",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 3: Sales Return frontend page + routing + sidebar",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 4: Purchase Return backend (CRUD + post/unpost + inventory)",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 4: Purchase Return frontend page + routing + sidebar",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 5: Testing & verification",
+    "status": "in_progress"
   }
 ]

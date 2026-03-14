@@ -75,7 +75,7 @@ async def get_vouchers(
     limit: int = 20,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get vouchers with search, filters and pagination"""
+    """Get vouchers with search, filters and pagination - optimized with DB-level queries"""
     query = {'organization_id': organization_id}
     
     if voucher_type:
@@ -94,18 +94,16 @@ async def get_vouchers(
         else:
             query['date'] = {'$lte': date_to}
     
-    vouchers = await db.vouchers.find(query, {'_id': 0}).sort('created_at', -1).to_list(10000)
-    
+    # Server-side search using MongoDB $regex
     if search:
-        search_lower = search.lower()
-        vouchers = [v for v in vouchers if 
-            search_lower in (v.get('voucher_number') or '').lower() or
-            search_lower in (v.get('reference') or '').lower() or
-            search_lower in (v.get('description') or '').lower()
+        search_regex = {'$regex': search, '$options': 'i'}
+        query['$or'] = [
+            {'voucher_number': search_regex},
+            {'reference': search_regex},
+            {'description': search_regex}
         ]
     
-    total = len(vouchers)
-    vouchers = vouchers[skip:skip + limit]
+    vouchers = await db.vouchers.find(query, {'_id': 0}).sort('created_at', -1).skip(skip).limit(limit).to_list(limit)
     
     return [VoucherResponse(**v) for v in vouchers]
 
@@ -116,9 +114,11 @@ async def get_vouchers_count(
     voucher_type: Optional[str] = None,
     status: Optional[str] = None,
     search: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get count of vouchers"""
+    """Get count of vouchers - optimized with DB-level queries"""
     query = {'organization_id': organization_id}
     
     if voucher_type:
@@ -129,15 +129,21 @@ async def get_vouchers_count(
     elif status == 'draft':
         query['status'] = {'$ne': 'posted'}
     
+    if date_from:
+        query['date'] = {'$gte': date_from}
+    if date_to:
+        if 'date' in query:
+            query['date']['$lte'] = date_to
+        else:
+            query['date'] = {'$lte': date_to}
+    
     if search:
-        vouchers = await db.vouchers.find(query, {'_id': 0}).to_list(10000)
-        search_lower = search.lower()
-        count = sum(1 for v in vouchers if 
-            search_lower in (v.get('voucher_number') or '').lower() or
-            search_lower in (v.get('reference') or '').lower() or
-            search_lower in (v.get('description') or '').lower()
-        )
-        return {"count": count}
+        search_regex = {'$regex': search, '$options': 'i'}
+        query['$or'] = [
+            {'voucher_number': search_regex},
+            {'reference': search_regex},
+            {'description': search_regex}
+        ]
     
     count = await db.vouchers.count_documents(query)
     return {"count": count}

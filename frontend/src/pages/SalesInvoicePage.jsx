@@ -296,12 +296,12 @@ const SalesInvoicePage = () => {
     setLoading(true);
     try {
       if (isOnline) {
-        const [customersRes, salesRes, inventoryRes, serviceRes, currenciesRes] = await Promise.all([
+        const [customersRes, salesRes, inventoryRes, serviceRes, rateRes] = await Promise.all([
           axios.get(`${API}/customer-accounts?organization_id=${currentOrg.id}`),
           axios.get(`${API}/sales-accounts?organization_id=${currentOrg.id}`),
           axios.get(`${API}/inventory?organization_id=${currentOrg.id}&page_size=1000`),  // Load first 1000, search for more
           axios.get(`${API}/service-items?organization_id=${currentOrg.id}`).catch(() => ({ data: [] })),
-          axios.get(`${API}/currencies/active`).catch(() => ({ data: [] }))
+          axios.get(`${API}/exchange-rates/latest?organization_id=${currentOrg.id}`).catch(() => ({ data: { rate: 89500 } }))
         ]);
         
         // Handle paginated inventory response - extract items array
@@ -336,10 +336,13 @@ const SalesInvoicePage = () => {
         setSalesAccounts(salesRes.data);
         setInventoryItems(inventoryData);
         setServiceItems(serviceData);
-        setCurrencies(currenciesRes.data.length > 0 ? currenciesRes.data : [
+        setCurrencies([
           { code: 'USD', name: 'US Dollar', symbol: '$' },
           { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل' }
         ]);
+        
+        // Store latest exchange rate for use in conversions
+        // The rate is available via the exchange-rates/latest endpoint when needed
         
         // Set default accounts if available
         if (customersRes.data.length > 0 && !formData.debit_account_id) {

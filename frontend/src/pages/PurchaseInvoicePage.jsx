@@ -134,11 +134,10 @@ const PurchaseInvoicePage = () => {
     setLoading(true);
     try {
       if (isOnline) {
-        const [suppliersRes, purchaseRes, inventoryRes, currenciesRes, servicesRes] = await Promise.all([
+        const [suppliersRes, purchaseRes, inventoryRes, servicesRes] = await Promise.all([
           axios.get(`${API}/supplier-accounts?organization_id=${currentOrg.id}`),
           axios.get(`${API}/purchase-accounts?organization_id=${currentOrg.id}`),
           axios.get(`${API}/inventory?organization_id=${currentOrg.id}&page_size=1000`),  // Load first 1000, search for more
-          axios.get(`${API}/currencies/active`).catch(() => ({ data: [] })),
           axios.get(`${API}/service-items?organization_id=${currentOrg.id}`).catch(() => ({ data: [] }))
         ]);
         
@@ -174,7 +173,7 @@ const PurchaseInvoicePage = () => {
         setPurchaseAccounts(purchaseRes.data);
         setInventoryItems(inventoryData);
         setServiceItems(serviceData);
-        setCurrencies(currenciesRes.data.length > 0 ? currenciesRes.data : [
+        setCurrencies([
           { code: 'USD', name: 'US Dollar', symbol: '$' },
           { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل' }
         ]);

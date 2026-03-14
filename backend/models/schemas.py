@@ -860,3 +860,173 @@ class FiscalYearCloseResponse(BaseModel):
     expense_total_lbp: float = 0
     expense_total_usd: float = 0
 
+
+
+# ================== SALES RETURN MODELS ==================
+
+class SalesReturnLineItem(BaseModel):
+    inventory_item_id: Optional[str] = None
+    item_name: str
+    item_name_ar: Optional[str] = None
+    barcode: Optional[str] = None
+    quantity: float
+    unit: str = 'piece'
+    unit_price: float
+    currency: str = 'USD'
+    exchange_rate: float = 1
+    discount_percent: float = 0
+    line_total: float
+    line_total_usd: Optional[float] = None
+    is_taxable: bool = True
+    batch_id: Optional[str] = None
+
+class SalesReturnCreate(BaseModel):
+    date: str
+    lines: List[SalesReturnLineItem]
+    subtotal: float
+    discount_percent: float = 0
+    discount_amount: float = 0
+    tax_percent: float = 0
+    tax_amount: float = 0
+    total: float
+    total_usd: float
+    currency: str = 'USD'
+    reason: Optional[str] = None
+    notes: Optional[str] = None
+    debit_account_id: str   # Sales Return account (credit side in accounting)
+    credit_account_id: str  # Customer account (debit side - reduce receivable)
+    organization_id: str
+
+class SalesReturnUpdate(BaseModel):
+    date: Optional[str] = None
+    lines: Optional[List[SalesReturnLineItem]] = None
+    subtotal: Optional[float] = None
+    discount_percent: Optional[float] = None
+    discount_amount: Optional[float] = None
+    tax_percent: Optional[float] = None
+    tax_amount: Optional[float] = None
+    total: Optional[float] = None
+    total_usd: Optional[float] = None
+    currency: Optional[str] = None
+    reason: Optional[str] = None
+    notes: Optional[str] = None
+    debit_account_id: Optional[str] = None
+    credit_account_id: Optional[str] = None
+
+class SalesReturnResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    return_number: str
+    date: str
+    lines: List[dict]
+    subtotal: float
+    discount_percent: float = 0
+    discount_amount: float = 0
+    tax_percent: float = 0
+    tax_amount: float = 0
+    total: float
+    total_usd: float
+    currency: str = 'USD'
+    reason: Optional[str] = None
+    notes: Optional[str] = None
+    debit_account_id: str
+    debit_account_code: Optional[str] = None
+    debit_account_name: Optional[str] = None
+    credit_account_id: str
+    credit_account_code: Optional[str] = None
+    credit_account_name: Optional[str] = None
+    status: str = 'draft'
+    is_posted: bool = False
+    voucher_id: Optional[str] = None
+    voucher_number: Optional[str] = None
+    organization_id: str
+    created_at: str
+    updated_at: Optional[str] = None
+    posted_at: Optional[str] = None
+    posted_by: Optional[str] = None
+    created_by: Optional[str] = None
+
+
+# ================== PURCHASE RETURN MODELS ==================
+
+class PurchaseReturnLineItem(BaseModel):
+    inventory_item_id: Optional[str] = None
+    item_name: str
+    item_name_ar: Optional[str] = None
+    barcode: Optional[str] = None
+    quantity: float
+    unit: str = 'piece'
+    unit_price: float
+    currency: str = 'USD'
+    exchange_rate: float = 1
+    discount_percent: float = 0
+    line_total: float
+    line_total_usd: Optional[float] = None
+    batch_number: Optional[str] = None
+    expiry_date: Optional[str] = None
+
+class PurchaseReturnCreate(BaseModel):
+    date: str
+    lines: List[PurchaseReturnLineItem]
+    subtotal: float
+    discount_percent: float = 0
+    discount_amount: float = 0
+    tax_percent: float = 0
+    tax_amount: float = 0
+    total: float
+    total_usd: float
+    currency: str = 'USD'
+    reason: Optional[str] = None
+    notes: Optional[str] = None
+    debit_account_id: str   # Supplier account (reduce payable)
+    credit_account_id: str  # Purchase Return account
+    organization_id: str
+
+class PurchaseReturnUpdate(BaseModel):
+    date: Optional[str] = None
+    lines: Optional[List[PurchaseReturnLineItem]] = None
+    subtotal: Optional[float] = None
+    discount_percent: Optional[float] = None
+    discount_amount: Optional[float] = None
+    tax_percent: Optional[float] = None
+    tax_amount: Optional[float] = None
+    total: Optional[float] = None
+    total_usd: Optional[float] = None
+    currency: Optional[str] = None
+    reason: Optional[str] = None
+    notes: Optional[str] = None
+    debit_account_id: Optional[str] = None
+    credit_account_id: Optional[str] = None
+
+class PurchaseReturnResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    return_number: str
+    date: str
+    lines: List[dict]
+    subtotal: float
+    discount_percent: float = 0
+    discount_amount: float = 0
+    tax_percent: float = 0
+    tax_amount: float = 0
+    total: float
+    total_usd: float
+    currency: str = 'USD'
+    reason: Optional[str] = None
+    notes: Optional[str] = None
+    debit_account_id: str
+    debit_account_code: Optional[str] = None
+    debit_account_name: Optional[str] = None
+    credit_account_id: str
+    credit_account_code: Optional[str] = None
+    credit_account_name: Optional[str] = None
+    status: str = 'draft'
+    is_posted: bool = False
+    voucher_id: Optional[str] = None
+    voucher_number: Optional[str] = None
+    organization_id: str
+    created_at: str
+    updated_at: Optional[str] = None
+    posted_at: Optional[str] = None
+    posted_by: Optional[str] = None
+    created_by: Optional[str] = None

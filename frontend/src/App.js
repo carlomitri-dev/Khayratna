@@ -22,6 +22,8 @@ import InventoryPage from './pages/InventoryPage';
 import SalesInvoicePage from './pages/SalesInvoicePage';
 import SalesQuotationsPage from './pages/SalesQuotationsPage';
 import PurchaseInvoicePage from './pages/PurchaseInvoicePage';
+import SalesReturnPage from './pages/SalesReturnPage';
+import PurchaseReturnPage from './pages/PurchaseReturnPage';
 import ImportDataPage from './pages/ImportDataPage';
 import './App.css';
 
@@ -189,6 +191,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <PurchaseInvoicePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/sales-returns"
+        element={
+          <ProtectedRoute>
+            <SalesReturnPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/purchase-returns"
+        element={
+          <ProtectedRoute>
+            <PurchaseReturnPage />
           </ProtectedRoute>
         }
       />
