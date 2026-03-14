@@ -237,7 +237,6 @@ async def create_pos_transaction(
     discount_acc = None
     payment_adjustment = getattr(transaction_data, 'payment_adjustment', 0) or 0
     if payment_adjustment != 0:
-        # Try to find discount account by code 72110001 first, then fallbacks
         discount_acc = await db.accounts.find_one({
             'organization_id': transaction_data.organization_id,
             'code': '72110001'
@@ -248,15 +247,11 @@ async def create_pos_transaction(
                 'code': '7211'
             })
         if not discount_acc:
-            # Try to find any discount account starting with 721
             discount_acc = await db.accounts.find_one({
                 'organization_id': transaction_data.organization_id,
                 'code': {'$regex': '^721'}
             })
-        
-        # If discount account doesn't exist and we have an adjustment, create it with correct code
         if not discount_acc:
-            import uuid
             discount_acc_id = str(uuid.uuid4())
             discount_acc = {
                 'id': discount_acc_id,
@@ -274,6 +269,75 @@ async def create_pos_transaction(
             }
             await db.accounts.insert_one(discount_acc)
     
+    # Get VAT Payable account if there's tax
+    vat_acc = None
+    tax_amount = transaction_data.tax_amount or 0
+    if tax_amount > 0:
+        # Try standard VAT payable codes
+        for vat_code in ['44210001', '4421', '44200001', '4420']:
+            vat_acc = await db.accounts.find_one({
+                'organization_id': transaction_data.organization_id,
+                'code': vat_code
+            })
+            if vat_acc:
+                break
+        if not vat_acc:
+            vat_acc = await db.accounts.find_one({
+                'organization_id': transaction_data.organization_id,
+                'code': {'$regex': '^442'}
+            })
+        if not vat_acc:
+            vat_acc_id = str(uuid.uuid4())
+            vat_acc = {
+                'id': vat_acc_id,
+                'code': '44210001',
+                'name': 'VAT Payable',
+                'name_ar': 'ضريبة القيمة المضافة',
+                'account_type': 'liability',
+                'parent_code': '4421',
+                'is_active': True,
+                'balance_usd': 0,
+                'balance_lbp': 0,
+                'organization_id': transaction_data.organization_id,
+                'created_at': now.isoformat(),
+                'created_by': current_user['id']
+            }
+            await db.accounts.insert_one(vat_acc)
+    
+    # Get line-level discount account if there's a discount_amount from the invoice
+    line_discount_acc = None
+    invoice_discount = transaction_data.discount_amount or 0
+    if invoice_discount > 0:
+        # Reuse the same discount account or find a different one
+        line_discount_acc = discount_acc
+        if not line_discount_acc:
+            line_discount_acc = await db.accounts.find_one({
+                'organization_id': transaction_data.organization_id,
+                'code': '72110001'
+            })
+            if not line_discount_acc:
+                line_discount_acc = await db.accounts.find_one({
+                    'organization_id': transaction_data.organization_id,
+                    'code': {'$regex': '^721'}
+                })
+            if not line_discount_acc:
+                line_discount_acc_id = str(uuid.uuid4())
+                line_discount_acc = {
+                    'id': line_discount_acc_id,
+                    'code': '72110001',
+                    'name': 'Sales Discount',
+                    'name_ar': 'خصم المبيعات',
+                    'account_type': 'expense',
+                    'parent_code': '7211',
+                    'is_active': True,
+                    'balance_usd': 0,
+                    'balance_lbp': 0,
+                    'organization_id': transaction_data.organization_id,
+                    'created_at': now.isoformat(),
+                    'created_by': current_user['id']
+                }
+                await db.accounts.insert_one(line_discount_acc)
+    
     # Create voucher description based on payment method
     payment_desc = {
         'cash': 'Cash Sale',
@@ -281,16 +345,21 @@ async def create_pos_transaction(
         'customer': f'Credit Sale to {transaction_data.customer_name or "Customer"}'
     }.get(transaction_data.payment_method, 'POS Sale')
     
-    # Calculate actual amounts considering adjustment
-    # If adjustment > 0 (discount), we received less than total
-    # If adjustment < 0 (premium), we received more than total
+    # Calculate actual amounts considering payment adjustment
     actual_received = transaction_data.total_usd - payment_adjustment
     actual_received_lbp = (transaction_data.total_lbp or 0) - (payment_adjustment * transaction_data.lbp_rate)
     
-    # Build voucher lines - use consistent field names with rest of system
-    # Structure:
-    # - Discount (+): Debit Cash, Debit 7211, Credit 7011
-    # - Premium (-): Debit Cash, Credit 7011, Credit 7211
+    # Net sales = subtotal - discount (before tax)
+    net_sales = transaction_data.subtotal_usd - invoice_discount
+    net_sales_lbp = net_sales * transaction_data.lbp_rate
+    
+    # Build voucher lines
+    # Proper accounting:
+    #   Debit: Cash/Bank/Customer for total received
+    #   Debit: Payment Adjustment (discount at register) if any
+    #   Credit: Sales account for net sales (subtotal - discount, before tax)
+    #   Credit: VAT Payable for tax amount
+    #   Debit: Sales Discount for invoice discount if any
     voucher_lines = []
     
     # Line 1: Debit Cash/Bank/Customer - amount actually received
@@ -301,15 +370,15 @@ async def create_pos_transaction(
         'description': f'POS Sale {receipt_number}',
         'currency': 'USD',
         'exchange_rate': 1.0,
-        'debit': round(actual_received, 2),
+        'debit': round(actual_received, 3),
         'credit': 0.0,
-        'debit_usd': round(actual_received, 2),
+        'debit_usd': round(actual_received, 3),
         'credit_usd': 0.0,
         'debit_lbp': round(actual_received_lbp, 0),
         'credit_lbp': 0.0
     })
     
-    # Line 2: If there's a discount (positive adjustment), Debit Sales Discount (7211)
+    # Line 2: If there's a payment adjustment discount, Debit Sales Discount
     if payment_adjustment > 0 and discount_acc:
         voucher_lines.append({
             'account_id': discount_acc['id'],
@@ -318,15 +387,15 @@ async def create_pos_transaction(
             'description': f'Sales Discount - {receipt_number}',
             'currency': 'USD',
             'exchange_rate': 1.0,
-            'debit': round(payment_adjustment, 2),
+            'debit': round(payment_adjustment, 3),
             'credit': 0.0,
-            'debit_usd': round(payment_adjustment, 2),
+            'debit_usd': round(payment_adjustment, 3),
             'credit_usd': 0.0,
             'debit_lbp': round(payment_adjustment * transaction_data.lbp_rate, 0),
             'credit_lbp': 0.0
         })
     
-    # Line 2 alt: If there's a premium (negative adjustment), Credit Sales Discount (7211)
+    # Line 2 alt: If premium (negative adjustment), Credit Sales Discount
     if payment_adjustment < 0 and discount_acc:
         voucher_lines.append({
             'account_id': discount_acc['id'],
@@ -336,14 +405,31 @@ async def create_pos_transaction(
             'currency': 'USD',
             'exchange_rate': 1.0,
             'debit': 0.0,
-            'credit': round(abs(payment_adjustment), 2),
+            'credit': round(abs(payment_adjustment), 3),
             'debit_usd': 0.0,
-            'credit_usd': round(abs(payment_adjustment), 2),
+            'credit_usd': round(abs(payment_adjustment), 3),
             'debit_lbp': 0.0,
             'credit_lbp': round(abs(payment_adjustment) * transaction_data.lbp_rate, 0)
         })
     
-    # Line 3: Credit Sales account (7011) for full sale amount
+    # Line 3: If there's an invoice-level discount, Debit Sales Discount
+    if invoice_discount > 0 and line_discount_acc:
+        voucher_lines.append({
+            'account_id': line_discount_acc['id'],
+            'account_code': line_discount_acc['code'],
+            'account_name': line_discount_acc['name'],
+            'description': f'Discount {transaction_data.discount_percent}% - {receipt_number}',
+            'currency': 'USD',
+            'exchange_rate': 1.0,
+            'debit': round(invoice_discount, 3),
+            'credit': 0.0,
+            'debit_usd': round(invoice_discount, 3),
+            'credit_usd': 0.0,
+            'debit_lbp': round(invoice_discount * transaction_data.lbp_rate, 0),
+            'credit_lbp': 0.0
+        })
+    
+    # Line 4: Credit Sales account for gross subtotal (before discount)
     voucher_lines.append({
         'account_id': credit_acc['id'],
         'account_code': credit_acc['code'],
@@ -352,12 +438,29 @@ async def create_pos_transaction(
         'currency': 'USD',
         'exchange_rate': 1.0,
         'debit': 0.0,
-        'credit': round(transaction_data.total_usd, 2),
+        'credit': round(transaction_data.subtotal_usd, 3),
         'debit_usd': 0.0,
-        'credit_usd': round(transaction_data.total_usd, 2),
+        'credit_usd': round(transaction_data.subtotal_usd, 3),
         'debit_lbp': 0.0,
-        'credit_lbp': round(transaction_data.total_lbp or 0, 0)
+        'credit_lbp': round(transaction_data.subtotal_usd * transaction_data.lbp_rate, 0)
     })
+    
+    # Line 5: Credit VAT Payable for tax amount
+    if tax_amount > 0 and vat_acc:
+        voucher_lines.append({
+            'account_id': vat_acc['id'],
+            'account_code': vat_acc['code'],
+            'account_name': vat_acc['name'],
+            'description': f'VAT {transaction_data.tax_percent}% - {receipt_number}',
+            'currency': 'USD',
+            'exchange_rate': 1.0,
+            'debit': 0.0,
+            'credit': round(tax_amount, 3),
+            'debit_usd': 0.0,
+            'credit_usd': round(tax_amount, 3),
+            'debit_lbp': 0.0,
+            'credit_lbp': round(tax_amount * transaction_data.lbp_rate, 0)
+        })
     
     # Calculate totals
     total_debit_usd = sum(line['debit_usd'] for line in voucher_lines)
@@ -393,17 +496,31 @@ async def create_pos_transaction(
         {'id': debit_acc['id']},
         {'$inc': {'balance_usd': actual_received}}
     )
+    # Credit Sales for gross subtotal
     await db.accounts.update_one(
         {'id': credit_acc['id']},
-        {'$inc': {'balance_usd': -transaction_data.total_usd}}
+        {'$inc': {'balance_usd': -transaction_data.subtotal_usd}}
     )
     
-    # Update discount account balance if used
+    # Update VAT Payable balance
+    if tax_amount > 0 and vat_acc:
+        await db.accounts.update_one(
+            {'id': vat_acc['id']},
+            {'$inc': {'balance_usd': -tax_amount}}
+        )
+    
+    # Update invoice discount account balance (debit = increase expense)
+    if invoice_discount > 0 and line_discount_acc:
+        await db.accounts.update_one(
+            {'id': line_discount_acc['id']},
+            {'$inc': {'balance_usd': invoice_discount}}
+        )
+    
+    # Update payment adjustment discount account balance if used
     if payment_adjustment != 0 and discount_acc:
-        # Discount: debit increases, Premium: credit decreases
         await db.accounts.update_one(
             {'id': discount_acc['id']},
-            {'$inc': {'balance_usd': payment_adjustment}}  # positive for discount, negative for premium
+            {'$inc': {'balance_usd': payment_adjustment}}
         )
     
     # Deduct inventory quantities
