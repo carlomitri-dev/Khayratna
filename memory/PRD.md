@@ -1,48 +1,46 @@
 # KAIROS - Digital Invoicing System
 
 ## Original Problem Statement
-Lebanese accounting/invoicing SaaS application (KAIROS) built with React + FastAPI + MongoDB. Supports chart of accounts (LCOA), vouchers, sales/purchase invoices, inventory management, POS, exchange rates (USD/LBP), and more.
+Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full accounting, invoicing, inventory, POS, exchange rates.
 
 ## Architecture
-- **Frontend**: React (port 3000), Shadcn/UI components, AccountSelector + InventorySelector reusable components
+- **Frontend**: React (port 3000), Shadcn/UI
 - **Backend**: FastAPI (port 8001), MongoDB, routers in `/app/backend/routers/`
-- **Auth**: JWT-based, role-based access (super_admin, admin, accountant, cashier)
+- **Auth**: JWT-based, role-based (super_admin, admin, accountant, cashier)
 
-## What's Been Implemented
-- Full accounting module (vouchers, accounts, fiscal years)
-- Sales & Purchase invoices with posting/unposting/printing (rewritten Mar 14)
-- Sales & Purchase Returns with printing (print added Mar 14)
-- Inventory management with CSV/DBF import
-- Exchange rate simplification (USD/LBP only)
-- Performance optimization: remote search for account selectors
-- Credit/Debit notes with attachments
-- POS system, Cashier sessions
-- Customer & Supplier management with VAT number + Add new
+## Implemented Modules
+- Chart of Accounts (LCOA), Fiscal Years
+- Voucher Entry (journal, receipt, payment, sales, payroll)
+- Sales & Purchase Invoices (rewritten clean, with print, post/unpost)
+- Sales & Purchase Returns (with print)
+- Credit/Debit Notes
+- Inventory Management (CSV/DBF import, batch/expiry)
+- POS Terminal (barcode scanner, quick items, cart, receipt print)
+- Cashier System (sessions, PIN login, admin management)
+- Customer & Supplier Management (with VAT number)
+- Exchange Rates (USD/LBP simplified)
+- Reports: Trial Balance, Income Statement, General Ledger
 - 3 decimal places for all numeric formatting
 
 ## Changes Log
 
+### March 14, 2026 (Session 3)
+- **POS Module Connected** — Wired up 4 existing POS pages (POSPage, CashierPOSPage, CashierSessionsPage, CashierLoginPage) with routes in App.js and sidebar navigation
+- **POS Router Included** — Added POS router to server.py (was missing)
+- **POS Endpoint Cleanup** — Removed ~605 lines of duplicate POS endpoints from server.py
+- **POS Inventory Endpoint** — Added missing GET /api/pos/inventory to routers/pos.py
+
 ### March 14, 2026 (Session 2)
-- **Invoice Pages Rewrite** — Completely rewrote SalesInvoicePage and PurchaseInvoicePage from scratch using the clean pattern from the working Return pages
-- **Print for Returns** — Added print functionality to both SalesReturnPage and PurchaseReturnPage
-- **Duplicate Endpoint Cleanup** — Removed ~1000 lines of duplicate sales-invoices and purchase-invoices endpoints from server.py
-- **Purchase Invoice selling_price** — Added selling_price field to purchase invoice line items (updates inventory price on posting)
-- **No Service Items** — Removed service items from both invoice types
-- **No Copy From** — Removed "Copy from Sales Invoice" from Purchase Invoice
+- Invoice pages rewrite, print for returns, selling_price in purchase invoice
 
 ### March 14, 2026 (Session 1)
-- 3 decimal places for all numeric values
-- Removed service items from invoices
-- Added selling_price field to purchase invoice
-- Customer/Supplier module: Add new with VAT number
-- Inventory table alignment fix
-- Performance fix: removed duplicate endpoints from server.py
+- 3 decimal places, service removal, customer/supplier add with VAT, inventory fix, performance fix
 
 ## Known Issues
-- Minor: React hydration warning (<tr> inside <span>) in Dashboard — not blocking
-- Minor: dropdown z-index conflict in header (fiscal year selector)
+- Minor: React hydration warning in Dashboard (not blocking)
+- Minor: Dropdown z-index conflict in header
 
 ## Backlog
 - P2: Full audit of remaining duplicate endpoints in server.py
-- P2: Extract shared AccountSelector logic
-- P3: Minor UI z-index fix for header dropdown
+- P2: Extract shared AccountSelector component
+- P3: Dashboard hydration fix
