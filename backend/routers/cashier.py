@@ -792,3 +792,143 @@ async def void_transaction(transaction_id: str, reason: str = "Admin void", curr
         await db.cashier_sessions.update_one({'id': transaction['session_id']}, update_doc)
     
     return {"message": "Transaction voided", "transaction_id": transaction_id}
+
+
+
+@router.get("/admin/daily-closing-report")
+async def get_daily_closing_report(
+    organization_id: str,
+    date: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get comprehensive daily POS closing report for a specific date.
+    Returns per-session breakdown with cashier info, transactions, variance."""
+    if current_user['role'] not in ['super_admin', 'admin']:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Get all sessions opened on this date
+    sessions = await db.cashier_sessions.find(
+        {'organization_id': organization_id, 'opened_at': {'$regex': f'^{date}'}},
+        {'_id': 0}
+    ).to_list(None)
+    
+    # Also get sessions closed on this date (opened on a previous day)
+    closed_sessions = await db.cashier_sessions.find(
+        {'organization_id': organization_id, 'closed_at': {'$regex': f'^{date}'}, 'opened_at': {'$not': {'$regex': f'^{date}'}}},
+        {'_id': 0}
+    ).to_list(None)
+    
+    all_sessions = sessions + closed_sessions
+    
+    # Get cashier names
+    cashier_ids = list(set(s.get('cashier_id') for s in all_sessions if s.get('cashier_id')))
+    cashiers = {}
+    if cashier_ids:
+        cashier_docs = await db.cashiers.find({'id': {'$in': cashier_ids}}, {'_id': 0, 'id': 1, 'name': 1}).to_list(None)
+        cashiers = {c['id']: c['name'] for c in cashier_docs}
+    
+    # Get transactions for each session
+    session_ids = [s['id'] for s in all_sessions]
+    all_transactions = []
+    if session_ids:
+        all_transactions = await db.pos_transactions.find(
+            {'session_id': {'$in': session_ids}},
+            {'_id': 0}
+        ).sort('date', -1).to_list(None)
+    
+    # Also get non-session POS transactions for this date (admin POS)
+    admin_transactions = await db.pos_transactions.find(
+        {'organization_id': organization_id, 'date': {'$regex': f'^{date}'}, 'session_id': {'$exists': False}},
+        {'_id': 0}
+    ).sort('date', -1).to_list(None)
+    
+    # Build per-session report
+    session_reports = []
+    for session in all_sessions:
+        sid = session['id']
+        txns = [t for t in all_transactions if t.get('session_id') == sid]
+        active_txns = [t for t in txns if not t.get('is_voided')]
+        voided_txns = [t for t in txns if t.get('is_voided')]
+        
+        cash_txns = [t for t in active_txns if t.get('payment_method') == 'cash']
+        card_txns = [t for t in active_txns if t.get('payment_method') == 'card']
+        credit_txns = [t for t in active_txns if t.get('payment_method') == 'credit']
+        
+        session_reports.append({
+            'session_id': sid,
+            'cashier_name': cashiers.get(session.get('cashier_id'), 'Unknown'),
+            'cashier_id': session.get('cashier_id'),
+            'status': session.get('status', 'unknown'),
+            'opened_at': session.get('opened_at'),
+            'closed_at': session.get('closed_at'),
+            'opening_cash_usd': session.get('opening_cash_usd', 0),
+            'opening_cash_lbp': session.get('opening_cash_lbp', 0),
+            'closing_cash_usd': session.get('closing_cash_usd', 0),
+            'closing_cash_lbp': session.get('closing_cash_lbp', 0),
+            'expected_cash_usd': session.get('expected_cash_usd', 0),
+            'expected_cash_lbp': session.get('expected_cash_lbp', 0),
+            'difference_usd': session.get('difference_usd', 0),
+            'difference_lbp': session.get('difference_lbp', 0),
+            'transaction_count': len(active_txns),
+            'voided_count': len(voided_txns),
+            'total_sales_usd': sum(t.get('total_usd', 0) for t in active_txns),
+            'total_sales_lbp': sum(t.get('total_lbp', 0) for t in active_txns),
+            'cash_sales_usd': sum(t.get('total_usd', 0) for t in cash_txns),
+            'card_sales_usd': sum(t.get('total_usd', 0) for t in card_txns),
+            'credit_sales_usd': sum(t.get('total_usd', 0) for t in credit_txns),
+            'transactions': [{
+                'receipt_number': t.get('receipt_number'),
+                'time': t.get('date', '')[-8:] if t.get('date') else '',
+                'items_count': len(t.get('lines', [])),
+                'payment_method': t.get('payment_method', 'cash'),
+                'total_usd': t.get('total_usd', 0),
+                'total_lbp': t.get('total_lbp', 0),
+                'customer_name': t.get('customer_name', ''),
+                'is_voided': t.get('is_voided', False)
+            } for t in txns]
+        })
+    
+    # Admin POS summary
+    admin_active = [t for t in admin_transactions if not t.get('is_voided')]
+    admin_summary = {
+        'transaction_count': len(admin_active),
+        'total_sales_usd': sum(t.get('total_usd', 0) for t in admin_active),
+        'transactions': [{
+            'receipt_number': t.get('receipt_number'),
+            'time': t.get('date', '')[-8:] if t.get('date') else '',
+            'items_count': len(t.get('lines', [])),
+            'payment_method': t.get('payment_method', 'cash'),
+            'total_usd': t.get('total_usd', 0),
+            'customer_name': t.get('customer_name', ''),
+            'is_voided': t.get('is_voided', False)
+        } for t in admin_transactions]
+    }
+    
+    # Grand totals
+    all_active = [t for t in all_transactions if not t.get('is_voided')] + admin_active
+    grand_total_usd = sum(t.get('total_usd', 0) for t in all_active)
+    grand_total_lbp = sum(t.get('total_lbp', 0) for t in all_active)
+    grand_cash_usd = sum(t.get('total_usd', 0) for t in all_active if t.get('payment_method') == 'cash')
+    grand_card_usd = sum(t.get('total_usd', 0) for t in all_active if t.get('payment_method') == 'card')
+    grand_credit_usd = sum(t.get('total_usd', 0) for t in all_active if t.get('payment_method') == 'credit')
+    total_variance_usd = sum(s.get('difference_usd', 0) or 0 for s in all_sessions if s.get('status') == 'closed')
+    total_variance_lbp = sum(s.get('difference_lbp', 0) or 0 for s in all_sessions if s.get('status') == 'closed')
+    
+    return {
+        'date': date,
+        'grand_totals': {
+            'total_sales_usd': grand_total_usd,
+            'total_sales_lbp': grand_total_lbp,
+            'total_transactions': len(all_active),
+            'cash_usd': grand_cash_usd,
+            'card_usd': grand_card_usd,
+            'credit_usd': grand_credit_usd,
+            'total_sessions': len(all_sessions),
+            'open_sessions': len([s for s in all_sessions if s.get('status') == 'open']),
+            'closed_sessions': len([s for s in all_sessions if s.get('status') == 'closed']),
+            'total_variance_usd': total_variance_usd,
+            'total_variance_lbp': total_variance_lbp
+        },
+        'cashier_sessions': session_reports,
+        'admin_pos': admin_summary
+    }
