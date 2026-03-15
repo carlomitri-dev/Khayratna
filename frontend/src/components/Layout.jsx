@@ -231,7 +231,7 @@ const Header = ({ onMenuClick }) => {
                   <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-[250px]">
+              <DropdownMenuContent align="start" className="z-[60] w-[250px]">
                 {organizations.map((org) => (
                   <DropdownMenuItem
                     key={org.id}
@@ -274,7 +274,7 @@ const Header = ({ onMenuClick }) => {
                   <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-[280px]">
+              <DropdownMenuContent align="start" className="z-[60] w-[280px]">
                 <DropdownMenuItem
                   onClick={() => clearSelection()}
                   className={!selectedFY ? 'bg-primary/10' : ''}
@@ -333,7 +333,7 @@ const Header = ({ onMenuClick }) => {
                   <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="z-[60]">
                 <DropdownMenuItem disabled>
                   <span className="text-muted-foreground text-sm">{user.email}</span>
                 </DropdownMenuItem>

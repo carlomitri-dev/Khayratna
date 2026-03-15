@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useFiscalYear } from '../context/FiscalYearContext';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -30,7 +31,11 @@ import {
   FileText,
   Filter,
   RefreshCw,
-  Calculator
+  Calculator,
+  ShoppingCart,
+  Truck,
+  ArrowRight,
+  Zap
 } from 'lucide-react';
 import axios from 'axios';
 import { formatLBP, formatUSD, getTodayForInput, formatDate } from '../lib/utils';
@@ -104,31 +109,32 @@ const DashboardPage = () => {
   const [recalculating, setRecalculating] = useState(false);
   const [recalculateResult, setRecalculateResult] = useState(null);
 
-  useEffect(() => {
-    if (currentOrg) {
-      fetchDashboardData();
-    }
-  }, [currentOrg, selectedFY]);
+  // Recent transactions for quick-access widget
+  const [recentTransactions, setRecentTransactions] = useState({
+    salesInvoices: [],
+    purchaseInvoices: [],
+    crdbNotes: []
+  });
 
-  useEffect(() => {
-    filterVouchers();
-  }, [allVouchers, dateFrom, dateTo]);
+  const navigate = useNavigate();
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     setLoading(true);
     try {
       // Build FY date filter params
       const fyParams = selectedFY ? `&date_from=${selectedFY.start_date}&date_to=${selectedFY.end_date}` : '';
       const fyIdParam = selectedFY ? `&fy_id=${selectedFY.id}` : '';
       
-      const [accountsRes, vouchersCountRes, vouchersRes, incomeRes, rateRes, crdbRes, archiveRes] = await Promise.all([
+      const [accountsRes, vouchersCountRes, vouchersRes, incomeRes, rateRes, crdbRes, archiveRes, salesRes, purchaseRes] = await Promise.all([
         axios.get(`${API}/accounts?organization_id=${currentOrg.id}`),
         axios.get(`${API}/vouchers/count?organization_id=${currentOrg.id}${fyParams}`),
         axios.get(`${API}/vouchers?organization_id=${currentOrg.id}&limit=100${fyParams}`),
         axios.get(`${API}/reports/income-statement?organization_id=${currentOrg.id}${fyIdParam}`),
         axios.get(`${API}/exchange-rates/latest?organization_id=${currentOrg.id}`),
         axios.get(`${API}/crdb-notes?organization_id=${currentOrg.id}`),
-        axios.get(`${API}/image-archive?organization_id=${currentOrg.id}`)
+        axios.get(`${API}/image-archive?organization_id=${currentOrg.id}`),
+        axios.get(`${API}/sales-invoices?organization_id=${currentOrg.id}&limit=5`).catch(() => ({ data: [] })),
+        axios.get(`${API}/purchase-invoices?organization_id=${currentOrg.id}&limit=5`).catch(() => ({ data: [] }))
       ]);
 
       setMetrics({
@@ -156,14 +162,29 @@ const DashboardPage = () => {
       ].sort((a, b) => new Date(b.sortDate) - new Date(a.sortDate));
       
       setRecentActivity(activity);
+
+      // Set recent transactions for quick-access widget
+      const sortedCrdb = [...crdbRes.data].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+      const sortedSales = Array.isArray(salesRes.data) 
+        ? [...salesRes.data].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5)
+        : [];
+      const sortedPurchase = Array.isArray(purchaseRes.data)
+        ? [...purchaseRes.data].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5)
+        : [];
+      
+      setRecentTransactions({
+        salesInvoices: sortedSales,
+        purchaseInvoices: sortedPurchase,
+        crdbNotes: sortedCrdb
+      });
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentOrg, selectedFY]);
 
-  const filterVouchers = () => {
+  const filterVouchers = useCallback(() => {
     let filtered = [...allVouchers];
     
     if (dateFrom) {
@@ -174,7 +195,17 @@ const DashboardPage = () => {
     }
     
     setFilteredVouchers(filtered.sort((a, b) => new Date(b.date) - new Date(a.date)));
-  };
+  }, [allVouchers, dateFrom, dateTo]);
+
+  useEffect(() => {
+    if (currentOrg) {
+      fetchDashboardData();
+    }
+  }, [currentOrg, fetchDashboardData]);
+
+  useEffect(() => {
+    filterVouchers();
+  }, [filterVouchers]);
 
   const handleDeleteVoucher = async () => {
     if (!deleteConfirm) return;
@@ -424,6 +455,155 @@ const DashboardPage = () => {
           color="primary"
         />
       </div>
+
+      {/* Recent Transactions Quick Access */}
+      <Card data-testid="recent-transactions-widget">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2" style={{ fontFamily: 'Manrope, sans-serif' }}>
+              <Zap className="w-5 h-5 text-amber-400" />
+              Recent Transactions
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Sales Invoices Column */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                  <ShoppingCart className="w-3.5 h-3.5 text-emerald-400" />
+                  Sales Invoices
+                </h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 text-xs text-primary px-1.5"
+                  onClick={() => navigate('/sales-invoices')}
+                  data-testid="view-all-sales-invoices"
+                >
+                  View All <ArrowRight className="w-3 h-3 ml-1" />
+                </Button>
+              </div>
+              {recentTransactions.salesInvoices.length === 0 ? (
+                <p className="text-xs text-muted-foreground/60 text-center py-4">No recent sales invoices</p>
+              ) : (
+                recentTransactions.salesInvoices.map((inv) => (
+                  <div 
+                    key={inv.id} 
+                    className="flex items-center justify-between p-2 bg-muted/20 rounded-sm border border-border/50 hover:border-emerald-500/30 transition-colors cursor-pointer"
+                    onClick={() => navigate('/sales-invoices')}
+                    data-testid={`recent-sale-${inv.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs truncate">{inv.invoice_number}</p>
+                      <p className="text-[10px] text-muted-foreground">{formatDate(inv.date)}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-2">
+                      <p className="font-mono text-xs font-medium">
+                        {inv.currency === 'LBP' ? formatLBP(inv.total_amount || 0) + ' L' : '$' + formatUSD(inv.total_amount || 0)}
+                      </p>
+                      <span className={`text-[10px] ${inv.is_posted ? 'text-emerald-400' : 'text-amber-400'}`}>
+                        {inv.is_posted ? 'Posted' : 'Draft'}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Purchase Invoices Column */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5 text-blue-400" />
+                  Purchase Invoices
+                </h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 text-xs text-primary px-1.5"
+                  onClick={() => navigate('/purchase-invoices')}
+                  data-testid="view-all-purchase-invoices"
+                >
+                  View All <ArrowRight className="w-3 h-3 ml-1" />
+                </Button>
+              </div>
+              {recentTransactions.purchaseInvoices.length === 0 ? (
+                <p className="text-xs text-muted-foreground/60 text-center py-4">No recent purchase invoices</p>
+              ) : (
+                recentTransactions.purchaseInvoices.map((inv) => (
+                  <div 
+                    key={inv.id} 
+                    className="flex items-center justify-between p-2 bg-muted/20 rounded-sm border border-border/50 hover:border-blue-500/30 transition-colors cursor-pointer"
+                    onClick={() => navigate('/purchase-invoices')}
+                    data-testid={`recent-purchase-${inv.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs truncate">{inv.invoice_number}</p>
+                      <p className="text-[10px] text-muted-foreground">{formatDate(inv.date)}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-2">
+                      <p className="font-mono text-xs font-medium">
+                        {inv.currency === 'LBP' ? formatLBP(inv.total_amount || 0) + ' L' : '$' + formatUSD(inv.total_amount || 0)}
+                      </p>
+                      <span className={`text-[10px] ${inv.is_posted ? 'text-emerald-400' : 'text-amber-400'}`}>
+                        {inv.is_posted ? 'Posted' : 'Draft'}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Cr/Db Notes Column */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-amber-400" />
+                  Cr/Db Notes
+                </h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 text-xs text-primary px-1.5"
+                  onClick={() => navigate('/cr-db-notes')}
+                  data-testid="view-all-crdb-notes"
+                >
+                  View All <ArrowRight className="w-3 h-3 ml-1" />
+                </Button>
+              </div>
+              {recentTransactions.crdbNotes.length === 0 ? (
+                <p className="text-xs text-muted-foreground/60 text-center py-4">No recent notes</p>
+              ) : (
+                recentTransactions.crdbNotes.map((note) => (
+                  <div 
+                    key={note.id} 
+                    className="flex items-center justify-between p-2 bg-muted/20 rounded-sm border border-border/50 hover:border-amber-500/30 transition-colors cursor-pointer"
+                    onClick={() => navigate('/cr-db-notes')}
+                    data-testid={`recent-note-${note.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs truncate">{note.note_number}</p>
+                      <p className="text-[10px] text-muted-foreground">{formatDate(note.date)}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-2">
+                      <p className="font-mono text-xs font-medium">
+                        {note.currency === 'LBP' ? formatLBP(note.amount || 0) + ' L' : '$' + formatUSD(note.amount || 0)}
+                      </p>
+                      <span className={`text-[10px] capitalize ${
+                        note.note_type === 'credit' ? 'text-emerald-400' : note.note_type === 'dbcr' ? 'text-blue-400' : 'text-red-400'
+                      }`}>
+                        {note.note_type}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Recalculate Balances Section */}
       {canRecalculate && (
