@@ -26,6 +26,11 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 
 ## Changes Log
 
+### March 15, 2026 (Session 5)
+- **Auto Account Code Generation** — Fixed and verified `/api/accounts/next-code` endpoint with numeric sorting. Customers page auto-fills code with prefix `4111`, Suppliers page with `4011` when clicking "Add".
+- **Exchange Rate Visibility in Cr/Db Notes** — Exchange rate input visible and editable in the note form. Rate column displayed in the notes list table.
+- **CrDb Notes handleSave Bug Fix** — Fixed critical bug where saving/updating notes failed because `accounts` array was empty after RemoteAccountSelector refactoring. Now uses note state directly. Backend `CrDbNoteUpdate` accepts both IDs and codes as fallback.
+
 ### March 14, 2026 (Session 4)
 - **POS Transaction Void (Soft Delete)** — New PUT /api/pos/invoices/{id}/void endpoint. Voids transaction with reason, reverses account balances and inventory, marks voucher as voided. Frontend: void dialog with reason input, "Show voided" filter in history, VOIDED badge with strikethrough, separate hard delete option.
 - **POS Transaction Delete Fix** — Added missing DELETE endpoint
@@ -37,6 +42,8 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 
 ## Known Issues
 - Minor: React hydration warning in Dashboard (not blocking)
+- P2: Minor z-index dropdown overlay conflict in Header.jsx
 
 ## Backlog
+- P2: Header dropdown z-index fix
 - P3: Dashboard hydration fix
