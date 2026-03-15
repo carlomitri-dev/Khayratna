@@ -205,7 +205,15 @@ const SuppliersPage = () => {
           </p>
         </div>
         {canEdit && (
-          <Button onClick={() => setAddDialogOpen(true)} className="gap-2" data-testid="add-supplier-btn">
+          <Button onClick={async () => {
+            try {
+              const res = await axios.get(`${API}/accounts/next-code?organization_id=${currentOrg.id}&prefix=4011`);
+              setNewSupplier({ code: res.data.next_code, name: '', name_ar: '', vat_number: '', phone: '', mobile: '' });
+            } catch {
+              setNewSupplier({ code: '', name: '', name_ar: '', vat_number: '', phone: '', mobile: '' });
+            }
+            setAddDialogOpen(true);
+          }} className="gap-2" data-testid="add-supplier-btn">
             <Plus className="w-4 h-4" />
             Add Supplier
           </Button>

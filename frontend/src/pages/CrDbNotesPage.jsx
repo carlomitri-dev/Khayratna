@@ -279,11 +279,13 @@ const CrDbNotesPage = () => {
     date: getTodayForInput(),
     debit_account_code: '',
     debit_account_name: '',
+    debit_account_id: '',
     credit_account_code: '',
     credit_account_name: '',
+    credit_account_id: '',
     currency: 'USD',
     amount: '',
-    exchange_rate: 1.0,
+    exchange_rate: currentOrg?.base_exchange_rate || 89500,
     description: ''
   });
 
@@ -431,25 +433,11 @@ const CrDbNotesPage = () => {
 
     setSaving(true);
     try {
-      const debitAccount = accounts.find(a => a.code === note.debit_account_code);
-      const creditAccount = accounts.find(a => a.code === note.credit_account_code);
-      
-      if (!debitAccount) {
-        alert(`Debit account with code "${note.debit_account_code}" not found`);
-        setSaving(false);
-        return;
-      }
-      if (!creditAccount) {
-        alert(`Credit account with code "${note.credit_account_code}" not found`);
-        setSaving(false);
-        return;
-      }
-      
       if (isOnline) {
         // Online: Send to server
         let noteId;
         if (editingNote) {
-          // Update existing note - send account IDs
+          // Update existing note - send account IDs (with codes as fallback)
           const updatePayload = {
             note_type: note.note_type,
             date: note.date,
@@ -458,8 +446,10 @@ const CrDbNotesPage = () => {
             amount: parseFloat(note.amount),
             exchange_rate: parseFloat(note.exchange_rate) || 1,
             organization_id: currentOrg.id,
-            debit_account_id: debitAccount.id,
-            credit_account_id: creditAccount.id
+            debit_account_id: note.debit_account_id || null,
+            debit_account_code: note.debit_account_code,
+            credit_account_id: note.credit_account_id || null,
+            credit_account_code: note.credit_account_code
           };
           await axios.put(`${API}/crdb-notes/${editingNote.id}`, updatePayload);
           noteId = editingNote.id;
@@ -474,10 +464,10 @@ const CrDbNotesPage = () => {
             amount: parseFloat(note.amount),
             exchange_rate: parseFloat(note.exchange_rate) || 1,
             organization_id: currentOrg.id,
-            debit_account_code: debitAccount.code,
-            debit_account_name: debitAccount.name,
-            credit_account_code: creditAccount.code,
-            credit_account_name: creditAccount.name
+            debit_account_code: note.debit_account_code,
+            debit_account_name: note.debit_account_name,
+            credit_account_code: note.credit_account_code,
+            credit_account_name: note.credit_account_name
           };
           const response = await axios.post(`${API}/crdb-notes`, createPayload);
           noteId = response.data.id;
@@ -512,10 +502,10 @@ const CrDbNotesPage = () => {
           amount: parseFloat(note.amount),
           exchange_rate: parseFloat(note.exchange_rate) || 1,
           organization_id: currentOrg.id,
-          debit_account_code: debitAccount.code,
-          debit_account_name: debitAccount.name,
-          credit_account_code: creditAccount.code,
-          credit_account_name: creditAccount.name
+          debit_account_code: note.debit_account_code,
+          debit_account_name: note.debit_account_name,
+          credit_account_code: note.credit_account_code,
+          credit_account_name: note.credit_account_name
         };
         
         const offlineNote = {
@@ -581,8 +571,10 @@ const CrDbNotesPage = () => {
       date: noteToEdit.date,
       debit_account_code: noteToEdit.debit_account_code,
       debit_account_name: noteToEdit.debit_account_name,
+      debit_account_id: noteToEdit.debit_account_id || '',
       credit_account_code: noteToEdit.credit_account_code,
       credit_account_name: noteToEdit.credit_account_name,
+      credit_account_id: noteToEdit.credit_account_id || '',
       currency: noteToEdit.currency,
       amount: noteToEdit.amount,
       exchange_rate: noteToEdit.exchange_rate,
@@ -598,11 +590,13 @@ const CrDbNotesPage = () => {
       date: getTodayForInput(),
       debit_account_code: '',
       debit_account_name: '',
+      debit_account_id: '',
       credit_account_code: '',
       credit_account_name: '',
+      credit_account_id: '',
       currency: 'USD',
       amount: '',
-      exchange_rate: 1.0,
+      exchange_rate: currentOrg?.base_exchange_rate || 89500,
       description: ''
     });
     setPendingAttachment(null);
@@ -847,6 +841,20 @@ const CrDbNotesPage = () => {
                 </Select>
               </div>
 
+              {/* Exchange Rate */}
+              <div className="space-y-2">
+                <Label className="text-xs lg:text-sm">Exchange Rate (LBP)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="89500"
+                  value={note.exchange_rate}
+                  onChange={(e) => setNote({ ...note, exchange_rate: parseFloat(e.target.value) || 1 })}
+                  className="font-mono"
+                  data-testid="exchange-rate-input"
+                />
+              </div>
+
               {/* Amount */}
               <div className="space-y-2">
                 <Label className="text-xs lg:text-sm">Amount</Label>
@@ -866,7 +874,7 @@ const CrDbNotesPage = () => {
               <RemoteAccountSelector
                 organizationId={currentOrg?.id}
                 value={note.debit_account_code}
-                onChange={(code, name) => setNote({ ...note, debit_account_code: code, debit_account_name: name })}
+                onChange={(code, name, id) => setNote({ ...note, debit_account_code: code, debit_account_name: name, debit_account_id: id })}
                 placeholder="Select debit account..."
                 label="Debit Account"
               />
@@ -875,7 +883,7 @@ const CrDbNotesPage = () => {
               <RemoteAccountSelector
                 organizationId={currentOrg?.id}
                 value={note.credit_account_code}
-                onChange={(code, name) => setNote({ ...note, credit_account_code: code, credit_account_name: name })}
+                onChange={(code, name, id) => setNote({ ...note, credit_account_code: code, credit_account_name: name, credit_account_id: id })}
                 placeholder="Select credit account..."
                 label="Credit Account"
               />
@@ -1101,6 +1109,7 @@ const CrDbNotesPage = () => {
                       <th>Debit Account</th>
                       <th>Credit Account</th>
                       <th className="text-right">Amount</th>
+                      <th className="text-right">Rate</th>
                       <th>Status</th>
                       <th>Actions</th>
                     </tr>
@@ -1120,6 +1129,9 @@ const CrDbNotesPage = () => {
                         <td className="font-mono text-xs">{n.credit_account_code}</td>
                         <td className="text-right font-mono">
                           {n.currency} {n.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}
+                        </td>
+                        <td className="text-right font-mono text-xs text-muted-foreground">
+                          {n.exchange_rate ? n.exchange_rate.toLocaleString() : '-'}
                         </td>
                         <td>
                           <span className={n.is_posted ? 'status-posted' : 'status-draft'}>

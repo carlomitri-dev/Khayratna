@@ -139,7 +139,7 @@ const RemoteAccountSelector = ({
                 key={acc.id}
                 className={`flex items-center px-2 py-1.5 cursor-pointer hover:bg-muted text-xs transition-colors ${value === acc.code ? 'bg-muted' : ''}`}
                 onClick={() => {
-                  onChange(acc.code, acc.name);
+                  onChange(acc.code, acc.name, acc.id);
                   setSelectedAccount(acc);
                   setOpen(false);
                   setSearch('');

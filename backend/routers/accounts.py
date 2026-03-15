@@ -44,6 +44,36 @@ router = APIRouter(tags=["Accounts"])
 
 # ================== ACCOUNT CRUD ==================
 
+@router.get("/accounts/next-code")
+async def get_next_account_code(
+    organization_id: str,
+    prefix: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get the next available account code for a given prefix (e.g., '4111' returns '41110101' if last is '41110100')."""
+    accounts = await db.accounts.find(
+        {'organization_id': organization_id, 'code': {'$regex': f'^{prefix}'}},
+        {'_id': 0, 'code': 1}
+    ).to_list(None)
+
+    max_num = 0
+    prefix_len = len(prefix)
+    for acc in accounts:
+        suffix = acc['code'][prefix_len:]
+        try:
+            num = int(suffix)
+            if num > max_num:
+                max_num = num
+        except ValueError:
+            pass
+
+    next_num = max_num + 1
+    # Preserve digit count: if prefix is 4 chars and codes are 8 chars, suffix is 4 digits
+    suffix_len = max(4, len(str(next_num)))
+    next_code = f"{prefix}{next_num:0{suffix_len}d}"
+    return {'next_code': next_code}
+
+
 @router.post("/accounts", response_model=AccountResponse)
 async def create_account(account_data: AccountCreate, current_user: dict = Depends(get_current_user)):
     """Create a new account. Auto-creates VAT mirror account for customers (4111→4114) and suppliers (4011→4014)."""

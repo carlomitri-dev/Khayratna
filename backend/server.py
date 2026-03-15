@@ -3129,8 +3129,10 @@ class CrDbNoteCreate(BaseModel):
 class CrDbNoteUpdate(BaseModel):
     note_type: Literal['credit', 'debit', 'dbcr']
     date: str
-    debit_account_id: str
-    credit_account_id: str
+    debit_account_id: Optional[str] = None
+    debit_account_code: Optional[str] = None
+    credit_account_id: Optional[str] = None
+    credit_account_code: Optional[str] = None
     currency: str
     amount: float
     exchange_rate: float = 1.0
@@ -3683,15 +3685,32 @@ async def update_crdb_note(note_id: str, note_data: CrDbNoteUpdate, current_user
     if note['is_posted']:
         raise HTTPException(status_code=400, detail="Cannot edit posted note. Unpost first.")
     
-    # Get account details for the updated accounts
-    debit_account = await db.accounts.find_one({
-        'id': note_data.debit_account_id,
-        'organization_id': note_data.organization_id
-    }, {'_id': 0})
-    credit_account = await db.accounts.find_one({
-        'id': note_data.credit_account_id,
-        'organization_id': note_data.organization_id
-    }, {'_id': 0})
+    # Get account details for the updated accounts (support both ID and code lookup)
+    if note_data.debit_account_id:
+        debit_account = await db.accounts.find_one({
+            'id': note_data.debit_account_id,
+            'organization_id': note_data.organization_id
+        }, {'_id': 0})
+    elif note_data.debit_account_code:
+        debit_account = await db.accounts.find_one({
+            'code': note_data.debit_account_code,
+            'organization_id': note_data.organization_id
+        }, {'_id': 0})
+    else:
+        debit_account = None
+
+    if note_data.credit_account_id:
+        credit_account = await db.accounts.find_one({
+            'id': note_data.credit_account_id,
+            'organization_id': note_data.organization_id
+        }, {'_id': 0})
+    elif note_data.credit_account_code:
+        credit_account = await db.accounts.find_one({
+            'code': note_data.credit_account_code,
+            'organization_id': note_data.organization_id
+        }, {'_id': 0})
+    else:
+        credit_account = None
     
     if not debit_account:
         raise HTTPException(status_code=400, detail="Debit account not found")
@@ -3720,10 +3739,10 @@ async def update_crdb_note(note_id: str, note_data: CrDbNoteUpdate, current_user
         'amount': amount,
         'amount_lbp': amount_lbp,
         'amount_usd': amount_usd,
-        'debit_account_id': note_data.debit_account_id,
+        'debit_account_id': debit_account.get('id', ''),
         'debit_account_code': debit_account['code'],
         'debit_account_name': debit_account['name'],
-        'credit_account_id': note_data.credit_account_id,
+        'credit_account_id': credit_account.get('id', ''),
         'credit_account_code': credit_account['code'],
         'credit_account_name': credit_account['name'],
         'updated_at': datetime.now(timezone.utc).isoformat(),
