@@ -30,6 +30,9 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 - **Auto Account Code Generation** — Fixed and verified `/api/accounts/next-code` endpoint with numeric sorting. Customers page auto-fills code with prefix `4111`, Suppliers page with `4011` when clicking "Add".
 - **Exchange Rate Visibility in Cr/Db Notes** — Exchange rate input visible and editable in the note form. Rate column displayed in the notes list table.
 - **CrDb Notes handleSave Bug Fix** — Fixed critical bug where saving/updating notes failed because `accounts` array was empty after RemoteAccountSelector refactoring. Now uses note state directly. Backend `CrDbNoteUpdate` accepts both IDs and codes as fallback.
+- **z-index Dropdown Fix (P2)** — Added `z-[60]` to all Header dropdown menus (FY selector, Org switcher, User menu) to render above sidebar (`z-50`).
+- **Dashboard React Warnings Fix (P3)** — Wrapped `fetchDashboardData` and `filterVouchers` in `useCallback` with proper dependency arrays. Eliminated missing dependency warnings.
+- **Recent Transactions Widget** — Added a 3-column quick-access widget to Dashboard showing latest Sales Invoices, Purchase Invoices, and Cr/Db Notes with "View All" navigation links.
 
 ### March 14, 2026 (Session 4)
 - **POS Transaction Void (Soft Delete)** — New PUT /api/pos/invoices/{id}/void endpoint. Voids transaction with reason, reverses account balances and inventory, marks voucher as voided. Frontend: void dialog with reason input, "Show voided" filter in history, VOIDED badge with strikethrough, separate hard delete option.
@@ -41,9 +44,7 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 - **AccountSelector Refactored** — Shared RemoteAccountSelector component
 
 ## Known Issues
-- Minor: React hydration warning in Dashboard (not blocking)
-- P2: Minor z-index dropdown overlay conflict in Header.jsx
+- None currently tracked.
 
 ## Backlog
-- P2: Header dropdown z-index fix
-- P3: Dashboard hydration fix
+- P3: Webpack dev server deprecation warnings (onAfterSetupMiddleware/onBeforeSetupMiddleware) - cosmetic only
