@@ -34,6 +34,7 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 - **Dashboard React Warnings Fix (P3)** — Wrapped `fetchDashboardData` and `filterVouchers` in `useCallback` with proper dependency arrays. Eliminated missing dependency warnings.
 - **Recent Transactions Widget** — Added a 3-column quick-access widget to Dashboard showing latest Sales Invoices, Purchase Invoices, and Cr/Db Notes with "View All" navigation links.
 - **Auto-Retry on Connection Error** — Global axios interceptor shows a toast with a "Retry" button on connection errors/timeouts. Max 2 retries, skips auth requests, auto-dismisses after 10s.
+- **Global Loading Bar** — Added a YouTube/GitHub-style loading bar at the top of the viewport that animates during API calls. Uses axios interceptors to track active requests.
 
 ### March 14, 2026 (Session 4)
 - **POS Transaction Void (Soft Delete)** — New PUT /api/pos/invoices/{id}/void endpoint. Voids transaction with reason, reverses account balances and inventory, marks voucher as voided. Frontend: void dialog with reason input, "Show voided" filter in history, VOIDED badge with strikethrough, separate hard delete option.

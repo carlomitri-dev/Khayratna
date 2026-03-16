@@ -6,6 +6,7 @@ import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
 import axios from 'axios';
 import Layout from './components/Layout';
+import GlobalLoadingBar from './components/GlobalLoadingBar';
 
 // Global axios interceptor for connection errors with auto-retry
 axios.interceptors.response.use(
@@ -339,6 +340,7 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
             <FiscalYearProvider>
+              <GlobalLoadingBar />
               <AppRoutes />
               <Toaster />
             </FiscalYearProvider>
