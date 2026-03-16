@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useFiscalYear } from '../context/FiscalYearContext';
+import { useKeyboardShortcuts, useSequenceShortcut } from '../hooks/useKeyboardShortcuts';
+import ShortcutsHelpDialog from './ShortcutsHelpDialog';
 import {
   LayoutDashboard,
   BookOpen,
@@ -350,10 +352,11 @@ const Header = ({ onMenuClick }) => {
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    // Persist collapse state in localStorage
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved === 'true';
   });
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const navigate = useNavigate();
 
   const toggleCollapse = () => {
     setSidebarCollapsed(prev => {
@@ -362,6 +365,67 @@ const Layout = ({ children }) => {
       return newValue;
     });
   };
+
+  // Global shortcuts: ?, /, Escape
+  useKeyboardShortcuts([
+    {
+      key: '?', shift: true,
+      action: () => setShortcutsOpen(true)
+    },
+    {
+      key: '/',
+      action: () => {
+        const searchEl = document.querySelector('[data-testid*="search"] input, [data-testid*="search"], input[placeholder*="Search"], input[placeholder*="search"]');
+        if (searchEl) searchEl.focus();
+      }
+    },
+    {
+      key: 'Escape', allowInInput: true,
+      action: () => {
+        const active = document.activeElement;
+        if (active && active.tagName.toLowerCase() === 'input') {
+          active.blur();
+        }
+      },
+      preventDefault: false
+    },
+    {
+      key: 'n', ctrl: true,
+      action: () => {
+        const addBtn = document.querySelector('[data-testid*="add-"][data-testid*="btn"]');
+        if (addBtn) addBtn.click();
+      },
+      allowInInput: true
+    },
+    {
+      key: 's', ctrl: true,
+      action: () => {
+        const saveBtn = document.querySelector('[data-testid*="save-"][data-testid*="btn"]:not([disabled])');
+        if (saveBtn) saveBtn.click();
+      },
+      allowInInput: true
+    }
+  ]);
+
+  // Sequence shortcuts: g+d, g+v, etc.
+  useSequenceShortcut((seq, reset) => {
+    const routes = {
+      'gd': '/',
+      'gv': '/vouchers',
+      'ga': '/chart-of-accounts',
+      'gc': '/customers',
+      'gs': '/suppliers',
+      'gn': '/cr-db-notes',
+      'gi': '/inventory',
+      'gp': '/pos'
+    };
+    if (routes[seq]) {
+      navigate(routes[seq]);
+      reset();
+    }
+    // Reset if sequence is too long or doesn't start with 'g'
+    if (seq.length >= 2 && !routes[seq]) reset();
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -377,6 +441,7 @@ const Layout = ({ children }) => {
           {children}
         </main>
       </div>
+      <ShortcutsHelpDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
   );
 };
