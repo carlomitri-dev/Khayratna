@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useFiscalYear } from '../context/FiscalYearContext';
-import { useSync } from '../context/SyncContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { DateInput } from '../components/ui/date-input';
-import OfflineBanner from '../components/OfflineBanner';
 import {
   Select,
   SelectContent,
@@ -26,8 +24,6 @@ import {
 import { Plus, Trash2, AlertCircle, Save, Send, RefreshCw, Pencil, Undo2, ChevronDown, Filter, WifiOff, Loader2, Check, Search } from 'lucide-react';
 import axios from 'axios';
 import { formatLBP, formatUSD, getTodayForInput, getVoucherTypeName, formatDate } from '../lib/utils';
-import db from '../lib/db';
-import { addToSyncQueue, OPERATION_TYPES, ACTION_TYPES } from '../lib/syncService';
 import AccountSelector from '../components/shared/RemoteAccountSelector';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -53,7 +49,6 @@ const CurrencySelector = ({ currencies, value, onChange }) => {
 const VoucherEntryPage = () => {
   const { currentOrg, user } = useAuth();
   const { selectedFY } = useFiscalYear();
-  const { isOnline, updatePendingCount } = useSync();
   const [accounts, setAccounts] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   const [vouchers, setVouchers] = useState([]);
@@ -114,49 +109,20 @@ const VoucherEntryPage = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      if (isOnline) {
-        const rateRes = await axios.get(`${API}/exchange-rates/latest?organization_id=${currentOrg.id}`).catch(() => ({ data: { rate: 89500 } }));
-        
-        // Set currencies - only USD and LBP
-        const currencyData = [
-              { code: 'USD', name: 'US Dollar', symbol: '$', rate_to_usd: 1, rate_to_lbp: rateRes.data.rate || 89500 },
-              { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل', rate_to_usd: 1/(rateRes.data.rate || 89500), rate_to_lbp: 1 }
-            ];
-        setCurrencies(currencyData);
-        setBaseExchangeRate(rateRes.data.rate || 89500);
-        
-        // Fetch vouchers with initial filters
-        await fetchVouchers(true);
-      } else {
-        // Load from IndexedDB when offline
-        console.log('[Voucher] Offline mode - loading from cache');
-        
-        const cachedAccounts = await db.chartOfAccounts.where('organization_id').equals(currentOrg.id).toArray();
-        const cachedVouchers = await db.vouchers.where('organization_id').equals(currentOrg.id).toArray();
-        
-        setAccounts(cachedAccounts);
-        setVouchers(cachedVouchers);
-        setTotalCount(cachedVouchers.length);
-        setCurrencies([
-          { code: 'USD', name: 'US Dollar', symbol: '$', rate_to_usd: 1, rate_to_lbp: 89500 },
-          { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل', rate_to_usd: 1/89500, rate_to_lbp: 1 }
-        ]);
-      }
+      const rateRes = await axios.get(`${API}/exchange-rates/latest?organization_id=${currentOrg.id}`).catch(() => ({ data: { rate: 89500 } }));
+      
+      const currencyData = [
+            { code: 'USD', name: 'US Dollar', symbol: '$', rate_to_usd: 1, rate_to_lbp: rateRes.data.rate || 89500 },
+            { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل', rate_to_usd: 1/(rateRes.data.rate || 89500), rate_to_lbp: 1 }
+          ];
+      setCurrencies(currencyData);
+      setBaseExchangeRate(rateRes.data.rate || 89500);
+      
+      await fetchVouchers(true);
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      
-      // Fallback to cached data
-      try {
-        const cachedAccounts = await db.chartOfAccounts.where('organization_id').equals(currentOrg.id).toArray();
-        const cachedVouchers = await db.vouchers.where('organization_id').equals(currentOrg.id).toArray();
-        
-        if (cachedAccounts.length > 0) setAccounts(cachedAccounts);
-        if (cachedVouchers.length > 0) {
-          setVouchers(cachedVouchers);
-          setTotalCount(cachedVouchers.length);
-        }
-      } catch (cacheError) {
-        console.error('[Voucher] Cache fallback failed:', cacheError);
+      if (!error.response && error.message === 'Network Error') {
+        alert('Connection Error: Unable to connect to the server. Please check your internet connection.');
       }
     } finally {
       setLoading(false);
@@ -348,53 +314,25 @@ const VoucherEntryPage = () => {
 
     setSaving(true);
     try {
-      if (isOnline) {
-        // Online: Send to server
-        if (editingVoucher) {
-          // Update existing voucher
-          const payload = {
-            voucher_type: voucher.voucher_type,
-            date: voucher.date,
-            reference: voucher.reference,
-            description: voucher.description,
-            lines: validLines
-          };
-          
-          await axios.put(`${API}/vouchers/${editingVoucher.id}`, payload);
-          
-          if (shouldPost && !editingVoucher.is_posted) {
-            await axios.post(`${API}/vouchers/${editingVoucher.id}/post`);
-          }
-          
-          alert('Voucher updated successfully!');
-        } else {
-          // Create new voucher
-          const payload = {
-            voucher_type: voucher.voucher_type,
-            date: voucher.date,
-            reference: voucher.reference,
-            description: voucher.description,
-            lines: validLines,
-            organization_id: currentOrg.id
-          };
-
-          const response = await axios.post(`${API}/vouchers`, payload);
-          
-          if (shouldPost) {
-            await axios.post(`${API}/vouchers/${response.data.id}/post`);
-          }
-          
-          alert(shouldPost ? 'Voucher saved and posted successfully!' : 'Voucher saved as draft');
+      if (editingVoucher) {
+        // Update existing voucher
+        const payload = {
+          voucher_type: voucher.voucher_type,
+          date: voucher.date,
+          reference: voucher.reference,
+          description: voucher.description,
+          lines: validLines
+        };
+        
+        await axios.put(`${API}/vouchers/${editingVoucher.id}`, payload);
+        
+        if (shouldPost && !editingVoucher.is_posted) {
+          await axios.post(`${API}/vouchers/${editingVoucher.id}/post`);
         }
+        
+        alert('Voucher updated successfully!');
       } else {
-        // Offline: Save locally and queue for sync
-        if (shouldPost) {
-          alert('Cannot post voucher while offline. Saving as draft.');
-        }
-        
-        const offlineId = 'offline_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        const offlineVoucherNumber = `${voucher.voucher_type}-OFFLINE-${String(Date.now()).slice(-5)}`;
-        
+        // Create new voucher
         const payload = {
           voucher_type: voucher.voucher_type,
           date: voucher.date,
@@ -403,31 +341,14 @@ const VoucherEntryPage = () => {
           lines: validLines,
           organization_id: currentOrg.id
         };
+
+        const response = await axios.post(`${API}/vouchers`, payload);
         
-        const offlineVoucher = {
-          id: editingVoucher?.id || offlineId,
-          voucher_number: editingVoucher?.voucher_number || offlineVoucherNumber,
-          ...payload,
-          is_posted: false,
-          status: 'draft',
-          created_offline: true,
-          created_at: new Date().toISOString()
-        };
+        if (shouldPost) {
+          await axios.post(`${API}/vouchers/${response.data.id}/post`);
+        }
         
-        // Save to IndexedDB
-        await db.vouchers.put(offlineVoucher);
-        
-        // Add to sync queue
-        const { addToSyncQueue, OPERATION_TYPES, ACTION_TYPES } = await import('../lib/syncService');
-        await addToSyncQueue(
-          OPERATION_TYPES.VOUCHER, 
-          editingVoucher ? ACTION_TYPES.UPDATE : ACTION_TYPES.CREATE, 
-          offlineVoucher.id, 
-          payload
-        );
-        await updatePendingCount();
-        
-        alert('Voucher saved offline. It will sync when you\'re back online.');
+        alert(shouldPost ? 'Voucher saved and posted successfully!' : 'Voucher saved as draft');
       }
       
       fetchData();
@@ -512,9 +433,6 @@ const VoucherEntryPage = () => {
 
   return (
     <div className="space-y-4 lg:space-y-6" data-testid="voucher-entry-page">
-      {/* Offline Banner */}
-      <OfflineBanner />
-      
       <div>
         <h1 className="text-xl lg:text-2xl font-bold" style={{ fontFamily: 'Manrope, sans-serif' }}>
           Voucher Entry

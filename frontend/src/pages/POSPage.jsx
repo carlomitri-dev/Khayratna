@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSync } from '../context/SyncContext';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import OfflineBanner from '../components/OfflineBanner';
 import {
   Select,
   SelectContent,
@@ -35,8 +33,6 @@ import {
 import axios from 'axios';
 import { formatUSD, formatDate } from '../lib/utils';
 import { toast } from 'sonner';
-import db from '../lib/db';
-import { addToSyncQueue, OPERATION_TYPES, ACTION_TYPES } from '../lib/syncService';
 import ReceiptSettingsDialog from '../components/shared/ReceiptSettingsDialog';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -242,7 +238,6 @@ const CustomerSelector = ({ customers, value, onChange }) => {
 
 const POSPage = () => {
   const { currentOrg, user } = useAuth();
-  const { isOnline, pendingCount, triggerSync, updatePendingCount } = useSync();
   const [searchParams, setSearchParams] = useSearchParams();
   const barcodeInputRef = useRef(null);
   
@@ -345,110 +340,43 @@ const POSPage = () => {
       if (!currentOrg) return;
       setLoading(true);
       try {
-        // Try to load from server first (if online)
-        if (isOnline) {
-          const [inventoryRes, cashRes, salesRes, customersRes, summaryRes] = await Promise.all([
-            axios.get(`${API}/pos/inventory?organization_id=${currentOrg.id}`),
-            axios.get(`${API}/pos/cash-accounts?organization_id=${currentOrg.id}`),
-            axios.get(`${API}/sales-accounts?organization_id=${currentOrg.id}`),
-            axios.get(`${API}/customer-accounts?organization_id=${currentOrg.id}`),
-            axios.get(`${API}/pos/daily-summary?organization_id=${currentOrg.id}`).catch(() => ({ data: null }))
-          ]);
-          
-          // POS inventory endpoint returns array directly
-          const inventoryData = inventoryRes.data;
-          
-          // Cache data in IndexedDB for offline use
-          try {
-            // Cache inventory
-            await db.inventoryItems.where('organization_id').equals(currentOrg.id).delete();
-            if (inventoryData.length > 0) {
-              // Add organization_id for caching
-              const itemsToCache = inventoryData.map(item => ({ ...item, organization_id: currentOrg.id }));
-              await db.inventoryItems.bulkPut(itemsToCache);
-            }
-            
-            // Cache customers
-            await db.customers.where('organization_id').equals(currentOrg.id).delete();
-            const customerData = customersRes.data.map(c => ({ ...c, organization_id: currentOrg.id }));
-            if (customerData.length > 0) {
-              await db.customers.bulkPut(customerData);
-            }
-            
-            // Cache chart of accounts for cash/sales accounts
-            const allAccounts = [...cashRes.data, ...salesRes.data];
-            const accountsToCache = allAccounts.map(a => ({ ...a, organization_id: currentOrg.id }));
-            if (accountsToCache.length > 0) {
-              await db.chartOfAccounts.bulkPut(accountsToCache);
-            }
-          } catch (cacheError) {
-            console.warn('[POS] Error caching data:', cacheError);
-          }
-          
-          setInventoryItems(inventoryData);
-          // Separate cash and bank accounts
-          const allCashAccounts = cashRes.data;
-          setCashAccounts(allCashAccounts.filter(a => a.code.startsWith('5'))); // All cash/bank accounts
-          setBankAccounts(allCashAccounts.filter(a => a.code.startsWith('5'))); // All cash/bank accounts
-          setSalesAccounts(salesRes.data);
-          setCustomerAccounts(customersRes.data);
-          setDailySummary(summaryRes.data);
-          
-          // Set defaults based on specific account codes
-          // Cash payment = 5311, Card/Bank = 5111, Sales = 7011
-          if (allCashAccounts.length > 0) {
-            const cashAcc = allCashAccounts.find(a => a.code === '5311') || allCashAccounts.find(a => a.code.startsWith('53')) || allCashAccounts[0];
-            const bankAcc = allCashAccounts.find(a => a.code === '5111') || allCashAccounts.find(a => a.code.startsWith('51')) || allCashAccounts[0];
-            setSelectedCashAccount(cashAcc?.id || allCashAccounts[0].id);
-            setSelectedBankAccount(bankAcc?.id || allCashAccounts[0].id);
-          }
-          // Set default Sales account - prefer 7011
-          if (salesRes.data.length > 0) {
-            const salesAcc = salesRes.data.find(a => a.code === '7011') || salesRes.data.find(a => a.code.startsWith('701')) || salesRes.data[0];
-            setCreditAccountId(salesAcc?.id || salesRes.data[0].id);
-          }
-        } else {
-          // Load from IndexedDB when offline
-          console.log('[POS] Offline mode - loading from cache');
-          
-          const cachedInventory = await db.inventoryItems.where('organization_id').equals(currentOrg.id).toArray();
-          const cachedCustomers = await db.customers.where('organization_id').equals(currentOrg.id).toArray();
-          const cachedAccounts = await db.chartOfAccounts.where('organization_id').equals(currentOrg.id).toArray();
-          
-          setInventoryItems(cachedInventory);
-          setCustomerAccounts(cachedCustomers);
-          
-          const allCashAccounts = cachedAccounts.filter(a => a.code?.startsWith('5'));
-          setCashAccounts(allCashAccounts);
-          setBankAccounts(allCashAccounts);
-          setSalesAccounts(cachedAccounts.filter(a => a.code?.startsWith('7')));
-          
-          // Set defaults based on specific account codes
-          if (allCashAccounts.length > 0) {
-            const cashAcc = allCashAccounts.find(a => a.code === '5311') || allCashAccounts.find(a => a.code?.startsWith('53')) || allCashAccounts[0];
-            const bankAcc = allCashAccounts.find(a => a.code === '5111') || allCashAccounts.find(a => a.code?.startsWith('51')) || allCashAccounts[0];
-            setSelectedCashAccount(cashAcc?.id || allCashAccounts[0]?.id);
-            setSelectedBankAccount(bankAcc?.id || allCashAccounts[0]?.id);
-          }
-          
-          // Set default Sales account - prefer 7011
-          const salesAccountsList = cachedAccounts.filter(a => a.code?.startsWith('7'));
-          if (salesAccountsList.length > 0) {
-            const salesAcc = salesAccountsList.find(a => a.code === '7011') || salesAccountsList.find(a => a.code?.startsWith('701')) || salesAccountsList[0];
-            setCreditAccountId(salesAcc?.id || salesAccountsList[0].id);
-          }
+        const [inventoryRes, cashRes, salesRes, customersRes, summaryRes] = await Promise.all([
+          axios.get(`${API}/pos/inventory?organization_id=${currentOrg.id}`),
+          axios.get(`${API}/pos/cash-accounts?organization_id=${currentOrg.id}`),
+          axios.get(`${API}/sales-accounts?organization_id=${currentOrg.id}`),
+          axios.get(`${API}/customer-accounts?organization_id=${currentOrg.id}`),
+          axios.get(`${API}/pos/daily-summary?organization_id=${currentOrg.id}`).catch(() => ({ data: null }))
+        ]);
+        
+        const inventoryData = inventoryRes.data;
+        
+        setInventoryItems(inventoryData);
+        const allCashAccounts = cashRes.data;
+        setCashAccounts(allCashAccounts.filter(a => a.code.startsWith('5')));
+        setBankAccounts(allCashAccounts.filter(a => a.code.startsWith('5')));
+        setSalesAccounts(salesRes.data);
+        setCustomerAccounts(customersRes.data);
+        setDailySummary(summaryRes.data);
+        
+        if (allCashAccounts.length > 0) {
+          const cashAcc = allCashAccounts.find(a => a.code === '5311') || allCashAccounts.find(a => a.code.startsWith('53')) || allCashAccounts[0];
+          const bankAcc = allCashAccounts.find(a => a.code === '5111') || allCashAccounts.find(a => a.code.startsWith('51')) || allCashAccounts[0];
+          setSelectedCashAccount(cashAcc?.id || allCashAccounts[0].id);
+          setSelectedBankAccount(bankAcc?.id || allCashAccounts[0].id);
+        }
+        if (salesRes.data.length > 0) {
+          const salesAcc = salesRes.data.find(a => a.code === '7011') || salesRes.data.find(a => a.code.startsWith('701')) || salesRes.data[0];
+          setCreditAccountId(salesAcc?.id || salesRes.data[0].id);
         }
         
         // Get exchange rate from org settings
         if (currentOrg.base_exchange_rate) setLbpRate(currentOrg.base_exchange_rate);
         
         // Load receipt settings
-        if (isOnline) {
-          try {
-            const rcptRes = await axios.get(`${API}/receipt-settings?organization_id=${currentOrg.id}`);
-            setReceiptSettings(rcptRes.data);
-          } catch { /* use defaults */ }
-        }
+        try {
+          const rcptRes = await axios.get(`${API}/receipt-settings?organization_id=${currentOrg.id}`);
+          setReceiptSettings(rcptRes.data);
+        } catch { /* use defaults */ }
         
         // Get tax rate from org settings
         if (currentOrg.tax_percent !== undefined && currentOrg.tax_percent !== null) {
@@ -457,29 +385,15 @@ const POSPage = () => {
         
       } catch (error) {
         console.error('Error loading data:', error);
-        
-        // Fallback to cached data on error
-        try {
-          const cachedInventory = await db.inventoryItems.where('organization_id').equals(currentOrg.id).toArray();
-          const cachedCustomers = await db.customers.where('organization_id').equals(currentOrg.id).toArray();
-          
-          if (cachedInventory.length > 0) {
-            setInventoryItems(cachedInventory);
-            console.log('[POS] Loaded inventory from cache');
-          }
-          if (cachedCustomers.length > 0) {
-            setCustomerAccounts(cachedCustomers);
-            console.log('[POS] Loaded customers from cache');
-          }
-        } catch (cacheError) {
-          console.error('[POS] Cache fallback failed:', cacheError);
+        if (!error.response && error.message === 'Network Error') {
+          alert('Connection Error: Unable to connect to the server. Please check your internet connection.');
         }
       }
       setLoading(false);
     };
     
     loadData();
-  }, [currentOrg, isOnline]);
+  }, [currentOrg]);
 
   // Handle view parameter from URL (for viewing transaction from inventory ledger)
   useEffect(() => {
@@ -767,51 +681,8 @@ const POSPage = () => {
       
       let transactionData;
       
-      if (isOnline) {
-        // Online: Send to server
-        const res = await axios.post(`${API}/pos/transactions`, payload);
-        transactionData = res.data;
-        
-        // Cache the transaction
-        try {
-          await db.posTransactions.put({ ...transactionData, organization_id: currentOrg.id });
-        } catch (e) {
-          console.warn('[POS] Error caching transaction:', e);
-        }
-      } else {
-        // Offline: Save locally and queue for sync
-        transactionData = {
-          id: transactionId,
-          receipt_number: receiptNumber,
-          ...payload,
-          date: new Date().toISOString(),
-          time: new Date().toLocaleTimeString('en-US', { hour12: false }),
-          status: 'pending_sync',
-          created_offline: true,
-          voucher_number: 'PENDING-SYNC'
-        };
-        
-        // Save to IndexedDB
-        await db.posTransactions.put(transactionData);
-        
-        // Update local inventory quantities
-        for (const item of cart) {
-          if (item.inventory_item_id) {
-            const invItem = await db.inventoryItems.get(item.inventory_item_id);
-            if (invItem) {
-              invItem.on_hand_qty = (invItem.on_hand_qty || 0) - item.quantity;
-              await db.inventoryItems.put(invItem);
-            }
-          }
-        }
-        
-        // Add to sync queue
-        await addToSyncQueue(OPERATION_TYPES.POS_TRANSACTION, ACTION_TYPES.CREATE, transactionId, payload);
-        await updatePendingCount();
-        
-        // Update local inventory state
-        setInventoryItems(await db.inventoryItems.where('organization_id').equals(currentOrg.id).toArray());
-      }
+      const res = await axios.post(`${API}/pos/transactions`, payload);
+      transactionData = res.data;
       
       setShowPayment(false);
       setShowReceipt(transactionData);
@@ -1019,11 +890,6 @@ const POSPage = () => {
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col lg:flex-row gap-4 p-4">
-      {/* Offline Banner */}
-      <div className="absolute top-0 left-0 right-0 z-10 px-4 pt-2">
-        <OfflineBanner />
-      </div>
-      
       {/* Left Panel - Products (only if quick items enabled) */}
       {showQuickItems && (
       <div className="flex-1 flex flex-col gap-4 min-w-0">

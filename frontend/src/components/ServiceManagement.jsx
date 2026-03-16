@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSync } from '../context/SyncContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -33,13 +32,10 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import axios from 'axios';
-import db from '../lib/db';
-
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const ServiceManagement = () => {
   const { currentOrg } = useAuth();
-  const { isOnline } = useSync();
   
   // Service Items state
   const [serviceItems, setServiceItems] = useState([]);
@@ -68,43 +64,10 @@ const ServiceManagement = () => {
   const fetchServiceItems = async () => {
     if (!currentOrg?.id) return;
     try {
-      if (isOnline) {
-        const response = await axios.get(`${API}/service-items?organization_id=${currentOrg.id}`);
-        setServiceItems(response.data);
-        
-        // Cache in IndexedDB for offline use
-        try {
-          const itemsToCache = response.data.map(s => ({ ...s, organization_id: currentOrg.id }));
-          await db.serviceItems.where('organization_id').equals(currentOrg.id).delete();
-          if (itemsToCache.length > 0) {
-            await db.serviceItems.bulkPut(itemsToCache);
-          }
-        } catch (cacheError) {
-          console.warn('[ServiceManagement] Error caching service items:', cacheError);
-        }
-      } else {
-        // Load from IndexedDB when offline
-        console.log('[ServiceManagement] Offline mode - loading service items from cache');
-        const cachedItems = await db.serviceItems
-          .where('organization_id')
-          .equals(currentOrg.id)
-          .toArray();
-        setServiceItems(cachedItems);
-      }
+      const response = await axios.get(`${API}/service-items?organization_id=${currentOrg.id}`);
+      setServiceItems(response.data);
     } catch (error) {
       console.error('Failed to fetch service items:', error);
-      // Fallback to cached data
-      try {
-        const cachedItems = await db.serviceItems
-          .where('organization_id')
-          .equals(currentOrg.id)
-          .toArray();
-        if (cachedItems.length > 0) {
-          setServiceItems(cachedItems);
-        }
-      } catch (cacheError) {
-        console.error('[ServiceManagement] Cache fallback failed:', cacheError);
-      }
     }
   };
 
@@ -116,39 +79,10 @@ const ServiceManagement = () => {
         organization_id: currentOrg.id
       };
       
-      if (isOnline) {
-        // Online: Send to server
-        if (editingService) {
-          await axios.put(`${API}/service-items/${editingService.id}`, newService);
-        } else {
-          await axios.post(`${API}/service-items`, payload);
-        }
+      if (editingService) {
+        await axios.put(`${API}/service-items/${editingService.id}`, newService);
       } else {
-        // Offline: Save locally and queue for sync
-        const offlineId = 'offline_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        const offlineCode = 'SVC-OFFLINE-' + String(Date.now()).slice(-5);
-        
-        const offlineService = {
-          id: editingService?.id || offlineId,
-          code: editingService?.code || offlineCode,
-          ...payload,
-          created_offline: true,
-          created_at: new Date().toISOString()
-        };
-        
-        // Save to IndexedDB
-        await db.serviceItems.put(offlineService);
-        
-        // Add to sync queue
-        const { addToSyncQueue, OPERATION_TYPES, ACTION_TYPES } = await import('../lib/syncService');
-        await addToSyncQueue(
-          OPERATION_TYPES.SERVICE_ITEM, 
-          editingService ? ACTION_TYPES.UPDATE : ACTION_TYPES.CREATE, 
-          offlineService.id, 
-          payload
-        );
-        
-        alert('Service item saved offline. It will sync when you\'re back online.');
+        await axios.post(`${API}/service-items`, payload);
       }
       
       setIsServiceDialogOpen(false);

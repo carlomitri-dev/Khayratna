@@ -1,11 +1,32 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { SyncProvider } from './context/SyncContext';
 import { FiscalYearProvider } from './context/FiscalYearContext';
 import { Toaster } from './components/ui/sonner';
-import OfflineToast from './components/OfflineToast';
+import { toast } from 'sonner';
+import axios from 'axios';
 import Layout from './components/Layout';
+
+// Global axios interceptor for connection errors
+axios.interceptors.response.use(
+  response => response,
+  error => {
+    if (!error.response && error.message === 'Network Error') {
+      toast.error('Connection Error', {
+        description: 'Unable to connect to the server. Please check your internet connection and try again.',
+        duration: 5000,
+        id: 'connection-error'
+      });
+    } else if (error.code === 'ECONNABORTED') {
+      toast.error('Connection Timeout', {
+        description: 'The server took too long to respond. Please try again.',
+        duration: 5000,
+        id: 'timeout-error'
+      });
+    }
+    return Promise.reject(error);
+  }
+);
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ChartOfAccountsPage from './pages/ChartOfAccountsPage';
@@ -278,13 +299,10 @@ function App() {
     <div className="App">
       <BrowserRouter>
         <AuthProvider>
-          <SyncProvider>
             <FiscalYearProvider>
               <AppRoutes />
               <Toaster />
-              <OfflineToast />
             </FiscalYearProvider>
-          </SyncProvider>
         </AuthProvider>
       </BrowserRouter>
     </div>

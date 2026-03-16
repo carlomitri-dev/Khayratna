@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useFiscalYear } from '../context/FiscalYearContext';
-import SyncStatusIndicator from './SyncStatusIndicator';
 import {
   LayoutDashboard,
   BookOpen,
@@ -316,9 +315,6 @@ const Header = ({ onMenuClick }) => {
         </div>
 
         <div className="flex items-center gap-2 lg:gap-4">
-          {/* Sync Status Indicator */}
-          <SyncStatusIndicator />
-          
           {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

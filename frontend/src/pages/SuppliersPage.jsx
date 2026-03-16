@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useFiscalYear } from '../context/FiscalYearContext';
-import { useSync } from '../context/SyncContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import OfflineBanner from '../components/OfflineBanner';
 import {
   Dialog,
   DialogContent,
@@ -23,14 +21,11 @@ import {
 import axios from 'axios';
 import { formatLBP, formatUSD } from '../lib/utils';
 import LedgerDialog from '../components/LedgerDialog';
-import db from '../lib/db';
-
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const SuppliersPage = () => {
   const { currentOrg, user } = useAuth();
   const { selectedFY } = useFiscalYear();
-  const { isOnline } = useSync();
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -53,61 +48,37 @@ const SuppliersPage = () => {
       setCurrentPage(0);
       fetchSuppliers(true);
     }
-  }, [currentOrg, isOnline, selectedFY, searchTerm]);
+  }, [currentOrg, selectedFY, searchTerm]);
 
   const fetchSuppliers = async (reset = false) => {
     if (reset) setLoading(true);
     else setLoadingMore(true);
     try {
-      if (isOnline) {
-        const params = new URLSearchParams({ 
-          organization_id: currentOrg.id,
-          skip: reset ? 0 : currentPage * PAGE_SIZE,
-          limit: PAGE_SIZE
-        });
-        if (selectedFY?.id) params.append('fy_id', selectedFY.id);
-        if (searchTerm) params.append('search', searchTerm);
-        
-        const [dataRes, countRes] = await Promise.all([
-          axios.get(`${API}/suppliers?${params.toString()}`),
-          axios.get(`${API}/suppliers/count?organization_id=${currentOrg.id}${searchTerm ? '&search=' + searchTerm : ''}`)
-        ]);
-        
-        if (reset) {
-          setSuppliers(dataRes.data);
-          setCurrentPage(1);
-        } else {
-          setSuppliers(prev => [...prev, ...dataRes.data]);
-          setCurrentPage(prev => prev + 1);
-        }
-        setTotalCount(countRes.data.count);
-        
-        // Cache in IndexedDB
-        try {
-          const suppliersToCache = dataRes.data.map(s => ({ ...s, organization_id: currentOrg.id }));
-          await db.suppliers.where('organization_id').equals(currentOrg.id).delete();
-          if (suppliersToCache.length > 0) {
-            await db.suppliers.bulkPut(suppliersToCache);
-          }
-        } catch (cacheError) {
-          console.warn('[Suppliers] Error caching:', cacheError);
-        }
+      const params = new URLSearchParams({ 
+        organization_id: currentOrg.id,
+        skip: reset ? 0 : currentPage * PAGE_SIZE,
+        limit: PAGE_SIZE
+      });
+      if (selectedFY?.id) params.append('fy_id', selectedFY.id);
+      if (searchTerm) params.append('search', searchTerm);
+      
+      const [dataRes, countRes] = await Promise.all([
+        axios.get(`${API}/suppliers?${params.toString()}`),
+        axios.get(`${API}/suppliers/count?organization_id=${currentOrg.id}${searchTerm ? '&search=' + searchTerm : ''}`)
+      ]);
+      
+      if (reset) {
+        setSuppliers(dataRes.data);
+        setCurrentPage(1);
       } else {
-        // Load from IndexedDB when offline
-        console.log('[Suppliers] Offline mode - loading from cache');
-        const cachedSuppliers = await db.suppliers.where('organization_id').equals(currentOrg.id).toArray();
-        setSuppliers(cachedSuppliers);
+        setSuppliers(prev => [...prev, ...dataRes.data]);
+        setCurrentPage(prev => prev + 1);
       }
+      setTotalCount(countRes.data.count);
     } catch (error) {
       console.error('Failed to fetch suppliers:', error);
-      // Fallback to cache
-      try {
-        const cachedSuppliers = await db.suppliers.where('organization_id').equals(currentOrg.id).toArray();
-        if (cachedSuppliers.length > 0) {
-          setSuppliers(cachedSuppliers);
-        }
-      } catch (cacheError) {
-        console.error('[Suppliers] Cache fallback failed:', cacheError);
+      if (!error.response && error.message === 'Network Error') {
+        alert('Connection Error: Unable to connect to the server. Please check your internet connection.');
       }
     } finally {
       setLoading(false);
@@ -191,9 +162,6 @@ const SuppliersPage = () => {
 
   return (
     <div className="space-y-4 lg:space-y-6" data-testid="suppliers-page">
-      {/* Offline Banner */}
-      <OfflineBanner />
-      
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

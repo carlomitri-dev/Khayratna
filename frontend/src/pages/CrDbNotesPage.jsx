@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSync } from '../context/SyncContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { DateInput } from '../components/ui/date-input';
-import OfflineBanner from '../components/OfflineBanner';
 import {
   Select,
   SelectContent,
@@ -25,12 +23,11 @@ import {
 import { 
   Plus, Trash2, Send, Printer, Search, 
   Camera, Upload, FileText, Image, X, Paperclip, Eye, Download,
-  ZoomIn, ZoomOut, RotateCw, Maximize2, ChevronDown, Filter, Pencil, Undo2, WifiOff, Loader2
+  ZoomIn, ZoomOut, RotateCw, Maximize2, ChevronDown, Filter, Pencil, Undo2, Loader2
 } from 'lucide-react';
 import axios from 'axios';
 import { formatLBP, formatUSD, getTodayForInput, formatDateTime, formatDate } from '../lib/utils';
 import { printReport } from '../lib/reportUtils';
-import db from '../lib/db';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -235,7 +232,6 @@ import RemoteAccountSelector from '../components/shared/RemoteAccountSelector';
 
 const CrDbNotesPage = () => {
   const { currentOrg, user } = useAuth();
-  const { isOnline, updatePendingCount } = useSync();
   const [accounts, setAccounts] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   const [notes, setNotes] = useState([]);
@@ -306,35 +302,15 @@ const CrDbNotesPage = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      if (isOnline) {
-        // No need to preload accounts - RemoteAccountSelector fetches remotely
-        setCurrencies([
-          { code: 'USD', name: 'US Dollar', symbol: '$' },
-          { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل' }
-        ]);
-        
-        // Fetch notes with initial filters
-        await fetchNotes(true);
-      } else {
-        // Load from IndexedDB when offline
-        console.log('[CrDbNotes] Offline mode - loading from cache');
-        
-        const cachedAccounts = await db.chartOfAccounts.where('organization_id').equals(currentOrg.id).toArray();
-        setAccounts(cachedAccounts);
-        setCurrencies([
-          { code: 'USD', name: 'US Dollar', symbol: '$' },
-          { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل' }
-        ]);
-      }
+      setCurrencies([
+        { code: 'USD', name: 'US Dollar', symbol: '$' },
+        { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل' }
+      ]);
+      await fetchNotes(true);
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      
-      // Fallback to cached data
-      try {
-        const cachedAccounts = await db.chartOfAccounts.where('organization_id').equals(currentOrg.id).toArray();
-        if (cachedAccounts.length > 0) setAccounts(cachedAccounts);
-      } catch (cacheError) {
-        console.error('[CrDbNotes] Cache fallback failed:', cacheError);
+      if (!error.response && error.message === 'Network Error') {
+        alert('Connection Error: Unable to connect to the server. Please check your internet connection.');
       }
     } finally {
       setLoading(false);
@@ -349,61 +325,33 @@ const CrDbNotesPage = () => {
     }
     
     try {
-      if (isOnline) {
-        const params = new URLSearchParams({
-          organization_id: currentOrg.id,
-          skip: reset ? 0 : currentPage * PAGE_SIZE,
-          limit: PAGE_SIZE
-        });
-        
-        if (searchTerm) params.append('search', searchTerm);
-        if (filterType !== 'all') params.append('note_type', filterType);
-        if (filterStatus !== 'all') params.append('status', filterStatus);
-        
-        const [notesRes, countRes] = await Promise.all([
-          axios.get(`${API}/crdb-notes?${params.toString()}`),
-          axios.get(`${API}/crdb-notes/count?${params.toString()}`)
-        ]);
-        
-        // Cache notes in IndexedDB
-        try {
-          const notesToCache = notesRes.data.map(n => ({ ...n, organization_id: currentOrg.id }));
-          if (reset) {
-            await db.crdbNotes.where('organization_id').equals(currentOrg.id).delete();
-          }
-          if (notesToCache.length > 0) {
-            await db.crdbNotes.bulkPut(notesToCache);
-          }
-        } catch (cacheError) {
-          console.warn('[CrDbNotes] Error caching:', cacheError);
-        }
-        
-        if (reset) {
-          setNotes(notesRes.data);
-          setCurrentPage(1);
-        } else {
-          setNotes(prev => [...prev, ...notesRes.data]);
-          setCurrentPage(prev => prev + 1);
-        }
-        setTotalCount(countRes.data.count);
+      const params = new URLSearchParams({
+        organization_id: currentOrg.id,
+        skip: reset ? 0 : currentPage * PAGE_SIZE,
+        limit: PAGE_SIZE
+      });
+      
+      if (searchTerm) params.append('search', searchTerm);
+      if (filterType !== 'all') params.append('note_type', filterType);
+      if (filterStatus !== 'all') params.append('status', filterStatus);
+      
+      const [notesRes, countRes] = await Promise.all([
+        axios.get(`${API}/crdb-notes?${params.toString()}`),
+        axios.get(`${API}/crdb-notes/count?${params.toString()}`)
+      ]);
+      
+      if (reset) {
+        setNotes(notesRes.data);
+        setCurrentPage(1);
       } else {
-        // Load from IndexedDB when offline
-        console.log('[CrDbNotes] Offline mode - loading from cache');
-        const cachedNotes = await db.crdbNotes.where('organization_id').equals(currentOrg.id).toArray();
-        setNotes(cachedNotes);
-        setTotalCount(cachedNotes.length);
+        setNotes(prev => [...prev, ...notesRes.data]);
+        setCurrentPage(prev => prev + 1);
       }
+      setTotalCount(countRes.data.count);
     } catch (error) {
       console.error('Failed to fetch notes:', error);
-      // Fallback to cache
-      try {
-        const cachedNotes = await db.crdbNotes.where('organization_id').equals(currentOrg.id).toArray();
-        if (cachedNotes.length > 0) {
-          setNotes(cachedNotes);
-          setTotalCount(cachedNotes.length);
-        }
-      } catch (cacheError) {
-        console.error('[CrDbNotes] Cache fallback failed:', cacheError);
+      if (!error.response && error.message === 'Network Error') {
+        alert('Connection Error: Unable to connect to the server. Please check your internet connection.');
       }
     } finally {
       setLoading(false);
@@ -433,68 +381,28 @@ const CrDbNotesPage = () => {
 
     setSaving(true);
     try {
-      if (isOnline) {
-        // Online: Send to server
-        let noteId;
-        if (editingNote) {
-          // Update existing note - send account IDs (with codes as fallback)
-          const updatePayload = {
-            note_type: note.note_type,
-            date: note.date,
-            description: note.description,
-            currency: note.currency,
-            amount: parseFloat(note.amount),
-            exchange_rate: parseFloat(note.exchange_rate) || 1,
-            organization_id: currentOrg.id,
-            debit_account_id: note.debit_account_id || null,
-            debit_account_code: note.debit_account_code,
-            credit_account_id: note.credit_account_id || null,
-            credit_account_code: note.credit_account_code
-          };
-          await axios.put(`${API}/crdb-notes/${editingNote.id}`, updatePayload);
-          noteId = editingNote.id;
-          alert('Note updated successfully!');
-        } else {
-          // Create new note - send account codes and names
-          const createPayload = {
-            note_type: note.note_type,
-            date: note.date,
-            description: note.description,
-            currency: note.currency,
-            amount: parseFloat(note.amount),
-            exchange_rate: parseFloat(note.exchange_rate) || 1,
-            organization_id: currentOrg.id,
-            debit_account_code: note.debit_account_code,
-            debit_account_name: note.debit_account_name,
-            credit_account_code: note.credit_account_code,
-            credit_account_name: note.credit_account_name
-          };
-          const response = await axios.post(`${API}/crdb-notes`, createPayload);
-          noteId = response.data.id;
-          
-          // If there's a pending attachment, upload it
-          if (pendingAttachment) {
-            const formData = new FormData();
-            formData.append('file', pendingAttachment);
-            await axios.post(
-              `${API}/crdb-notes/${noteId}/attachment`,
-              formData,
-              { headers: { 'Content-Type': 'multipart/form-data' } }
-            );
-          }
-          
-          alert('Note saved successfully!' + (pendingAttachment ? ' Attachment uploaded.' : ''));
-        }
+      let noteId;
+      if (editingNote) {
+        // Update existing note - send account IDs (with codes as fallback)
+        const updatePayload = {
+          note_type: note.note_type,
+          date: note.date,
+          description: note.description,
+          currency: note.currency,
+          amount: parseFloat(note.amount),
+          exchange_rate: parseFloat(note.exchange_rate) || 1,
+          organization_id: currentOrg.id,
+          debit_account_id: note.debit_account_id || null,
+          debit_account_code: note.debit_account_code,
+          credit_account_id: note.credit_account_id || null,
+          credit_account_code: note.credit_account_code
+        };
+        await axios.put(`${API}/crdb-notes/${editingNote.id}`, updatePayload);
+        noteId = editingNote.id;
+        alert('Note updated successfully!');
       } else {
-        // Offline: Save locally and queue for sync
-        if (pendingAttachment) {
-          alert('Attachments cannot be uploaded while offline. The note will be saved without the attachment.');
-        }
-        
-        const offlineId = 'offline_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        const offlineNoteNumber = `${note.note_type}-OFFLINE-${String(Date.now()).slice(-5)}`;
-        
-        const payload = {
+        // Create new note - send account codes and names
+        const createPayload = {
           note_type: note.note_type,
           date: note.date,
           description: note.description,
@@ -507,30 +415,21 @@ const CrDbNotesPage = () => {
           credit_account_code: note.credit_account_code,
           credit_account_name: note.credit_account_name
         };
+        const response = await axios.post(`${API}/crdb-notes`, createPayload);
+        noteId = response.data.id;
         
-        const offlineNote = {
-          id: editingNote?.id || offlineId,
-          note_number: editingNote?.note_number || offlineNoteNumber,
-          ...payload,
-          is_posted: false,
-          status: 'draft',
-          created_offline: true,
-          created_at: new Date().toISOString()
-        };
+        // If there's a pending attachment, upload it
+        if (pendingAttachment) {
+          const formData = new FormData();
+          formData.append('file', pendingAttachment);
+          await axios.post(
+            `${API}/crdb-notes/${noteId}/attachment`,
+            formData,
+            { headers: { 'Content-Type': 'multipart/form-data' } }
+          );
+        }
         
-        // Save to IndexedDB
-        await db.crdbNotes.put(offlineNote);
-        
-        // Add to sync queue
-        const { addToSyncQueue, OPERATION_TYPES, ACTION_TYPES } = await import('../lib/syncService');
-        await addToSyncQueue(
-          OPERATION_TYPES.CRDB_NOTE, 
-          editingNote ? ACTION_TYPES.UPDATE : ACTION_TYPES.CREATE, 
-          offlineNote.id, 
-          payload
-        );
-        
-        alert('Note saved offline. It will sync when you\'re back online.');
+        alert('Note saved successfully!' + (pendingAttachment ? ' Attachment uploaded.' : ''));
       }
       
       fetchData();
@@ -754,9 +653,6 @@ const CrDbNotesPage = () => {
 
   return (
     <div className="space-y-4 lg:space-y-6" data-testid="crdb-notes-page">
-      {/* Offline Banner */}
-      <OfflineBanner />
-      
       <div>
         <h1 className="text-xl lg:text-2xl font-bold" style={{ fontFamily: 'Manrope, sans-serif' }}>
           Credit / Debit Notes

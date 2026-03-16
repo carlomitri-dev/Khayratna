@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSync } from '../context/SyncContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { DateInput } from '../components/ui/date-input';
-import OfflineBanner from '../components/OfflineBanner';
 import {
   Select,
   SelectContent,
@@ -33,8 +31,6 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { formatUSD, formatDate } from '../lib/utils';
-import db from '../lib/db';
-
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const UNITS = [
@@ -52,7 +48,6 @@ const UNITS = [
 
 const InventoryPage = () => {
   const { currentOrg, user } = useAuth();
-  const { isOnline } = useSync();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
@@ -202,7 +197,7 @@ const InventoryPage = () => {
       fetchSuppliers();
       fetchCurrencies();
     }
-  }, [currentOrg, isOnline]);
+  }, [currentOrg]);
   
   // Refetch when filters change
   useEffect(() => {
@@ -215,75 +210,39 @@ const InventoryPage = () => {
   const fetchInventory = async (page = currentPage) => {
     setLoading(true);
     try {
-      if (isOnline) {
-        const params = new URLSearchParams({
-          organization_id: currentOrg.id,
-          page: page.toString(),
-          page_size: pageSize.toString()
-        });
-        
-        // Add search filter
-        if (searchTerm) {
-          params.append('search', searchTerm);
-        }
-        
-        // Add category filter
-        if (filterCategory && filterCategory !== 'all') {
-          params.append('category_id', filterCategory);
-        }
-        
-        // Add supplier filter  
-        if (filterSupplier && filterSupplier !== 'all') {
-          params.append('supplier_id', filterSupplier);
-        }
-        
-        const response = await axios.get(`${API}/inventory?${params.toString()}`);
-        const data = response.data;
-        
-        // Handle paginated response
-        if (data.items) {
-          setItems(data.items);
-          setTotalItems(data.total);
-          setTotalPages(data.total_pages);
-          setCurrentPage(data.page);
-          
-          // Cache in IndexedDB (only first page for offline)
-          if (page === 1) {
-            try {
-              await db.inventoryItems.where('organization_id').equals(currentOrg.id).delete();
-              if (data.items.length > 0) {
-                await db.inventoryItems.bulkPut(data.items);
-              }
-            } catch (cacheError) {
-              console.warn('[Inventory] Error caching:', cacheError);
-            }
-          }
-        } else {
-          // Backward compatibility - old response format
-          setItems(data);
-          setTotalItems(data.length);
-          setTotalPages(1);
-        }
+      const params = new URLSearchParams({
+        organization_id: currentOrg.id,
+        page: page.toString(),
+        page_size: pageSize.toString()
+      });
+      
+      if (searchTerm) {
+        params.append('search', searchTerm);
+      }
+      if (filterCategory && filterCategory !== 'all') {
+        params.append('category_id', filterCategory);
+      }
+      if (filterSupplier && filterSupplier !== 'all') {
+        params.append('supplier_id', filterSupplier);
+      }
+      
+      const response = await axios.get(`${API}/inventory?${params.toString()}`);
+      const data = response.data;
+      
+      if (data.items) {
+        setItems(data.items);
+        setTotalItems(data.total);
+        setTotalPages(data.total_pages);
+        setCurrentPage(data.page);
       } else {
-        // Load from IndexedDB when offline
-        console.log('[Inventory] Offline mode - loading from cache');
-        const cachedItems = await db.inventoryItems.where('organization_id').equals(currentOrg.id).toArray();
-        setItems(cachedItems);
-        setTotalItems(cachedItems.length);
+        setItems(data);
+        setTotalItems(data.length);
         setTotalPages(1);
       }
     } catch (error) {
       console.error('Failed to fetch inventory:', error);
-      // Fallback to cache
-      try {
-        const cachedItems = await db.inventoryItems.where('organization_id').equals(currentOrg.id).toArray();
-        if (cachedItems.length > 0) {
-          setItems(cachedItems);
-          setTotalItems(cachedItems.length);
-          setTotalPages(1);
-        }
-      } catch (cacheError) {
-        console.error('[Inventory] Cache fallback failed:', cacheError);
+      if (!error.response && error.message === 'Network Error') {
+        alert('Connection Error: Unable to connect to the server. Please check your internet connection.');
       }
     } finally {
       setLoading(false);
@@ -291,7 +250,6 @@ const InventoryPage = () => {
   };
 
   const fetchStats = async () => {
-    if (!isOnline) return; // Stats require server calculation
     try {
       const response = await axios.get(`${API}/inventory/stats/summary?organization_id=${currentOrg.id}`);
       setStats(response.data);
@@ -302,10 +260,8 @@ const InventoryPage = () => {
 
   const fetchCategories = async () => {
     try {
-      if (isOnline) {
-        const response = await axios.get(`${API}/inventory-categories?organization_id=${currentOrg.id}`);
-        setCategories(response.data);
-      }
+      const response = await axios.get(`${API}/inventory-categories?organization_id=${currentOrg.id}`);
+      setCategories(response.data);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
     }
@@ -313,19 +269,8 @@ const InventoryPage = () => {
 
   const fetchSuppliers = async () => {
     try {
-      if (isOnline) {
-        const response = await axios.get(`${API}/inventory-suppliers?organization_id=${currentOrg.id}`);
-        setSuppliers(response.data);
-        
-        // Cache suppliers
-        try {
-          const suppliersToCache = response.data.map(s => ({ ...s, organization_id: currentOrg.id }));
-          await db.suppliers.bulkPut(suppliersToCache);
-        } catch (e) {}
-      } else {
-        const cachedSuppliers = await db.suppliers.where('organization_id').equals(currentOrg.id).toArray();
-        setSuppliers(cachedSuppliers);
-      }
+      const response = await axios.get(`${API}/inventory-suppliers?organization_id=${currentOrg.id}`);
+      setSuppliers(response.data);
     } catch (error) {
       console.error('Failed to fetch suppliers:', error);
     }
@@ -333,10 +278,8 @@ const InventoryPage = () => {
 
   const fetchCurrencies = async () => {
     try {
-      if (isOnline) {
-        const response = await axios.get(`${API}/currencies/active`);
-        setCurrencies(response.data);
-      }
+      const response = await axios.get(`${API}/currencies/active`);
+      setCurrencies(response.data);
     } catch (error) {
       console.error('Failed to fetch currencies:', error);
     }
@@ -1142,9 +1085,6 @@ const InventoryPage = () => {
 
   return (
     <div className="space-y-4 lg:space-y-6" data-testid="inventory-page">
-      {/* Offline Banner */}
-      <OfflineBanner />
-      
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>

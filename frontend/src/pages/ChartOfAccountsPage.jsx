@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useFiscalYear } from '../context/FiscalYearContext';
-import { useSync } from '../context/SyncContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import OfflineBanner from '../components/OfflineBanner';
 import {
   Select,
   SelectContent,
@@ -31,14 +29,12 @@ import {
 import axios from 'axios';
 import { formatLBP, formatUSD, getAccountClassName, getNumberClass } from '../lib/utils';
 import LedgerDialog from '../components/LedgerDialog';
-import db from '../lib/db';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const ChartOfAccountsPage = () => {
   const { currentOrg, canEdit, canAdmin, user } = useAuth();
   const { selectedFY } = useFiscalYear();
-  const { isOnline } = useSync();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -93,61 +89,30 @@ const ChartOfAccountsPage = () => {
     if (reset) setLoading(true);
     else setLoadingMore(true);
     try {
-      if (isOnline) {
-        const params = new URLSearchParams({ 
-          organization_id: currentOrg.id,
-          skip: reset ? 0 : currentPage * PAGE_SIZE,
-          limit: PAGE_SIZE
-        });
-        if (selectedFY?.id) params.append('fy_id', selectedFY.id);
-        if (searchTerm) params.append('search', searchTerm);
-        const response = await axios.get(`${API}/accounts?${params.toString()}`);
-        const data = response.data;
-        const accts = data.accounts || data;
-        const total = data.total || (Array.isArray(data) ? data.length : 0);
-        
-        if (reset) {
-          setAccounts(Array.isArray(accts) ? accts : []);
-          setCurrentPage(1);
-        } else {
-          setAccounts(prev => [...prev, ...(Array.isArray(accts) ? accts : [])]);
-          setCurrentPage(prev => prev + 1);
-        }
-        setTotalCount(total);
-        
-        // Cache in IndexedDB for offline use
-        try {
-          const accountsToCache = response.data.map(a => ({ ...a, organization_id: currentOrg.id }));
-          await db.chartOfAccounts.where('organization_id').equals(currentOrg.id).delete();
-          if (accountsToCache.length > 0) {
-            await db.chartOfAccounts.bulkPut(accountsToCache);
-          }
-        } catch (cacheError) {
-          console.warn('[ChartOfAccounts] Error caching accounts:', cacheError);
-        }
+      const params = new URLSearchParams({ 
+        organization_id: currentOrg.id,
+        skip: reset ? 0 : currentPage * PAGE_SIZE,
+        limit: PAGE_SIZE
+      });
+      if (selectedFY?.id) params.append('fy_id', selectedFY.id);
+      if (searchTerm) params.append('search', searchTerm);
+      const response = await axios.get(`${API}/accounts?${params.toString()}`);
+      const data = response.data;
+      const accts = data.accounts || data;
+      const total = data.total || (Array.isArray(data) ? data.length : 0);
+      
+      if (reset) {
+        setAccounts(Array.isArray(accts) ? accts : []);
+        setCurrentPage(1);
       } else {
-        // Load from IndexedDB when offline
-        console.log('[ChartOfAccounts] Offline mode - loading from cache');
-        const cachedAccounts = await db.chartOfAccounts
-          .where('organization_id')
-          .equals(currentOrg.id)
-          .toArray();
-        setAccounts(cachedAccounts);
+        setAccounts(prev => [...prev, ...(Array.isArray(accts) ? accts : [])]);
+        setCurrentPage(prev => prev + 1);
       }
+      setTotalCount(total);
     } catch (error) {
       console.error('Failed to fetch accounts:', error);
-      // Fallback to cached data on error
-      try {
-        const cachedAccounts = await db.chartOfAccounts
-          .where('organization_id')
-          .equals(currentOrg.id)
-          .toArray();
-        if (cachedAccounts.length > 0) {
-          setAccounts(cachedAccounts);
-          console.log('[ChartOfAccounts] Loaded from cache after error');
-        }
-      } catch (cacheError) {
-        console.error('[ChartOfAccounts] Cache fallback failed:', cacheError);
+      if (!error.response && error.message === 'Network Error') {
+        alert('Connection Error: Unable to connect to the server. Please check your internet connection.');
       }
     } finally {
       setLoading(false);
@@ -166,42 +131,12 @@ const ChartOfAccountsPage = () => {
         organization_id: currentOrg.id
       };
       
-      if (isOnline) {
-        // Online: Send to server
-        if (editingAccount) {
-          await axios.put(`${API}/accounts/${editingAccount.id}`, payload);
-        } else {
-          await axios.post(`${API}/accounts`, payload);
-        }
-        // Clear any previous failed operation on success
-        setFailedOperation(null);
+      if (editingAccount) {
+        await axios.put(`${API}/accounts/${editingAccount.id}`, payload);
       } else {
-        // Offline: Save locally and queue for sync
-        const offlineId = 'offline_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        
-        const offlineAccount = {
-          id: editingAccount?.id || offlineId,
-          ...payload,
-          balance_usd: editingAccount?.balance_usd || 0,
-          balance_lbp: editingAccount?.balance_lbp || 0,
-          created_offline: true,
-          created_at: new Date().toISOString()
-        };
-        
-        // Save to IndexedDB
-        await db.chartOfAccounts.put(offlineAccount);
-        
-        // Add to sync queue
-        const { addToSyncQueue, OPERATION_TYPES, ACTION_TYPES } = await import('../lib/syncService');
-        await addToSyncQueue(
-          OPERATION_TYPES.ACCOUNT, 
-          editingAccount ? ACTION_TYPES.UPDATE : ACTION_TYPES.CREATE, 
-          offlineAccount.id, 
-          payload
-        );
-        
-        alert('Account saved offline. It will sync when you\'re back online.');
+        await axios.post(`${API}/accounts`, payload);
       }
+      setFailedOperation(null);
       
       setIsDialogOpen(false);
       resetForm();
@@ -562,9 +497,6 @@ const ChartOfAccountsPage = () => {
 
   return (
     <div className="space-y-4 lg:space-y-6" data-testid="chart-of-accounts-page">
-      {/* Offline Banner */}
-      <OfflineBanner />
-      
       {/* Failed Operation Banner - Re-update Button */}
       {failedOperation && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -595,7 +527,7 @@ const ChartOfAccountsPage = () => {
             <Button 
               size="sm" 
               onClick={handleRetryOperation}
-              disabled={retrying || !isOnline}
+              disabled={retrying}
               className="flex-1 sm:flex-initial text-xs bg-red-500 hover:bg-red-600"
               data-testid="retry-account-btn"
             >
@@ -862,7 +794,7 @@ const ChartOfAccountsPage = () => {
               size="sm" 
               className="text-xs"
               onClick={handleRebuildFromVouchers}
-              disabled={rebuildingFromVouchers || !isOnline}
+              disabled={rebuildingFromVouchers}
               data-testid="rebuild-from-vouchers-btn"
             >
               {rebuildingFromVouchers ? (
