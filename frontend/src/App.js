@@ -7,23 +7,62 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import Layout from './components/Layout';
 
-// Global axios interceptor for connection errors
+// Global axios interceptor for connection errors with auto-retry
 axios.interceptors.response.use(
   response => response,
   error => {
+    const config = error.config;
+    // Skip retry for login requests or already-retried requests
+    if (!config || config._retryCount >= 2 || config.url?.includes('/auth/login')) {
+      if (!error.response && error.message === 'Network Error') {
+        toast.error('Connection Error', {
+          description: 'Unable to connect to the server. Please check your internet connection.',
+          duration: 5000,
+          id: 'connection-error-final'
+        });
+      }
+      return Promise.reject(error);
+    }
+
     if (!error.response && error.message === 'Network Error') {
-      toast.error('Connection Error', {
-        description: 'Unable to connect to the server. Please check your internet connection and try again.',
-        duration: 5000,
-        id: 'connection-error'
-      });
-    } else if (error.code === 'ECONNABORTED') {
-      toast.error('Connection Timeout', {
-        description: 'The server took too long to respond. Please try again.',
-        duration: 5000,
-        id: 'timeout-error'
+      config._retryCount = (config._retryCount || 0) + 1;
+      return new Promise((resolve, reject) => {
+        toast.error('Connection Error', {
+          description: 'Unable to connect to the server.',
+          duration: 8000,
+          id: 'connection-error',
+          action: {
+            label: 'Retry',
+            onClick: () => {
+              toast.loading('Retrying...', { id: 'connection-retry', duration: 3000 });
+              axios(config).then(resolve).catch(reject);
+            }
+          }
+        });
+        // Auto-reject after 10s if user doesn't click Retry
+        setTimeout(() => reject(error), 10000);
       });
     }
+
+    if (error.code === 'ECONNABORTED') {
+      config._retryCount = (config._retryCount || 0) + 1;
+      return new Promise((resolve, reject) => {
+        toast.error('Connection Timeout', {
+          description: 'The server took too long to respond.',
+          duration: 8000,
+          id: 'timeout-error',
+          action: {
+            label: 'Retry',
+            onClick: () => {
+              toast.loading('Retrying...', { id: 'connection-retry', duration: 3000 });
+              axios(config).then(resolve).catch(reject);
+            }
+          }
+        });
+        setTimeout(() => reject(error), 10000);
+      });
+    }
+
     return Promise.reject(error);
   }
 );
