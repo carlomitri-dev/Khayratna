@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from './ui/dialog';
 
 const Kbd = ({ children }) => (
@@ -31,6 +32,9 @@ const ShortcutsHelpDialog = ({ open, onOpenChange }) => (
     <DialogContent className="max-w-md" data-testid="shortcuts-help-dialog">
       <DialogHeader>
         <DialogTitle className="text-lg">Keyboard Shortcuts</DialogTitle>
+        <DialogDescription className="text-xs text-muted-foreground">
+          Press these keys to quickly navigate and perform actions.
+        </DialogDescription>
       </DialogHeader>
 
       <div className="space-y-4 mt-2">
