@@ -33,6 +33,7 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 - **z-index Dropdown Fix (P2)** — Added `z-[60]` to all Header dropdown menus (FY selector, Org switcher, User menu) to render above sidebar (`z-50`).
 - **Dashboard React Warnings Fix (P3)** — Wrapped `fetchDashboardData` and `filterVouchers` in `useCallback` with proper dependency arrays. Eliminated missing dependency warnings.
 - **Recent Transactions Widget** — Added a 3-column quick-access widget to Dashboard showing latest Sales Invoices, Purchase Invoices, and Cr/Db Notes with "View All" navigation links.
+- **Offline Mode Removal** — Completely removed offline mode (IndexedDB caching, SyncContext, SyncProvider, OfflineBanner, OfflineToast, SyncStatusIndicator) from all pages. Added global axios interceptor in App.js that shows "Connection Error" toast when server is unreachable. Files cleaned: App.js, Layout.jsx, CustomersPage, SuppliersPage, ChartOfAccountsPage, CrDbNotesPage, VoucherEntryPage, InventoryPage, POSPage, ServiceManagement.
 
 ### March 14, 2026 (Session 4)
 - **POS Transaction Void (Soft Delete)** — New PUT /api/pos/invoices/{id}/void endpoint. Voids transaction with reason, reverses account balances and inventory, marks voucher as voided. Frontend: void dialog with reason input, "Show voided" filter in history, VOIDED badge with strikethrough, separate hard delete option.
@@ -47,4 +48,4 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 - None currently tracked.
 
 ## Backlog
-- P3: Webpack dev server deprecation warnings (onAfterSetupMiddleware/onBeforeSetupMiddleware) - cosmetic only
+- Cleanup: Remove unused offline library files (db.js, syncService.js, offlineDataService.js, SyncContext.js, OfflineBanner.jsx, OfflineToast.jsx, SyncStatusIndicator.jsx, SyncConflictDialog.jsx, useOfflineData.js) — these are no longer imported but still exist in the codebase
