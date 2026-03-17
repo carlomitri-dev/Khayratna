@@ -157,8 +157,6 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
     .signature-area { display: flex; justify-content: space-between; margin-top: 16px; }
     .signature-box { width: 200px; text-align: center; }
     .signature-line { border-top: 1px solid #000; margin-top: 35px; padding-top: 4px; font-size: 12px; }
-    .vat-notice { text-align: center; font-size: 11px; color: #000; font-weight: bold; margin-top: 8px; }
-
     /* --- Print-specific rules for multi-page --- */
     @media print {
       body { padding: 0; }
