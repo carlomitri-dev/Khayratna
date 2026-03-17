@@ -37,6 +37,12 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 - **Global Loading Bar** — Added a YouTube/GitHub-style loading bar at the top of the viewport that animates during API calls. Uses axios interceptors to track active requests.
 - **Keyboard Shortcuts** — Added power-user shortcuts: `?` help dialog, `/` focus search, `Esc` close/blur, `Ctrl+N` new record, `Ctrl+S` save, plus `G then D/V/A/C/S/N/I/P` navigation sequences. Implemented via `useKeyboardShortcuts` and `useSequenceShortcut` hooks in Layout.jsx.
 
+### March 17, 2026 (Session 5 continued)
+- **Sales Invoice Due Date Freeze Fix** — Fixed DateInput component (`date-input.jsx`) that was passing synthetic event objects instead of string values to onChange. All consumers now receive plain date strings.
+- **Account Balance by Fiscal Year** — Added `fy_id` parameter to `/customer-accounts`, `/supplier-accounts`, and `/accounts/movable/list` endpoints. When a fiscal year is selected, account balances are recalculated from posted voucher entries within that FY's date range. Frontend AccountSelector and RemoteAccountSelector now pass the selected FY ID.
+- **Restored Custom Print Template** — SalesInvoicePage and SalesReturnPage now use the bilingual `SalesInvoicePrint` component (with MM logo, Arabic/English headers, proper formatting) instead of the generic inline template.
+- **Inventory Searchable Dropdowns** — Replaced basic Select dropdowns for Category and Supplier filters with searchable Popover+Command comboboxes that support typing to filter.
+
 ### March 14, 2026 (Session 4)
 - **POS Transaction Void (Soft Delete)** — New PUT /api/pos/invoices/{id}/void endpoint. Voids transaction with reason, reverses account balances and inventory, marks voucher as voided. Frontend: void dialog with reason input, "Show voided" filter in history, VOIDED badge with strikethrough, separate hard delete option.
 - **POS Transaction Delete Fix** — Added missing DELETE endpoint
