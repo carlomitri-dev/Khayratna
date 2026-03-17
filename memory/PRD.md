@@ -28,12 +28,18 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 
 ### March 17, 2026 (Session 6)
 - **Invoice Print Template Redesign** — Updated `SalesInvoicePrint.jsx` with:
-  - Replaced "MM" text logo with Khayratna Logo (base64-embedded grayscale PNG)
-  - Increased all font sizes by 2 points (body 13px, headers 16px, table 12px, totals 13px, grand total 15px)
-  - Converted template to full monochrome (black/white only) for laser printer optimization
+  - Replaced "MM" text logo with Khayratna Logo (served via URL from /assets/)
+  - Increased all font sizes by 2 points
+  - Converted template to full monochrome (white bg, black text) for laser printer optimization
   - Expanded item table from 15 to 20 rows per page
   - Added CSS `@media print` rules for multi-page support with repeating table headers
-  - Both Sales Invoice and Sales Return pages use the same updated component
+  - Removed duplicate VAT notice line
+- **PDF Export/Download** — Added `html2pdf.js` integration:
+  - `downloadPdf()` function in `SalesInvoicePrint.jsx` generates PDF from the same monochrome template
+  - Download PDF buttons added to Sales Invoice list + view dialog
+  - Download PDF buttons added to Sales Return list + view dialog
+  - PDF files named `Invoice-{number}.pdf` with A4 format
+- **Codebase Cleanup** — Removed 9 unused offline library files (db.js, syncService.js, etc.)
 
 ### March 17, 2026 (Session 5 continued)
 - **Sales Invoice Due Date Freeze Fix** — Fixed DateInput component
