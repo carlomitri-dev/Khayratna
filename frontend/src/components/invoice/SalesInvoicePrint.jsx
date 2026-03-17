@@ -264,9 +264,6 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
     </div>
   </div>
 
-  <!-- VAT Notice -->
-  <div class="vat-notice">خاضع للضريبة على القيمة المضافة - Subject to Value Added Tax</div>
-
   <script>window.onload = function() { window.print(); }</script>
 </body>
 </html>`;
