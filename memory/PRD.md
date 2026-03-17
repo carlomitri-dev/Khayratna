@@ -60,8 +60,7 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 - **AccountSelector Refactored** — Shared RemoteAccountSelector component
 
 ## Known Issues
-- Minor hydration warning: `<tr>` inside `<span>` in Dashboard recent transactions (cosmetic, non-functional)
+- None currently tracked.
 
 ## Backlog
-- P3: Fix Dashboard hydration warning (cosmetic)
-- P3: Cleanup — Remove unused offline library files (db.js, syncService.js, offlineDataService.js, SyncContext.js, OfflineBanner.jsx, OfflineToast.jsx, SyncStatusIndicator.jsx, SyncConflictDialog.jsx, useOfflineData.js)
+- No pending items.
