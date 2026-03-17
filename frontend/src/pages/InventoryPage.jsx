@@ -6,6 +6,8 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { DateInput } from '../components/ui/date-input';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { Command, CommandInput, CommandList, CommandItem, CommandEmpty, CommandGroup } from '../components/ui/command';
 import {
   Select,
   SelectContent,
@@ -71,6 +73,8 @@ const InventoryPage = () => {
   const [filterSupplier, setFilterSupplier] = useState('all');
   const [filterStock, setFilterStock] = useState('all');
   const [sortBy, setSortBy] = useState('name');
+  const [catFilterOpen, setCatFilterOpen] = useState(false);
+  const [supFilterOpen, setSupFilterOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState('asc');
   
   // Dialog states
@@ -1196,31 +1200,71 @@ const InventoryPage = () => {
             </div>
             
             <div className="flex flex-wrap gap-2">
-              <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger className="w-[160px]">
-                  <Tag className="w-3 h-3 mr-1" />
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map(cat => (
-                    <SelectItem key={cat.cat_id || cat.id} value={cat.cat_id || cat.id}>{cat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={catFilterOpen} onOpenChange={setCatFilterOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[180px] justify-start text-left font-normal" data-testid="category-filter">
+                    <Tag className="w-3 h-3 mr-1.5 flex-shrink-0" />
+                    <span className="truncate">
+                      {filterCategory === 'all' ? 'All Categories' : categories.find(c => (c.cat_id || c.id) === filterCategory)?.name || 'Category'}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[220px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search category..." />
+                    <CommandList>
+                      <CommandEmpty>No category found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem value="all" onSelect={() => { setFilterCategory('all'); setCatFilterOpen(false); }}>
+                          All Categories
+                        </CommandItem>
+                        {categories.map(cat => (
+                          <CommandItem
+                            key={cat.cat_id || cat.id}
+                            value={cat.name}
+                            onSelect={() => { setFilterCategory(cat.cat_id || cat.id); setCatFilterOpen(false); }}
+                          >
+                            {cat.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               
-              <Select value={filterSupplier} onValueChange={setFilterSupplier}>
-                <SelectTrigger className="w-[160px]">
-                  <Truck className="w-3 h-3 mr-1" />
-                  <SelectValue placeholder="Supplier" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Suppliers</SelectItem>
-                  {suppliers.map(sup => (
-                    <SelectItem key={sup.code || sup.id} value={sup.code || sup.id}>{sup.code} - {sup.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={supFilterOpen} onOpenChange={setSupFilterOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[180px] justify-start text-left font-normal" data-testid="supplier-filter">
+                    <Truck className="w-3 h-3 mr-1.5 flex-shrink-0" />
+                    <span className="truncate">
+                      {filterSupplier === 'all' ? 'All Suppliers' : suppliers.find(s => (s.code || s.id) === filterSupplier)?.name || 'Supplier'}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[250px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search supplier..." />
+                    <CommandList>
+                      <CommandEmpty>No supplier found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem value="all" onSelect={() => { setFilterSupplier('all'); setSupFilterOpen(false); }}>
+                          All Suppliers
+                        </CommandItem>
+                        {suppliers.map(sup => (
+                          <CommandItem
+                            key={sup.code || sup.id}
+                            value={`${sup.code} ${sup.name}`}
+                            onSelect={() => { setFilterSupplier(sup.code || sup.id); setSupFilterOpen(false); }}
+                          >
+                            {sup.code} - {sup.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               
               <Select value={filterStock} onValueChange={setFilterStock}>
                 <SelectTrigger className="w-[130px]">

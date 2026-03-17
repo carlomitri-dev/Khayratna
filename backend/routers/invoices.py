@@ -37,6 +37,41 @@ async def enrich_invoice(invoice: dict) -> dict:
     
     return invoice
 
+async def recalculate_fy_balances(accounts: list, organization_id: str, fy_id: str) -> list:
+    """Recalculate account balances for a specific fiscal year from posted vouchers."""
+    fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+    if not fy:
+        return accounts
+    code_map = {}
+    for acc in accounts:
+        code = acc.get('code', '')
+        code_map[code] = acc
+        acc['balance_lbp'] = 0
+        acc['balance_usd'] = 0
+    pipeline = [
+        {'$match': {
+            'organization_id': organization_id,
+            'is_posted': True,
+            'date': {'$gte': fy['start_date'], '$lte': fy['end_date']}
+        }},
+        {'$unwind': '$lines'},
+        {'$group': {
+            '_id': '$lines.account_code',
+            'total_debit_lbp': {'$sum': {'$ifNull': ['$lines.debit_lbp', 0]}},
+            'total_credit_lbp': {'$sum': {'$ifNull': ['$lines.credit_lbp', 0]}},
+            'total_debit_usd': {'$sum': {'$ifNull': ['$lines.debit_usd', 0]}},
+            'total_credit_usd': {'$sum': {'$ifNull': ['$lines.credit_usd', 0]}}
+        }}
+    ]
+    async for r in db.vouchers.aggregate(pipeline):
+        code = r['_id']
+        if code in code_map:
+            code_map[code]['balance_lbp'] = r['total_debit_lbp'] - r['total_credit_lbp']
+            code_map[code]['balance_usd'] = r['total_debit_usd'] - r['total_credit_usd']
+    return accounts
+
+
+
 
 async def generate_next_invoice_number(organization_id: str, doc_type: str = 'sales_invoice') -> str:
     """
@@ -706,7 +741,7 @@ async def get_sales_accounts(organization_id: str, current_user: dict = Depends(
 
 
 @router.get("/customer-accounts")
-async def get_customer_accounts(organization_id: str, search: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+async def get_customer_accounts(organization_id: str, search: Optional[str] = None, fy_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Get customer accounts (codes starting with '41' and length > 4, for debit on sales invoices)"""
     query = {
         'organization_id': organization_id, 
@@ -729,11 +764,13 @@ async def get_customer_accounts(organization_id: str, search: Optional[str] = No
         query,
         {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1, 'address': 1, 'mobile': 1, 'contact_person': 1, 'registration_number': 1, 'region_id': 1}
     ).sort('code', 1).to_list(100)
+    if fy_id:
+        accounts = await recalculate_fy_balances(accounts, organization_id, fy_id)
     return accounts
 
 
 @router.get("/supplier-accounts")
-async def get_supplier_accounts(organization_id: str, search: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+async def get_supplier_accounts(organization_id: str, search: Optional[str] = None, fy_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Get supplier accounts (codes starting with '40' and length > 4, for credit on purchase invoices)"""
     query = {
         'organization_id': organization_id, 
@@ -756,6 +793,8 @@ async def get_supplier_accounts(organization_id: str, search: Optional[str] = No
         query,
         {'_id': 0, 'id': 1, 'code': 1, 'name': 1, 'name_ar': 1, 'balance_usd': 1, 'balance_lbp': 1, 'address': 1, 'mobile': 1, 'contact_person': 1, 'registration_number': 1}
     ).sort('code', 1).to_list(100)
+    if fy_id:
+        accounts = await recalculate_fy_balances(accounts, organization_id, fy_id)
     return accounts
 
 

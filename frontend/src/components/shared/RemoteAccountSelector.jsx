@@ -19,6 +19,7 @@ const RemoteAccountSelector = ({
   placeholder = 'Select account',
   label,
   organizationId,
+  fyId,
   compact = false,
 }) => {
   const [open, setOpen] = useState(false);
@@ -37,6 +38,7 @@ const RemoteAccountSelector = ({
     try {
       const params = new URLSearchParams({ organization_id: organizationId });
       if (searchTerm) params.set('search', searchTerm);
+      if (fyId) params.set('fy_id', fyId);
       const res = await axios.get(`${API}/accounts/movable/list?${params.toString()}`, {
         signal: abortRef.current.signal,
       });
@@ -48,7 +50,7 @@ const RemoteAccountSelector = ({
     } finally {
       setLoading(false);
     }
-  }, [organizationId]);
+  }, [organizationId, fyId]);
 
   useEffect(() => {
     if (open && accounts.length === 0) fetchAccounts('');

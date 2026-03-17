@@ -515,7 +515,7 @@ const PurchaseReturnPage = () => {
                 <Label>Supplier Account (Debit)</Label>
                 <AccountSelector
                   fetchUrl="/supplier-accounts"
-                  fetchParams={{ organization_id: currentOrg.id }}
+                  fetchParams={{ organization_id: currentOrg.id, ...(selectedFY?.id && { fy_id: selectedFY.id }) }}
                   value={formData.debit_account_id}
                   onChange={(val) => setFormData({ ...formData, debit_account_id: val })}
                   placeholder="Search supplier account..."

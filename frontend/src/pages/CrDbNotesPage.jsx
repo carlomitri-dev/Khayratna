@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useFiscalYear } from '../context/FiscalYearContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -232,6 +233,7 @@ import RemoteAccountSelector from '../components/shared/RemoteAccountSelector';
 
 const CrDbNotesPage = () => {
   const { currentOrg, user } = useAuth();
+  const { selectedFY } = useFiscalYear();
   const [accounts, setAccounts] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   const [notes, setNotes] = useState([]);
@@ -769,6 +771,7 @@ const CrDbNotesPage = () => {
               {/* Debit Account */}
               <RemoteAccountSelector
                 organizationId={currentOrg?.id}
+                fyId={selectedFY?.id}
                 value={note.debit_account_code}
                 onChange={(code, name, id) => setNote({ ...note, debit_account_code: code, debit_account_name: name, debit_account_id: id })}
                 placeholder="Select debit account..."
@@ -778,6 +781,7 @@ const CrDbNotesPage = () => {
               {/* Credit Account */}
               <RemoteAccountSelector
                 organizationId={currentOrg?.id}
+                fyId={selectedFY?.id}
                 value={note.credit_account_code}
                 onChange={(code, name, id) => setNote({ ...note, credit_account_code: code, credit_account_name: name, credit_account_id: id })}
                 placeholder="Select credit account..."

@@ -555,6 +555,7 @@ const VoucherEntryPage = () => {
                   </div>
                   <AccountSelector
                     organizationId={currentOrg?.id}
+                    fyId={selectedFY?.id}
                     value={line.account_code}
                     onChange={(code, name) => handleAccountSelect(index, code, name)}
                     placeholder="Search account..."
@@ -633,6 +634,7 @@ const VoucherEntryPage = () => {
                       <td className="px-2 py-1">
                         <AccountSelector
                           organizationId={currentOrg?.id}
+                          fyId={selectedFY?.id}
                           value={line.account_code}
                           onChange={(code, name) => handleAccountSelect(index, code, name)}
                           placeholder="Search account..."

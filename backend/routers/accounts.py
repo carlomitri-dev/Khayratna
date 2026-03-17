@@ -243,7 +243,7 @@ async def get_accounts(
 
 
 @router.get("/accounts/movable/list", response_model=List[AccountResponse])
-async def get_movable_accounts(organization_id: str, search: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+async def get_movable_accounts(organization_id: str, search: Optional[str] = None, fy_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Get movable accounts (leaf accounts with 5+ digit codes) for voucher entry"""
     pipeline = [
         {'$match': {
@@ -287,6 +287,35 @@ async def get_movable_accounts(organization_id: str, search: Optional[str] = Non
                 acc['account_class'] = int(acc.get('code', '0')[0])
             except:
                 acc['account_class'] = 0
+    
+    # Recompute balances for the selected fiscal year
+    if fy_id:
+        fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+        if fy:
+            acc_lookup = {acc.get('code', ''): acc for acc in accounts}
+            for acc in accounts:
+                acc['balance_lbp'] = 0
+                acc['balance_usd'] = 0
+            fy_pipeline = [
+                {'$match': {
+                    'organization_id': organization_id,
+                    'is_posted': True,
+                    'date': {'$gte': fy['start_date'], '$lte': fy['end_date']}
+                }},
+                {'$unwind': '$lines'},
+                {'$group': {
+                    '_id': '$lines.account_code',
+                    'total_debit_lbp': {'$sum': {'$ifNull': ['$lines.debit_lbp', 0]}},
+                    'total_credit_lbp': {'$sum': {'$ifNull': ['$lines.credit_lbp', 0]}},
+                    'total_debit_usd': {'$sum': {'$ifNull': ['$lines.debit_usd', 0]}},
+                    'total_credit_usd': {'$sum': {'$ifNull': ['$lines.credit_usd', 0]}}
+                }}
+            ]
+            async for result in db.vouchers.aggregate(fy_pipeline):
+                code = result['_id']
+                if code in acc_lookup:
+                    acc_lookup[code]['balance_lbp'] = result['total_debit_lbp'] - result['total_credit_lbp']
+                    acc_lookup[code]['balance_usd'] = result['total_debit_usd'] - result['total_credit_usd']
     
     return [AccountResponse(**acc) for acc in accounts]
 

@@ -1,0 +1,81 @@
+{
+  "summary": "Completed testing of 4 fixes in iteration 16: 1) DateInput due date freeze fix, 2) FY-filtered account balances, 3) Custom invoice print template, 4) Searchable category/supplier dropdowns in Inventory. All tests PASSED.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "DashboardPage",
+        "issues": ["Console warning: '<tr> cannot be a child of <span>' - this is a hydration error in the Recent Vouchers table (low priority, pre-existing from previous iterations)"]
+      },
+      {
+        "screen": "InventoryPage",
+        "issues": ["Same hydration warning in inventory table (pre-existing)"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration16_fixes.py",
+    "/app/test_reports/pytest/iteration16_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "DateInput component (date-input.jsx) correctly passes string value directly via onChange(newValue) instead of synthetic event object",
+    "SalesInvoicePage fetchParams correctly includes fy_id from selectedFY context",
+    "RemoteAccountSelector correctly passes fyId prop to /accounts/movable/list endpoint",
+    "Backend routers/invoices.py has recalculate_fy_balances helper function and fy_id param on customer-accounts and supplier-accounts",
+    "Backend routers/accounts.py has fy_id param on /accounts/movable/list endpoint",
+    "InventoryPage uses Popover+Command components for searchable category and supplier filters with data-testid attributes"
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (11/11 tests passed)",
+    "frontend": "100% (all 4 features verified)"
+  },
+  "test_credentials": {
+    "email": "carlo.mitri@gmail.com",
+    "password": "Carinemi@28"
+  },
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration 16 fixes all verified: DateInput freeze fix, FY-filtered balances, custom invoice print template (SalesInvoicePrint), and searchable dropdowns in Inventory page. The organization ID is fa6d4449-a859-445f-9e0b-fbb4aa90bfee, FY 2017 ID is ec0a1e9b-e0bc-433b-a5fa-059ca159b13d.",
+  "features_tested": {
+    "date_input_freeze_fix": {
+      "status": "PASS",
+      "details": "Changed due date on Sales Invoice form - page remained responsive. DateInput onChange now passes string value directly."
+    },
+    "fy_filtered_balances_customer_accounts": {
+      "status": "PASS",
+      "details": "GET /api/customer-accounts?organization_id=X&fy_id=Y returns accounts with FY-filtered balances"
+    },
+    "fy_filtered_balances_supplier_accounts": {
+      "status": "PASS",
+      "details": "GET /api/supplier-accounts?organization_id=X&fy_id=Y returns accounts with FY-filtered balances"
+    },
+    "fy_filtered_balances_movable_accounts": {
+      "status": "PASS",
+      "details": "GET /api/accounts/movable/list?organization_id=X&fy_id=Y returns accounts with FY-filtered balances"
+    },
+    "sales_invoice_print_template": {
+      "status": "PASS",
+      "details": "SalesInvoicePrint component is correctly imported and used in both SalesInvoicePage and SalesReturnPage. handlePrint calls printInvoice() to open bilingual template."
+    },
+    "inventory_category_search": {
+      "status": "PASS",
+      "details": "Category filter dropdown in Inventory page has search input (Popover+Command combobox with data-testid='category-filter')"
+    },
+    "inventory_supplier_search": {
+      "status": "PASS",
+      "details": "Supplier filter dropdown in Inventory page has search input (Popover+Command combobox with data-testid='supplier-filter')"
+    },
+    "crdb_notes_fy_filter": {
+      "status": "PASS",
+      "details": "RemoteAccountSelector in CrDbNotesPage passes fyId={selectedFY?.id} prop to /accounts/movable/list endpoint"
+    }
+  }
+}

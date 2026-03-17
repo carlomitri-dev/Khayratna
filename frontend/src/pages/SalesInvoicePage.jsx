@@ -9,6 +9,7 @@ import { Textarea } from '../components/ui/textarea';
 import { DateInput } from '../components/ui/date-input';
 import AccountSelector from '../components/selectors/AccountSelector';
 import InventorySelector from '../components/selectors/InventorySelector';
+import SalesInvoicePrint from '../components/invoice/SalesInvoicePrint';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../components/ui/select';
@@ -291,67 +292,16 @@ const SalesInvoicePage = () => {
   };
   
   const handlePrint = (inv) => {
-    const currSymbol = inv.currency === 'LBP' ? 'LBP' : '$';
-    const taxPercent = parseFloat(inv.tax_percent) || 0;
-    const discountAmt = parseFloat(inv.discount_amount) || 0;
-    const taxAmount = parseFloat(inv.tax_amount) || 0;
-    const total = parseFloat(inv.total) || 0;
-    const pw = window.open('', '_blank', 'width=800,height=600');
-    pw.document.write(`<!DOCTYPE html><html><head><title>Sales Invoice ${inv.invoice_number}</title>
-      <style>
-        body{font-family:Arial,sans-serif;margin:20px;color:#333}
-        .header{text-align:center;border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:20px}
-        .header h1{margin:0;font-size:22px} .header p{margin:4px 0;font-size:12px}
-        .info{display:flex;justify-content:space-between;margin-bottom:20px;font-size:13px}
-        .info div{line-height:1.8}
-        table{width:100%;border-collapse:collapse;margin-bottom:15px}
-        th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px}
-        th{background:#f5f5f5;font-weight:bold}
-        .text-right{text-align:right}
-        .totals{width:300px;margin-left:auto}
-        .totals td{border:none;padding:4px 8px;font-size:13px}
-        .totals .grand{font-weight:bold;font-size:15px;border-top:2px solid #333}
-        .footer{margin-top:40px;display:flex;justify-content:space-between}
-        .footer div{text-align:center;width:200px;border-top:1px solid #333;padding-top:5px;font-size:12px}
-        @media print{body{margin:0}}
-      </style></head><body>
-      <div class="header">
-        <h1>${currentOrg?.name || 'Company'}</h1>
-        <p>Sales Invoice / فاتورة مبيعات</p>
-      </div>
-      <div class="info">
-        <div>
-          <strong>Invoice #:</strong> ${inv.invoice_number}<br/>
-          <strong>Date:</strong> ${formatDate(inv.date)}<br/>
-          ${inv.due_date ? `<strong>Due Date:</strong> ${formatDate(inv.due_date)}<br/>` : ''}
-        </div>
-        <div>
-          <strong>Customer:</strong> ${inv.debit_account_name || ''}<br/>
-          <strong>Code:</strong> ${inv.debit_account_code || ''}<br/>
-          <strong>Status:</strong> ${inv.status}
-        </div>
-      </div>
-      <table>
-        <thead><tr><th>#</th><th>Item</th><th class="text-right">Qty</th><th>Unit</th><th class="text-right">Price</th><th class="text-right">Disc%</th><th class="text-right">Total</th></tr></thead>
-        <tbody>
-          ${inv.lines.map((l, i) => `<tr><td>${i+1}</td><td>${l.item_name}${l.item_name_ar ? ' / '+l.item_name_ar : ''}</td><td class="text-right">${l.quantity}</td><td>${l.unit}</td><td class="text-right">${currSymbol} ${parseFloat(l.unit_price).toFixed(3)}</td><td class="text-right">${l.discount_percent||0}%</td><td class="text-right">${currSymbol} ${parseFloat(l.line_total).toFixed(3)}</td></tr>`).join('')}
-        </tbody>
-      </table>
-      <table class="totals">
-        <tr><td>Subtotal</td><td class="text-right">${currSymbol} ${parseFloat(inv.subtotal).toFixed(3)}</td></tr>
-        ${discountAmt > 0 ? `<tr><td>Discount</td><td class="text-right">-${currSymbol} ${discountAmt.toFixed(3)}</td></tr>` : ''}
-        <tr><td>VAT ${taxPercent}%</td><td class="text-right">${currSymbol} ${taxAmount.toFixed(3)}</td></tr>
-        <tr class="grand"><td>Total</td><td class="text-right">${currSymbol} ${total.toFixed(3)}</td></tr>
-        <tr><td>Total USD</td><td class="text-right">$ ${parseFloat(inv.total_usd).toFixed(3)}</td></tr>
-      </table>
-      ${inv.notes ? `<p><strong>Notes:</strong> ${inv.notes}</p>` : ''}
-      <div class="footer">
-        <div>Administration / الادارة</div>
-        <div>Customer Signature / توقيع الزبون</div>
-      </div>
-      <script>window.onload=function(){window.print()}</script>
-    </body></html>`);
-    pw.document.close();
+    const { printInvoice } = SalesInvoicePrint({
+      invoice: inv,
+      organization: currentOrg,
+      customer: {
+        name: inv.debit_account_name || inv.customer_name || '',
+        code: inv.debit_account_code || inv.customer_code || '',
+        address: inv.customer_address || ''
+      }
+    });
+    printInvoice();
   };
   
   const allInventoryItems = useMemo(() => {
@@ -506,7 +456,7 @@ const SalesInvoicePage = () => {
                 <Label>Customer Account (Debit)</Label>
                 <AccountSelector
                   fetchUrl="/customer-accounts"
-                  fetchParams={{ organization_id: currentOrg.id }}
+                  fetchParams={{ organization_id: currentOrg.id, ...(selectedFY?.id && { fy_id: selectedFY.id }) }}
                   value={formData.debit_account_id}
                   onChange={(val) => setFormData({ ...formData, debit_account_id: val })}
                   placeholder="Search customer..."

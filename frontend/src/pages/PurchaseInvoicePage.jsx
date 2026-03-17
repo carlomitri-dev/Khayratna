@@ -523,7 +523,7 @@ const PurchaseInvoicePage = () => {
                 <Label>Supplier Account (Credit)</Label>
                 <AccountSelector
                   fetchUrl="/supplier-accounts"
-                  fetchParams={{ organization_id: currentOrg.id }}
+                  fetchParams={{ organization_id: currentOrg.id, ...(selectedFY?.id && { fy_id: selectedFY.id }) }}
                   value={formData.credit_account_id}
                   onChange={(val) => setFormData({ ...formData, credit_account_id: val })}
                   placeholder="Search supplier..."

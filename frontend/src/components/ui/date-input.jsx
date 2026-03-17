@@ -52,15 +52,7 @@ const DateInput = React.forwardRef(({
     const newValue = e.target.value;
     setDisplayValue(formatForDisplay(newValue));
     if (onChange) {
-      // Create a synthetic event with the correct value format
-      const syntheticEvent = {
-        ...e,
-        target: {
-          ...e.target,
-          value: newValue
-        }
-      };
-      onChange(syntheticEvent);
+      onChange(newValue);
     }
   };
 
@@ -78,10 +70,7 @@ const DateInput = React.forwardRef(({
       const dateObj = new Date(isoDate);
       if (!isNaN(dateObj.getTime())) {
         if (onChange) {
-          const syntheticEvent = {
-            target: { value: isoDate }
-          };
-          onChange(syntheticEvent);
+          onChange(isoDate);
         }
       }
     }
