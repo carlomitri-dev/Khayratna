@@ -1,4 +1,5 @@
 import React from 'react';
+import html2pdf from 'html2pdf.js';
 
 /**
  * Sales Invoice Print Template - Khayratna / Michel Matar Trading Est.
@@ -25,10 +26,8 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
   // Use absolute URL so the popup window can load the logo
   const logoUrl = `${window.location.origin}/assets/khayratna-logo.png`;
 
-  const printInvoice = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
+  // Build the invoice body HTML (shared between print and PDF)
+  const buildInvoiceHtml = () => {
     const lines = invoice?.lines || [];
 
     const itemRows = lines.map((line, i) => {
@@ -49,7 +48,6 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
       `;
     }).join('');
 
-    // Fill empty rows up to 20 per first page
     const emptyRows = Math.max(0, 20 - lines.length);
     const emptyRowsHtml = Array(emptyRows).fill(`
       <tr>
@@ -63,18 +61,12 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
       </tr>
     `).join('');
 
-    const html = `
-<!DOCTYPE html>
-<html dir="ltr">
-<head>
-  <meta charset="UTF-8">
-  <title>Invoice ${invoice?.invoice_number || ''}</title>
-  <style>
-    @page {
-      size: A4;
-      margin: 8mm 10mm;
-    }
-    body {
+    return { itemRows, emptyRowsHtml };
+  };
+
+  // CSS styles shared between print and PDF
+  const getStyles = () => `
+    body, .invoice-container {
       font-family: Arial, sans-serif;
       font-size: 13px;
       color: #000;
@@ -82,8 +74,6 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
       margin: 0;
       padding: 10px;
     }
-
-    /* --- Header --- */
     .header {
       display: flex;
       justify-content: space-between;
@@ -98,8 +88,6 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
     .header h2 { font-size: 16px; margin: 0 0 3px 0; color: #000; }
     .header p { margin: 1px 0; font-size: 12px; color: #000; }
     .logo-img { max-height: 80px; max-width: 140px; }
-
-    /* --- Invoice Title --- */
     .invoice-title {
       text-align: center;
       font-size: 20px;
@@ -109,8 +97,6 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
       border: 2px solid #000;
       padding: 3px;
     }
-
-    /* --- Customer Section --- */
     .customer-section {
       display: flex;
       justify-content: space-between;
@@ -122,8 +108,6 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
     .customer-right { text-align: right; direction: rtl; }
     .customer-field { margin: 2px 0; font-size: 13px; }
     .customer-label { font-weight: bold; color: #000; }
-
-    /* --- Items Table --- */
     table.items {
       width: 100%;
       border-collapse: collapse;
@@ -138,39 +122,25 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
       border: 1px solid #000;
       font-weight: bold;
     }
-    table.items td {
-      font-size: 12px;
-    }
-    table.items tbody tr {
-      page-break-inside: avoid;
-    }
-
-    /* --- Totals --- */
+    table.items td { font-size: 12px; }
+    table.items tbody tr { page-break-inside: avoid; }
     .totals-section { display: flex; justify-content: flex-end; margin-top: 4px; }
     .totals-table { width: 300px; border-collapse: collapse; }
     .totals-table td { padding: 3px 8px; font-size: 13px; border: 1px solid #000; color: #000; }
     .totals-table .label { text-align: right; direction: rtl; font-weight: bold; background: #fff; }
     .totals-table .value { text-align: right; font-family: monospace; background: #fff; }
     .totals-table .grand-total td { font-size: 15px; font-weight: bold; border: 2px solid #000; }
-
-    /* --- Footer / Signatures --- */
     .star-note { font-size: 11px; color: #000; margin-top: 4px; direction: rtl; text-align: right; font-weight: bold; }
     .footer { margin-top: 10px; font-size: 11px; color: #000; direction: rtl; text-align: right; }
     .signature-area { display: flex; justify-content: space-between; margin-top: 16px; }
     .signature-box { width: 200px; text-align: center; }
     .signature-line { border-top: 1px solid #000; margin-top: 35px; padding-top: 4px; font-size: 12px; }
+  `;
 
-    /* --- Print-specific rules for multi-page --- */
-    @media print {
-      body { padding: 0; background: #fff; }
-      .no-break { page-break-inside: avoid; }
-      table.items thead { display: table-header-group; }
-      table.items tfoot { display: table-footer-group; }
-    }
-  </style>
-</head>
-<body>
-  <!-- Header -->
+  // Build invoice body HTML (without <html>/<head> wrapper)
+  const getBodyHtml = () => {
+    const { itemRows, emptyRowsHtml } = buildInvoiceHtml();
+    return `
   <div class="header">
     <div class="header-left">
       <h2>${companyEn}</h2>
@@ -190,11 +160,7 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
       <p>ض.ق.م.: ${regNumber}</p>
     </div>
   </div>
-
-  <!-- Invoice Title -->
   <div class="invoice-title">فاتورة - Invoice</div>
-
-  <!-- Customer Section -->
   <div class="customer-section">
     <div class="customer-left">
       <div class="customer-field"><span class="customer-label">Date:</span> ${invoice?.date || ''}</div>
@@ -206,8 +172,6 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
       <div class="customer-field"><span class="customer-label">العنوان:</span> ${customerAddress}</div>
     </div>
   </div>
-
-  <!-- Items Table -->
   <table class="items">
     <thead>
       <tr>
@@ -225,11 +189,8 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
       ${emptyRowsHtml}
     </tbody>
   </table>
-
   <p class="star-note">* = خاضع للضريبة على القيمة المضافة (Subject to VAT)</p>
-
-  <!-- Totals -->
-  <div class="totals-section no-break">
+  <div class="totals-section">
     <table class="totals-table">
       <tr>
         <td class="label">المجموع / Subtotal</td>
@@ -249,24 +210,43 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
       </tr>
     </table>
   </div>
-
-  <!-- Receipt Statement -->
   <div class="footer">
     <p>استلمت البضاعة طبقاً للمبين في الفاتورة أعلاه بحالة جيدة وتأكدت من سلامتها ونوعيتها ومن صلاحية تاريخ الصنع</p>
   </div>
-
-  <!-- Signature Areas -->
-  <div class="signature-area no-break">
+  <div class="signature-area">
     <div class="signature-box">
       <div class="signature-line">الإدارة / Administration</div>
     </div>
     <div class="signature-box">
       <div class="signature-line">إمضاء الزبون / Customer Signature</div>
     </div>
-  </div>
+  </div>`;
+  };
 
+  const printInvoice = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const html = `
+<!DOCTYPE html>
+<html dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <title>Invoice ${invoice?.invoice_number || ''}</title>
+  <style>
+    @page { size: A4; margin: 8mm 10mm; }
+    ${getStyles()}
+    @media print {
+      body { padding: 0; background: #fff; }
+      .no-break { page-break-inside: avoid; }
+      table.items thead { display: table-header-group; }
+      table.items tfoot { display: table-footer-group; }
+    }
+  </style>
+</head>
+<body>
+  ${getBodyHtml()}
   <script>
-    // Wait for logo to load before printing
     var img = document.querySelector('.logo-img');
     if (img && !img.complete) {
       img.onload = function() { window.print(); };
@@ -282,7 +262,58 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
     printWindow.document.close();
   };
 
-  return { printInvoice };
+  const downloadPdf = async () => {
+    const filename = `Invoice-${invoice?.invoice_number || 'draft'}.pdf`;
+
+    // Create a hidden container in the current page
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    container.style.width = '210mm';
+    container.style.background = '#fff';
+
+    // Add styles inline
+    const styleEl = document.createElement('style');
+    styleEl.textContent = getStyles();
+    container.appendChild(styleEl);
+
+    // Add body content
+    const content = document.createElement('div');
+    content.className = 'invoice-container';
+    content.innerHTML = getBodyHtml();
+    container.appendChild(content);
+
+    document.body.appendChild(container);
+
+    // Wait for logo image to load
+    const img = container.querySelector('.logo-img');
+    if (img && !img.complete) {
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+        setTimeout(resolve, 3000); // fallback timeout
+      });
+    }
+
+    try {
+      await html2pdf()
+        .set({
+          margin: [8, 10, 8, 10],
+          filename,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        })
+        .from(content)
+        .save();
+    } finally {
+      document.body.removeChild(container);
+    }
+  };
+
+  return { printInvoice, downloadPdf };
 };
 
 export default SalesInvoicePrint;

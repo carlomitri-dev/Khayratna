@@ -29,7 +29,7 @@ import { Badge } from '../components/ui/badge';
 import {
   RotateCcw, Search, Plus, Edit, Trash2, Send, Eye, Printer,
   Package, DollarSign, Calendar, Filter,
-  Undo2, Check, X, Save
+  Undo2, Check, X, Save, Download
 } from 'lucide-react';
 import axios from 'axios';
 import { formatUSD, formatDate } from '../lib/utils';
@@ -322,6 +322,25 @@ const SalesReturnPage = () => {
     });
     printInvoice();
   };
+
+  const handleDownloadPdf = (ret) => {
+    const { downloadPdf } = SalesInvoicePrint({
+      invoice: {
+        ...ret,
+        invoice_number: ret.return_number,
+        subtotal_usd: ret.subtotal || 0,
+        tax_amount_usd: ret.tax_amount || 0,
+        total_usd: ret.total_usd || ret.total || 0
+      },
+      organization: currentOrg,
+      customer: {
+        name: ret.credit_account_name || '',
+        code: ret.credit_account_code || '',
+        address: ''
+      }
+    });
+    downloadPdf();
+  };
   
   const allInventoryItems = useMemo(() => {
     return inventoryItems.map(item => ({
@@ -425,6 +444,9 @@ const SalesReturnPage = () => {
                           </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handlePrint(ret)} data-testid={`print-return-${ret.id}`}>
                             <Printer className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadPdf(ret)} data-testid={`pdf-return-${ret.id}`} title="Download PDF">
+                            <Download className="w-4 h-4" />
                           </Button>
                           {!ret.is_posted && canEdit() && (
                             <>
@@ -689,7 +711,10 @@ const SalesReturnPage = () => {
                     ))}
                   </tbody>
                 </table>
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => handleDownloadPdf(viewReturn)} data-testid="pdf-from-view-btn">
+                    <Download className="w-4 h-4 mr-2" /> Download PDF
+                  </Button>
                   <Button onClick={() => handlePrint(viewReturn)} data-testid="print-from-view-btn">
                     <Printer className="w-4 h-4 mr-2" /> Print Return
                   </Button>

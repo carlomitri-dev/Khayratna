@@ -19,7 +19,7 @@ import {
 import { Badge } from '../components/ui/badge';
 import {
   FileText, Search, Plus, Edit, Trash2, Send, Eye, Printer,
-  Filter, Undo2, X, Save
+  Filter, Undo2, X, Save, Download
 } from 'lucide-react';
 import axios from 'axios';
 import { formatUSD, formatDate } from '../lib/utils';
@@ -303,6 +303,19 @@ const SalesInvoicePage = () => {
     });
     printInvoice();
   };
+
+  const handleDownloadPdf = (inv) => {
+    const { downloadPdf } = SalesInvoicePrint({
+      invoice: inv,
+      organization: currentOrg,
+      customer: {
+        name: inv.debit_account_name || inv.customer_name || '',
+        code: inv.debit_account_code || inv.customer_code || '',
+        address: inv.customer_address || ''
+      }
+    });
+    downloadPdf();
+  };
   
   const allInventoryItems = useMemo(() => {
     return inventoryItems.map(item => ({
@@ -397,6 +410,9 @@ const SalesInvoicePage = () => {
                           </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handlePrint(inv)} data-testid={`print-invoice-${inv.id}`}>
                             <Printer className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadPdf(inv)} data-testid={`pdf-invoice-${inv.id}`} title="Download PDF">
+                            <Download className="w-4 h-4" />
                           </Button>
                           {!inv.is_posted && canEdit() && (
                             <>
@@ -647,7 +663,10 @@ const SalesInvoicePage = () => {
                     ))}
                   </tbody>
                 </table>
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => handleDownloadPdf(viewInvoice)} data-testid="pdf-from-view-btn">
+                    <Download className="w-4 h-4 mr-2" /> Download PDF
+                  </Button>
                   <Button onClick={() => handlePrint(viewInvoice)} data-testid="print-from-view-btn">
                     <Printer className="w-4 h-4 mr-2" /> Print Invoice
                   </Button>
