@@ -26,6 +26,15 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 
 ## Changes Log
 
+### March 19, 2026 (Session 7)
+- **Database Cleanup** — Cleaned 35,209 orphaned documents (28K+ vouchers, 4K accounts, etc.) from deleted organization. DB reduced from 34MB to <1KB
+- **Background Voucher Import** — Refactored `/api/import/vouchers` to use `asyncio.create_task()` background processing:
+  - Returns immediately with `job_id` (no more timeout)
+  - New polling endpoint: `GET /api/import/vouchers/status/{job_id}` 
+  - Real-time progress bar on frontend (0-100%) with status messages
+  - Both Quick Import and Match Fields flows use background processing
+- **Organization Delete Fix** — Added missing collection cleanup (fiscal_years, regions, receipt_settings, sales_returns, purchase_returns, purchase_orders, sales_quotations) to the delete organization endpoint
+
 ### March 17, 2026 (Session 6)
 - **Invoice Print Template Redesign** — Updated `SalesInvoicePrint.jsx` with:
   - Replaced "MM" text logo with Khayratna Logo (served via URL from /assets/)

@@ -112,14 +112,21 @@ async def delete_organization(org_id: str, current_user: dict = Depends(get_curr
     # Delete all dependent data
     await db.accounts.delete_many({'organization_id': org_id})
     await db.vouchers.delete_many({'organization_id': org_id})
+    await db.fiscal_years.delete_many({'organization_id': org_id})
     await db.exchange_rates.delete_many({'organization_id': org_id})
     await db.crdb_notes.delete_many({'organization_id': org_id})
     await db.image_archive.delete_many({'organization_id': org_id})
     await db.inventory_categories.delete_many({'organization_id': org_id})
     await db.inventory_items.delete_many({'organization_id': org_id})
     await db.sales_invoices.delete_many({'organization_id': org_id})
+    await db.sales_returns.delete_many({'organization_id': org_id})
     await db.purchase_invoices.delete_many({'organization_id': org_id})
+    await db.purchase_returns.delete_many({'organization_id': org_id})
+    await db.purchase_orders.delete_many({'organization_id': org_id})
     await db.pos_transactions.delete_many({'organization_id': org_id})
+    await db.regions.delete_many({'organization_id': org_id})
+    await db.receipt_settings.delete_many({'organization_id': org_id})
+    await db.sales_quotations.delete_many({'organization_id': org_id})
     
     # Update users to remove organization reference
     await db.users.update_many(

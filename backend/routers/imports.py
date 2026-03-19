@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from typing import Optional
 import uuid
 import json
+import asyncio
 from datetime import datetime, timezone
 from collections import defaultdict
 import io
@@ -16,6 +17,9 @@ from core.auth import get_current_user
 
 router = APIRouter(tags=["Import"])
 logger = logging.getLogger(__name__)
+
+# In-memory store for import job progress
+_import_jobs = {}
 
 
 # ================== PREVIEW HEADERS ==================
@@ -140,7 +144,7 @@ async def import_chart_of_accounts(
             seen_codes.add(code)
             
             account_name = str(get_col(row, 'account_name', 2)).strip()
-            account_type_ar = str(get_col(row, 'account_type', 3)).strip()
+            account_type_ar = str(get_col(row, 'account_type', 3)).strip()  # noqa: F841
             
             # Determine account class from first digit
             account_class = int(code[0]) if code[0].isdigit() else None
@@ -301,10 +305,10 @@ async def import_vouchers(
     file: UploadFile = File(...),
     organization_id: str = Form(...),
     fiscal_year_id: str = Form(None),
-    field_mapping: str = Form(None),  # JSON: {"tran": 0, "account_code": 3, "date": 5, "cr_lbp": 8, "dr_lbp": 10, "cr_usd": 11, "dr_usd": 12, "description": 14, "currency": 17}
+    field_mapping: str = Form(None),
     current_user: dict = Depends(get_current_user)
 ):
-    """Import voucher transactions with optional field mapping."""
+    """Import voucher transactions. Returns immediately with a job_id; processing runs in background."""
     if current_user['role'] not in ['super_admin', 'admin']:
         raise HTTPException(status_code=403, detail="Only admins can import data")
     
@@ -313,6 +317,9 @@ async def import_vouchers(
     except ImportError:
         raise HTTPException(status_code=500, detail="openpyxl library not available")
     
+    # Read file into memory immediately (before response)
+    contents = await file.read()
+    
     # Parse field mapping
     mapping = None
     if field_mapping:
@@ -320,6 +327,35 @@ async def import_vouchers(
             mapping = json.loads(field_mapping)
         except json.JSONDecodeError:
             pass
+    
+    # Create job ID and start background task
+    job_id = str(uuid.uuid4())
+    _import_jobs[job_id] = {
+        "status": "processing",
+        "progress": 0,
+        "message": "Starting import...",
+        "started_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    asyncio.create_task(_process_voucher_import(
+        job_id, contents, organization_id, fiscal_year_id, mapping, current_user['id']
+    ))
+    
+    return {"job_id": job_id, "status": "processing", "message": "Import started in background"}
+
+
+@router.get("/import/vouchers/status/{job_id}")
+async def get_voucher_import_status(job_id: str, current_user: dict = Depends(get_current_user)):
+    """Check the status of a background voucher import job."""
+    job = _import_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+async def _process_voucher_import(job_id, contents, organization_id, fiscal_year_id, mapping, user_id):
+    """Background task to process voucher import."""
+    import openpyxl
     
     def get_col(row, field_name, default_idx):
         idx = mapping.get(field_name, default_idx) if mapping else default_idx
@@ -333,219 +369,256 @@ async def import_vouchers(
             return None
         return row[idx] if row[idx] is not None else None
     
-    # Read the file
-    contents = await file.read()
-    wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
-    ws = wb.active
-    
-    # Step 1: Group all rows by TRAN (voucher ID)
-    voucher_groups = defaultdict(list)
-    row_count = 0
-    
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        row_count += 1
-        tran_id = get_col(row, 'tran', 0)
-        if tran_id is None:
-            continue
-        voucher_groups[tran_id].append(row)
-    
-    wb.close()
-    
-    logger.info(f"Import: {row_count} rows, {len(voucher_groups)} vouchers to process")
-    
-    # Step 1b: Load fiscal year date range if specified
-    fy_start = None
-    fy_end = None
-    if fiscal_year_id and fiscal_year_id != 'none':
-        fy = await db.fiscal_years.find_one({'id': fiscal_year_id}, {'_id': 0})
-        if fy:
-            fy_start = fy['start_date']
-            fy_end = fy['end_date']
-            logger.info(f"FY filter active: {fy['name']} ({fy_start} to {fy_end})")
-    
-    # Step 2: Get current voucher sequence number
-    last_voucher = await db.vouchers.find(
-        {'organization_id': organization_id, 'voucher_type': 'JV'},
-        {'voucher_number': 1}
-    ).sort('created_at', -1).limit(1).to_list(1)
-    
-    # Generate sequence starting point
-    seq_num = 1
-    if last_voucher:
-        try:
-            last_num = last_voucher[0].get('voucher_number', 'JV-0000-00000')
-            parts = last_num.split('-')
-            seq_num = int(parts[-1]) + 1 if len(parts) > 1 else 1
-        except (ValueError, IndexError):
-            seq_num = 1
-    
-    vouchers_created = 0
-    vouchers_failed = 0
-    vouchers_skipped = 0
-    lines_processed = 0
-    errors = []
-    
-    # Step 3: Process each voucher group
-    voucher_docs = []
-    
-    for tran_id, rows in voucher_groups.items():
-        try:
-            # Parse date from first row
-            date_raw = str(get_col(rows[0], 'date', 5) or '')
-            if len(date_raw) == 8:  # YYYYMMDD
-                date_str = f"{date_raw[:4]}-{date_raw[4:6]}-{date_raw[6:8]}"
-            elif len(date_raw) == 10:  # YYYY-MM-DD already
-                date_str = date_raw
-            else:
-                date_str = '2016-01-01'  # Fallback
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
+        ws = wb.active
+        
+        # Step 1: Group all rows by TRAN (voucher ID)
+        _import_jobs[job_id]["message"] = "Reading Excel file..."
+        voucher_groups = defaultdict(list)
+        row_count = 0
+        
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            row_count += 1
+            tran_id = get_col(row, 'tran', 0)
+            if tran_id is None:
+                continue
+            voucher_groups[tran_id].append(row)
+        
+        wb.close()
+        total_vouchers = len(voucher_groups)
+        _import_jobs[job_id]["message"] = f"Read {row_count} rows, {total_vouchers} vouchers to process"
+        _import_jobs[job_id]["progress"] = 10
+        logger.info(f"Import job {job_id}: {row_count} rows, {total_vouchers} vouchers")
+        
+        # Step 1b: Load fiscal year date range if specified
+        fy_start = None
+        fy_end = None
+        if fiscal_year_id and fiscal_year_id != 'none':
+            fy = await db.fiscal_years.find_one({'id': fiscal_year_id}, {'_id': 0})
+            if fy:
+                fy_start = fy['start_date']
+                fy_end = fy['end_date']
+                logger.info(f"FY filter active: {fy['name']} ({fy_start} to {fy_end})")
+        
+        # Step 2: Get current voucher sequence number
+        last_voucher = await db.vouchers.find(
+            {'organization_id': organization_id, 'voucher_type': 'JV'},
+            {'voucher_number': 1}
+        ).sort('created_at', -1).limit(1).to_list(1)
+        
+        seq_num = 1
+        if last_voucher:
+            try:
+                last_num = last_voucher[0].get('voucher_number', 'JV-0000-00000')
+                parts = last_num.split('-')
+                seq_num = int(parts[-1]) + 1 if len(parts) > 1 else 1
+            except (ValueError, IndexError):
+                seq_num = 1
+        
+        vouchers_created = 0
+        vouchers_failed = 0
+        vouchers_skipped = 0
+        lines_processed = 0
+        errors = []
+        
+        # Step 3: Process each voucher group
+        _import_jobs[job_id]["message"] = "Processing voucher groups..."
+        _import_jobs[job_id]["progress"] = 20
+        voucher_docs = []
+        processed_count = 0
+        
+        for tran_id, rows in voucher_groups.items():
+            processed_count += 1
+            # Update progress every 500 vouchers
+            if processed_count % 500 == 0:
+                pct = 20 + int((processed_count / total_vouchers) * 40)
+                _import_jobs[job_id]["progress"] = min(pct, 60)
+                _import_jobs[job_id]["message"] = f"Processing voucher {processed_count}/{total_vouchers}..."
             
-            # Skip vouchers outside the selected fiscal year
-            if fy_start and fy_end:
-                if date_str < fy_start or date_str > fy_end:
-                    vouchers_skipped += 1
-                    continue
-            
-            # Get description from first line
-            desc_val = get_col(rows[0], 'description', 14)
-            description = str(desc_val).strip() if desc_val else f'Import TRAN-{tran_id}'
-            
-            voucher_lines = []
-            total_debit_lbp = 0
-            total_credit_lbp = 0
-            total_debit_usd = 0
-            total_credit_usd = 0
-            
-            for line_row in rows:
-                acct_val = get_col(line_row, 'account_code', 3)
-                account_code = str(acct_val).strip() if acct_val else ''
-                if not account_code:
-                    continue
-                
-                # Extract amounts
-                cr_lbp = float(get_col(line_row, 'cr_lbp', 8) or 0)
-                dr_lbp = float(get_col(line_row, 'dr_lbp', 10) or 0)
-                cr_usd = float(get_col(line_row, 'cr_usd', 11) or 0)
-                dr_usd = float(get_col(line_row, 'dr_usd', 12) or 0)
-                
-                desc_v = get_col(line_row, 'description', 14)
-                line_desc = str(desc_v).strip() if desc_v else ''
-                cur_v = get_col(line_row, 'currency', 17)
-                cur = str(cur_v) if cur_v else '1'
-                
-                # Exchange rate - 89500 for USD since 2023, 1507.5 before
-                if cur == '2':
-                    year = int(date_str[:4]) if len(date_str) >= 4 else 2016
-                    exchange_rate = 89500.0 if year >= 2023 else 1507.5
+            try:
+                date_raw = str(get_col(rows[0], 'date', 5) or '')
+                if len(date_raw) == 8:
+                    date_str = f"{date_raw[:4]}-{date_raw[4:6]}-{date_raw[6:8]}"
+                elif len(date_raw) == 10:
+                    date_str = date_raw
                 else:
-                    exchange_rate = 1.0
+                    date_str = '2016-01-01'
                 
-                voucher_line = {
-                    'account_code': account_code,
-                    'description': line_desc,
-                    'debit_lbp': dr_lbp,
-                    'credit_lbp': cr_lbp,
-                    'debit_usd': dr_usd,
-                    'credit_usd': cr_usd,
-                    'exchange_rate': exchange_rate
+                if fy_start and fy_end:
+                    if date_str < fy_start or date_str > fy_end:
+                        vouchers_skipped += 1
+                        continue
+                
+                desc_val = get_col(rows[0], 'description', 14)
+                description = str(desc_val).strip() if desc_val else f'Import TRAN-{tran_id}'
+                
+                voucher_lines = []
+                total_debit_lbp = 0
+                total_credit_lbp = 0
+                total_debit_usd = 0
+                total_credit_usd = 0
+                
+                for line_row in rows:
+                    acct_val = get_col(line_row, 'account_code', 3)
+                    account_code = str(acct_val).strip() if acct_val else ''
+                    if not account_code:
+                        continue
+                    
+                    cr_lbp = float(get_col(line_row, 'cr_lbp', 8) or 0)
+                    dr_lbp = float(get_col(line_row, 'dr_lbp', 10) or 0)
+                    cr_usd = float(get_col(line_row, 'cr_usd', 11) or 0)
+                    dr_usd = float(get_col(line_row, 'dr_usd', 12) or 0)
+                    
+                    desc_v = get_col(line_row, 'description', 14)
+                    line_desc = str(desc_v).strip() if desc_v else ''
+                    cur_v = get_col(line_row, 'currency', 17)
+                    cur = str(cur_v) if cur_v else '1'
+                    
+                    if cur == '2':
+                        year = int(date_str[:4]) if len(date_str) >= 4 else 2016
+                        exchange_rate = 89500.0 if year >= 2023 else 1507.5
+                    else:
+                        exchange_rate = 1.0
+                    
+                    voucher_line = {
+                        'account_code': account_code,
+                        'description': line_desc,
+                        'debit_lbp': dr_lbp,
+                        'credit_lbp': cr_lbp,
+                        'debit_usd': dr_usd,
+                        'credit_usd': cr_usd,
+                        'exchange_rate': exchange_rate
+                    }
+                    
+                    voucher_lines.append(voucher_line)
+                    total_debit_lbp += dr_lbp
+                    total_credit_lbp += cr_lbp
+                    total_debit_usd += dr_usd
+                    total_credit_usd += cr_usd
+                    lines_processed += 1
+                
+                if not voucher_lines:
+                    continue
+                
+                year = date_str[:4]
+                voucher_number = f"JV-{year}-{seq_num:05d}"
+                seq_num += 1
+                
+                voucher_doc = {
+                    'id': str(uuid.uuid4()),
+                    'voucher_number': voucher_number,
+                    'voucher_type': 'JV',
+                    'date': date_str,
+                    'reference': f'IMPORT-{tran_id}',
+                    'description': description,
+                    'lines': voucher_lines,
+                    'total_debit_lbp': total_debit_lbp,
+                    'total_credit_lbp': total_credit_lbp,
+                    'total_debit_usd': total_debit_usd,
+                    'total_credit_usd': total_credit_usd,
+                    'is_posted': True,
+                    'status': 'posted',
+                    'posted_at': datetime.now(timezone.utc).isoformat(),
+                    'organization_id': organization_id,
+                    'source_type': 'excel_import',
+                    'source_id': str(tran_id),
+                    'created_by': user_id,
+                    'created_at': datetime.now(timezone.utc).isoformat()
                 }
                 
-                voucher_lines.append(voucher_line)
-                total_debit_lbp += dr_lbp
-                total_credit_lbp += cr_lbp
-                total_debit_usd += dr_usd
-                total_credit_usd += cr_usd
-                lines_processed += 1
-            
-            if not voucher_lines:
-                continue
-            
-            # Generate voucher number
-            year = date_str[:4]
-            voucher_number = f"JV-{year}-{seq_num:05d}"
-            seq_num += 1
-            
-            voucher_doc = {
-                'id': str(uuid.uuid4()),
-                'voucher_number': voucher_number,
-                'voucher_type': 'JV',
-                'date': date_str,
-                'reference': f'IMPORT-{tran_id}',
-                'description': description,
-                'lines': voucher_lines,
-                'total_debit_lbp': total_debit_lbp,
-                'total_credit_lbp': total_credit_lbp,
-                'total_debit_usd': total_debit_usd,
-                'total_credit_usd': total_credit_usd,
-                'is_posted': True,
-                'status': 'posted',
-                'posted_at': datetime.now(timezone.utc).isoformat(),
-                'organization_id': organization_id,
-                'source_type': 'excel_import',
-                'source_id': str(tran_id),
-                'created_by': current_user['id'],
-                'created_at': datetime.now(timezone.utc).isoformat()
-            }
-            
-            voucher_docs.append(voucher_doc)
-            vouchers_created += 1
-            
-        except Exception as e:
-            vouchers_failed += 1
-            errors.append(f"TRAN {tran_id}: {str(e)}")
-            if len(errors) > 50:
-                break
-    
-    # Step 4: Batch insert vouchers (skip existing by source_id)
-    vouchers_duplicate = 0
-    if voucher_docs:
-        # Check for existing vouchers by source_id to avoid duplicates on reimport
-        existing_source_ids = set()
-        existing = await db.vouchers.find(
-            {'organization_id': organization_id, 'source_id': {'$in': [v['source_id'] for v in voucher_docs]}},
-            {'source_id': 1, '_id': 0}
-        ).to_list(None)
-        existing_source_ids = {e['source_id'] for e in existing}
+                voucher_docs.append(voucher_doc)
+                vouchers_created += 1
+                
+            except Exception as e:
+                vouchers_failed += 1
+                errors.append(f"TRAN {tran_id}: {str(e)}")
+                if len(errors) > 50:
+                    break
         
-        new_vouchers = [v for v in voucher_docs if v['source_id'] not in existing_source_ids]
-        vouchers_duplicate = len(voucher_docs) - len(new_vouchers)
+        # Step 4: Batch insert vouchers (skip existing by source_id)
+        _import_jobs[job_id]["message"] = "Checking for duplicates..."
+        _import_jobs[job_id]["progress"] = 65
         
-        if new_vouchers:
-            for i in range(0, len(new_vouchers), 500):
-                batch = new_vouchers[i:i+500]
-                await db.vouchers.insert_many(batch)
-    else:
-        new_vouchers = []
-    
-    # Step 5: Update account balances from NEW posted vouchers only
-    balance_updates = defaultdict(lambda: {'lbp': 0, 'usd': 0})
-    for voucher in new_vouchers:
-        for line in voucher['lines']:
-            code = line['account_code']
-            balance_updates[code]['lbp'] += line['debit_lbp'] - line['credit_lbp']
-            balance_updates[code]['usd'] += line['debit_usd'] - line['credit_usd']
-    
-    accounts_updated = 0
-    for code, deltas in balance_updates.items():
-        if deltas['lbp'] != 0 or deltas['usd'] != 0:
-            result = await db.accounts.update_one(
-                {'code': code, 'organization_id': organization_id},
-                {'$inc': {'balance_lbp': deltas['lbp'], 'balance_usd': deltas['usd']}}
-            )
-            if result.modified_count > 0:
-                accounts_updated += 1
-    
-    return {
-        "message": "Voucher history imported successfully",
-        "vouchers_created": len(new_vouchers),
-        "vouchers_skipped": vouchers_skipped,
-        "vouchers_duplicate": vouchers_duplicate,
-        "vouchers_failed": vouchers_failed,
-        "lines_processed": lines_processed,
-        "accounts_balance_updated": accounts_updated,
-        "total_rows": row_count,
-        "errors": errors[:20],
-        "error_count": len(errors)
-    }
+        vouchers_duplicate = 0
+        new_vouchers = voucher_docs
+        
+        if voucher_docs:
+            # Check for duplicates in batches to avoid huge $in queries
+            existing_source_ids = set()
+            all_source_ids = [v['source_id'] for v in voucher_docs]
+            for i in range(0, len(all_source_ids), 1000):
+                batch_ids = all_source_ids[i:i+1000]
+                existing = await db.vouchers.find(
+                    {'organization_id': organization_id, 'source_id': {'$in': batch_ids}},
+                    {'source_id': 1, '_id': 0}
+                ).to_list(None)
+                existing_source_ids.update(e['source_id'] for e in existing)
+            
+            new_vouchers = [v for v in voucher_docs if v['source_id'] not in existing_source_ids]
+            vouchers_duplicate = len(voucher_docs) - len(new_vouchers)
+            
+            _import_jobs[job_id]["message"] = f"Inserting {len(new_vouchers)} vouchers..."
+            _import_jobs[job_id]["progress"] = 70
+            
+            if new_vouchers:
+                total_to_insert = len(new_vouchers)
+                for i in range(0, total_to_insert, 500):
+                    batch = new_vouchers[i:i+500]
+                    await db.vouchers.insert_many(batch)
+                    pct = 70 + int(((i + len(batch)) / total_to_insert) * 20)
+                    _import_jobs[job_id]["progress"] = min(pct, 90)
+                    _import_jobs[job_id]["message"] = f"Inserted {min(i + 500, total_to_insert)}/{total_to_insert} vouchers..."
+        
+        # Step 5: Update account balances
+        _import_jobs[job_id]["message"] = "Updating account balances..."
+        _import_jobs[job_id]["progress"] = 90
+        
+        balance_updates = defaultdict(lambda: {'lbp': 0, 'usd': 0})
+        for voucher in new_vouchers:
+            for line in voucher['lines']:
+                code = line['account_code']
+                balance_updates[code]['lbp'] += line['debit_lbp'] - line['credit_lbp']
+                balance_updates[code]['usd'] += line['debit_usd'] - line['credit_usd']
+        
+        accounts_updated = 0
+        for code, deltas in balance_updates.items():
+            if deltas['lbp'] != 0 or deltas['usd'] != 0:
+                result = await db.accounts.update_one(
+                    {'code': code, 'organization_id': organization_id},
+                    {'$inc': {'balance_lbp': deltas['lbp'], 'balance_usd': deltas['usd']}}
+                )
+                if result.modified_count > 0:
+                    accounts_updated += 1
+        
+        # Done!
+        result = {
+            "status": "completed",
+            "progress": 100,
+            "message": "Voucher history imported successfully",
+            "vouchers_created": len(new_vouchers),
+            "vouchers_skipped": vouchers_skipped,
+            "vouchers_duplicate": vouchers_duplicate,
+            "vouchers_failed": vouchers_failed,
+            "lines_processed": lines_processed,
+            "accounts_balance_updated": accounts_updated,
+            "total_rows": row_count,
+            "errors": errors[:20],
+            "error_count": len(errors),
+            "completed_at": datetime.now(timezone.utc).isoformat()
+        }
+        _import_jobs[job_id] = result
+        logger.info(f"Import job {job_id} completed: {len(new_vouchers)} vouchers created")
+        
+    except Exception as e:
+        logger.error(f"Import job {job_id} failed: {str(e)}")
+        _import_jobs[job_id] = {
+            "status": "failed",
+            "progress": 0,
+            "message": f"Import failed: {str(e)}",
+            "error": str(e),
+            "completed_at": datetime.now(timezone.utc).isoformat()
+        }
 
 
 # ================== CATEGORIES IMPORT ==================

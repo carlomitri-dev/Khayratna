@@ -121,6 +121,8 @@ const ImportDataPage = () => {
   const [voucherResult, setVoucherResult] = useState(null);
   const [voucherImporting, setVoucherImporting] = useState(false);
   const [voucherFYId, setVoucherFYId] = useState(selectedFY?.id || '');
+  const [voucherProgress, setVoucherProgress] = useState(0);
+  const [voucherStatusMsg, setVoucherStatusMsg] = useState('');
   
   const [catFile, setCatFile] = useState(null);
   const [catResult, setCatResult] = useState(null);
@@ -141,6 +143,56 @@ const ImportDataPage = () => {
   const [mapperSamples, setMapperSamples] = useState([]);
   const [mapperFile, setMapperFile] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Background voucher import with progress polling
+  const doVoucherImport = async (file, extraMapping = null) => {
+    if (!file || !currentOrg) return;
+    setVoucherImporting(true);
+    setVoucherResult(null);
+    setVoucherProgress(0);
+    setVoucherStatusMsg('Uploading file...');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('organization_id', currentOrg.id);
+      if (voucherFYId) formData.append('fiscal_year_id', voucherFYId);
+      if (extraMapping) formData.append('field_mapping', extraMapping);
+      
+      const response = await axios.post(`${API}/import/vouchers`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000
+      });
+      
+      const { job_id } = response.data;
+      if (!job_id) {
+        setVoucherResult(response.data);
+        setVoucherImporting(false);
+        return;
+      }
+      
+      // Poll for progress
+      setVoucherStatusMsg('Processing...');
+      const pollInterval = setInterval(async () => {
+        try {
+          const status = await axios.get(`${API}/import/vouchers/status/${job_id}`);
+          const data = status.data;
+          setVoucherProgress(data.progress || 0);
+          setVoucherStatusMsg(data.message || 'Processing...');
+          
+          if (data.status === 'completed' || data.status === 'failed') {
+            clearInterval(pollInterval);
+            setVoucherResult(data);
+            setVoucherImporting(false);
+          }
+        } catch (pollErr) {
+          // Keep polling even if one request fails
+        }
+      }, 2000);
+      
+    } catch (err) {
+      setVoucherResult({ error: true, message: err.response?.data?.detail || 'Import failed: ' + err.message });
+      setVoucherImporting(false);
+    }
+  };
 
   // Simple import (no mapping needed)
   const doSimpleImport = async (endpoint, file, setImporting, setResult, extraData = {}) => {
@@ -208,23 +260,7 @@ const ImportDataPage = () => {
         setCoaImporting(false);
       }
     } else if (mapperType === 'voucher') {
-      setVoucherImporting(true);
-      setVoucherResult(null);
-      try {
-        const formData = new FormData();
-        formData.append('file', mapperFile);
-        formData.append('organization_id', currentOrg.id);
-        formData.append('field_mapping', mappingJson);
-        if (voucherFYId) formData.append('fiscal_year_id', voucherFYId);
-        const r = await axios.post(`${API}/import/vouchers`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000
-        });
-        setVoucherResult(r.data);
-      } catch (err) {
-        setVoucherResult({ error: true, message: err.response?.data?.detail || 'Import failed' });
-      } finally {
-        setVoucherImporting(false);
-      }
+      doVoucherImport(mapperFile, mappingJson);
     } else if (mapperType === 'inventory') {
       setItemsImporting(true);
       setItemsResult(null);
@@ -368,7 +404,7 @@ const ImportDataPage = () => {
             </div>
             <FileUploader file={voucherFile} setFile={setVoucherFile} onClear={() => setVoucherResult(null)} />
             <div className="flex gap-2">
-              <Button onClick={() => doSimpleImport('/import/vouchers', voucherFile, setVoucherImporting, setVoucherResult, { fiscal_year_id: voucherFYId })} 
+              <Button onClick={() => doVoucherImport(voucherFile)} 
                 disabled={!voucherFile || voucherImporting || !voucherFYId} className="flex-1 bg-emerald-600 hover:bg-emerald-700" size="sm">
                 {voucherImporting ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Upload className="w-3 h-3 mr-1" />}{voucherImporting ? 'Importing...' : 'Quick Import (Default Mapping)'}
               </Button>
@@ -376,6 +412,14 @@ const ImportDataPage = () => {
                 <Columns className="w-3 h-3 mr-1" />Match Fields
               </Button>
             </div>
+            {voucherImporting && (
+              <div className="space-y-1">
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-emerald-600 h-2 rounded-full transition-all duration-500" style={{ width: `${voucherProgress}%` }} />
+                </div>
+                <p className="text-xs text-muted-foreground">{voucherStatusMsg} ({voucherProgress}%)</p>
+              </div>
+            )}
             <ResultDisplay result={voucherResult} />
           </CardContent>
         </Card>
