@@ -12,6 +12,132 @@ from core.auth import get_current_user
 router = APIRouter(tags=["Reports"])
 
 
+
+# ================== JOURNAL ==================
+
+@router.get("/reports/journal")
+async def get_journal(
+    organization_id: str,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    fy_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all posted vouchers with full line details for the journal report."""
+    query = {
+        'organization_id': organization_id,
+        'is_posted': True
+    }
+
+    # Date range
+    date_filter = {}
+    if fy_id:
+        fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
+        if fy:
+            date_filter['$gte'] = fy['start_date']
+            date_filter['$lte'] = fy['end_date']
+    if from_date:
+        date_filter['$gte'] = from_date
+    if to_date:
+        date_filter['$lte'] = to_date
+    if date_filter:
+        query['date'] = date_filter
+
+    vouchers = await db.vouchers.find(
+        query, {'_id': 0}
+    ).sort('date', 1).to_list(None)
+
+    # Enrich with balance check and account names
+    all_codes = set()
+    for v in vouchers:
+        for line in v.get('lines', []):
+            all_codes.add(line.get('account_code', ''))
+
+    # Batch fetch account names
+    accounts_map = {}
+    if all_codes:
+        accts = await db.accounts.find(
+            {'organization_id': organization_id, 'code': {'$in': list(all_codes)}},
+            {'_id': 0, 'code': 1, 'name': 1, 'name_ar': 1}
+        ).to_list(None)
+        accounts_map = {a['code']: a for a in accts}
+
+    grand_debit_usd = 0
+    grand_credit_usd = 0
+    grand_debit_lbp = 0
+    grand_credit_lbp = 0
+
+    result_vouchers = []
+    for v in vouchers:
+        total_debit_usd = 0
+        total_credit_usd = 0
+        total_debit_lbp = 0
+        total_credit_lbp = 0
+
+        lines = []
+        for line in v.get('lines', []):
+            code = line.get('account_code', '')
+            acct = accounts_map.get(code, {})
+            dr_usd = line.get('debit_usd', line.get('debit', 0)) or 0
+            cr_usd = line.get('credit_usd', line.get('credit', 0)) or 0
+            dr_lbp = line.get('debit_lbp', 0) or 0
+            cr_lbp = line.get('credit_lbp', 0) or 0
+
+            total_debit_usd += dr_usd
+            total_credit_usd += cr_usd
+            total_debit_lbp += dr_lbp
+            total_credit_lbp += cr_lbp
+
+            lines.append({
+                'account_code': code,
+                'account_name': acct.get('name', ''),
+                'account_name_ar': acct.get('name_ar', ''),
+                'description': line.get('description', ''),
+                'debit_usd': dr_usd,
+                'credit_usd': cr_usd,
+                'debit_lbp': dr_lbp,
+                'credit_lbp': cr_lbp,
+                'exchange_rate': line.get('exchange_rate', 1)
+            })
+
+        is_balanced_usd = abs(total_debit_usd - total_credit_usd) < 0.01
+        is_balanced_lbp = abs(total_debit_lbp - total_credit_lbp) < 0.5
+
+        grand_debit_usd += total_debit_usd
+        grand_credit_usd += total_credit_usd
+        grand_debit_lbp += total_debit_lbp
+        grand_credit_lbp += total_credit_lbp
+
+        result_vouchers.append({
+            'id': v.get('id', ''),
+            'voucher_number': v.get('voucher_number', ''),
+            'voucher_type': v.get('voucher_type', ''),
+            'date': v.get('date', ''),
+            'description': v.get('description', ''),
+            'reference': v.get('reference', ''),
+            'lines': lines,
+            'total_debit_usd': total_debit_usd,
+            'total_credit_usd': total_credit_usd,
+            'total_debit_lbp': total_debit_lbp,
+            'total_credit_lbp': total_credit_lbp,
+            'is_balanced_usd': is_balanced_usd,
+            'is_balanced_lbp': is_balanced_lbp
+        })
+
+    return {
+        'vouchers': result_vouchers,
+        'total_vouchers': len(result_vouchers),
+        'grand_total': {
+            'debit_usd': grand_debit_usd,
+            'credit_usd': grand_credit_usd,
+            'debit_lbp': grand_debit_lbp,
+            'credit_lbp': grand_credit_lbp
+        },
+        'from_date': from_date or (date_filter.get('$gte') if date_filter else None),
+        'to_date': to_date or (date_filter.get('$lte') if date_filter else None)
+    }
+
+
 # ================== TRIAL BALANCE ==================
 
 @router.get("/reports/trial-balance")
