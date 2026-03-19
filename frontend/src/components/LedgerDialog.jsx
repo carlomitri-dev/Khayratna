@@ -172,17 +172,23 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
     container.style.position = 'fixed';
     container.style.left = '-9999px';
     container.style.width = '297mm';
+    container.style.background = '#fff';
     container.innerHTML = buildLedgerHtml();
     document.body.appendChild(container);
+    const content = container.querySelector('div');
+    if (!content) {
+      document.body.removeChild(container);
+      return;
+    }
     try {
       await html2pdf().set({
         margin: [8, 10, 8, 10],
         filename: `Ledger_${account.code}_${fromDate || 'all'}_${toDate || 'all'}.pdf`,
         image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2 },
+        html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-      }).from(container.firstChild).save();
+      }).from(content).save();
     } finally {
       document.body.removeChild(container);
     }
