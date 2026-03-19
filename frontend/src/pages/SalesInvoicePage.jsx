@@ -66,7 +66,7 @@ const SalesInvoicePage = () => {
     due_date: '',
     lines: [{ ...emptyLine }],
     subtotal: 0, discount_percent: 0, discount_amount: 0,
-    tax_percent: 0, tax_amount: 0, total: 0, total_usd: 0,
+    tax_percent: 11, tax_amount: 0, total: 0, total_usd: 0,
     currency: 'USD', notes: '',
     debit_account_id: '', credit_account_id: '',
     organization_id: currentOrg?.id || ''
@@ -166,19 +166,25 @@ const SalesInvoicePage = () => {
   const handleLineChange = (index, field, value) => {
     const newLines = [...formData.lines];
     newLines[index] = { ...newLines[index], [field]: value };
-    if (field === 'inventory_item_id' && value) {
-      const item = inventoryItems.find(i => i.id === value);
-      if (item) {
-        newLines[index] = {
-          ...newLines[index],
-          item_name: item.name, item_name_ar: item.name_ar || '',
-          barcode: item.barcode || '', unit: item.unit || 'piece',
-          unit_price: item.price || 0, currency: item.currency || 'USD',
-          exchange_rate: item.currency === 'LBP' ? exchangeRate : 1,
-          is_taxable: item.is_taxable !== false
-        };
-      }
-    }
+    const { lineTotal, lineTotalUsd } = calculateLineTotal(newLines[index]);
+    newLines[index].line_total = lineTotal;
+    newLines[index].line_total_usd = lineTotalUsd;
+    const totals = recalculateTotals(newLines, formData.discount_percent, formData.tax_percent);
+    setFormData({ ...formData, lines: newLines, subtotal: totals.subtotal, discount_amount: totals.discountAmount, tax_amount: totals.taxAmount, total: totals.total, total_usd: totals.totalUsd });
+  };
+  
+  const handleItemSelect = (index, item) => {
+    const newLines = [...formData.lines];
+    newLines[index] = {
+      ...newLines[index],
+      inventory_item_id: item.id,
+      item_name: item.name, item_name_ar: item.name_ar || '',
+      barcode: item.barcode || '', unit: item.unit || 'piece',
+      unit_price: item.price || 0, currency: item.currency || 'USD',
+      exchange_rate: item.currency === 'LBP' ? exchangeRate : 1,
+      is_taxable: item.is_taxable !== false,
+      discount_percent: item.discount_percent || 0
+    };
     const { lineTotal, lineTotalUsd } = calculateLineTotal(newLines[index]);
     newLines[index].line_total = lineTotal;
     newLines[index].line_total_usd = lineTotalUsd;
@@ -521,13 +527,11 @@ const SalesInvoicePage = () => {
                             items={allInventoryItems}
                             value={line.inventory_item_id}
                             onChange={(val) => handleLineChange(index, 'inventory_item_id', val)}
+                            onItemSelect={(item) => handleItemSelect(index, item)}
                             placeholder="Search item..."
                             organizationId={currentOrg?.id}
                             apiUrl={API}
                           />
-                          {line.inventory_item_id === '' && (
-                            <Input placeholder="Item name (manual)" value={line.item_name} onChange={(e) => handleLineChange(index, 'item_name', e.target.value)} className="mt-1 h-8 text-xs" />
-                          )}
                         </td>
                         <td className="p-2">
                           <Input type="number" value={line.quantity} onChange={(e) => handleLineChange(index, 'quantity', e.target.value)} min="0" step="0.01" className="h-9" />

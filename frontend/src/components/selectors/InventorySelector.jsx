@@ -117,8 +117,6 @@ const InventorySelector = ({
             <span className="truncate">
               {selectedItem.barcode ? `[${selectedItem.barcode}] ` : ''}{selectedItem.name}
             </span>
-          ) : value === '' ? (
-            <span className="text-muted-foreground">Manual Entry</span>
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
           )}
@@ -140,20 +138,6 @@ const InventorySelector = ({
           </div>
         </div>
         <div className="max-h-[300px] overflow-y-auto">
-          {/* Manual Entry Option */}
-          <div
-            className={`flex items-center px-2 py-1.5 cursor-pointer hover:bg-muted text-xs ${value === '' ? 'bg-muted' : ''}`}
-            onClick={() => {
-              onChange('');
-              setOpen(false);
-              setSearch('');
-            }}
-            data-testid="manual-entry-option"
-          >
-            <span className="text-muted-foreground">Manual Entry</span>
-            {value === '' && <Check className="ml-auto h-3 w-3" />}
-          </div>
-          
           {/* Inventory Items Section */}
           {filteredItems.length > 0 && (
             <>
