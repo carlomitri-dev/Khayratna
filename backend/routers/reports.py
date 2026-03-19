@@ -348,11 +348,13 @@ async def get_general_ledger(
     account_code: str, 
     organization_id: str, 
     fy_id: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 50000,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get general ledger with pagination. Returns paginated entries + total count + closing balance."""
+    """Get general ledger with date range, opening balance, and pagination."""
     account = await db.accounts.find_one(
         {'code': account_code, 'organization_id': organization_id},
         {'_id': 0}
@@ -360,17 +362,62 @@ async def get_general_ledger(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
     
-    # Build voucher query
+    # Build base voucher query
     voucher_query = {
         'organization_id': organization_id,
         'is_posted': True,
         'lines.account_code': account_code
     }
     
+    # Determine effective date range from FY or explicit dates
+    effective_from = None
+    effective_to = None
+    
     if fy_id:
         fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
         if fy:
-            voucher_query['date'] = {'$gte': fy['start_date'], '$lte': fy['end_date']}
+            effective_from = fy['start_date']
+            effective_to = fy['end_date']
+    
+    # Explicit from_date/to_date override FY range
+    if from_date:
+        effective_from = from_date
+    if to_date:
+        effective_to = to_date
+    
+    # Calculate opening balance (all transactions BEFORE from_date)
+    opening_lbp = 0
+    opening_usd = 0
+    if effective_from:
+        opening_query = {
+            **voucher_query,
+            'date': {'$lt': effective_from}
+        }
+        opening_pipeline = [
+            {'$match': opening_query},
+            {'$unwind': '$lines'},
+            {'$match': {'lines.account_code': account_code}},
+            {'$group': {
+                '_id': None,
+                'total_debit_lbp': {'$sum': {'$ifNull': ['$lines.debit_lbp', 0]}},
+                'total_credit_lbp': {'$sum': {'$ifNull': ['$lines.credit_lbp', 0]}},
+                'total_debit_usd': {'$sum': {'$ifNull': [{'$ifNull': ['$lines.debit_usd', '$lines.debit']}, 0]}},
+                'total_credit_usd': {'$sum': {'$ifNull': [{'$ifNull': ['$lines.credit_usd', '$lines.credit']}, 0]}}
+            }}
+        ]
+        opening_result = await db.vouchers.aggregate(opening_pipeline).to_list(1)
+        if opening_result:
+            opening_lbp = opening_result[0]['total_debit_lbp'] - opening_result[0]['total_credit_lbp']
+            opening_usd = opening_result[0]['total_debit_usd'] - opening_result[0]['total_credit_usd']
+    
+    # Apply date range filter for entries
+    date_filter = {}
+    if effective_from:
+        date_filter['$gte'] = effective_from
+    if effective_to:
+        date_filter['$lte'] = effective_to
+    if date_filter:
+        voucher_query['date'] = date_filter
     
     # Use aggregation to get entries efficiently with pagination
     pipeline = [
@@ -421,7 +468,7 @@ async def get_general_ledger(
     entries_pipeline = pipeline + [{'$skip': skip}, {'$limit': limit}]
     raw_entries = await db.vouchers.aggregate(entries_pipeline).to_list(limit)
     
-    # Compute running balance for the page (need balance before this page)
+    # Compute running balance starting from opening balance
     if skip > 0:
         pre_balance_pipeline = pipeline + [
             {'$limit': skip},
@@ -434,11 +481,11 @@ async def get_general_ledger(
             }}
         ]
         pre_result = await db.vouchers.aggregate(pre_balance_pipeline).to_list(1)
-        running_lbp = (pre_result[0]['pre_debit_lbp'] - pre_result[0]['pre_credit_lbp']) if pre_result else 0
-        running_usd = (pre_result[0]['pre_debit_usd'] - pre_result[0]['pre_credit_usd']) if pre_result else 0
+        running_lbp = opening_lbp + ((pre_result[0]['pre_debit_lbp'] - pre_result[0]['pre_credit_lbp']) if pre_result else 0)
+        running_usd = opening_usd + ((pre_result[0]['pre_debit_usd'] - pre_result[0]['pre_credit_usd']) if pre_result else 0)
     else:
-        running_lbp = 0
-        running_usd = 0
+        running_lbp = opening_lbp
+        running_usd = opening_usd
     
     entries = []
     for e in raw_entries:
@@ -470,8 +517,14 @@ async def get_general_ledger(
         'account': account,
         'entries': entries,
         'total_entries': total_entries,
+        'opening_balance': {
+            'lbp': opening_lbp,
+            'usd': opening_usd
+        },
         'closing_balance': {
-            'lbp': closing_lbp,
-            'usd': closing_usd
-        }
+            'lbp': opening_lbp + closing_lbp,
+            'usd': opening_usd + closing_usd
+        },
+        'from_date': effective_from,
+        'to_date': effective_to
     }

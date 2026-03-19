@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
@@ -9,8 +9,10 @@ import {
   DialogFooter,
 } from './ui/dialog';
 import { Button } from './ui/button';
-import { List, Download, Printer, Eye, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { Input } from './ui/input';
+import { List, Download, Printer, Eye, Pencil, Trash2, AlertTriangle, FileDown, Calendar } from 'lucide-react';
 import axios from 'axios';
+import html2pdf from 'html2pdf.js';
 import { formatLBP, formatUSD, getNumberClass, formatDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -23,23 +25,22 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [viewVoucher, setViewVoucher] = useState(null);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const canEdit = userRole === 'super_admin' || userRole === 'admin' || userRole === 'accountant';
   const canDelete = userRole === 'super_admin' || userRole === 'admin';
   const isSuperAdmin = userRole === 'super_admin';
 
-  useEffect(() => {
-    if (open && account && organizationId) {
-      fetchLedger();
-    }
-  }, [open, account, organizationId, fyId]);
-
-  const fetchLedger = async () => {
+  const fetchLedger = useCallback(async () => {
+    if (!account || !organizationId) return;
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ organization_id: organizationId });
       if (fyId) params.append('fy_id', fyId);
+      if (fromDate) params.append('from_date', fromDate);
+      if (toDate) params.append('to_date', toDate);
       const response = await axios.get(
         `${API}/reports/general-ledger/${account.code}?${params.toString()}`
       );
@@ -49,7 +50,13 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
     } finally {
       setLoading(false);
     }
-  };
+  }, [account, organizationId, fyId, fromDate, toDate]);
+
+  useEffect(() => {
+    if (open && account && organizationId) {
+      fetchLedger();
+    }
+  }, [open, account, organizationId, fyId, fetchLedger]);
 
   const handleViewVoucher = async (entry) => {
     try {
@@ -61,19 +68,17 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
   };
 
   const handleEditVoucher = (entry) => {
-    // Navigate to voucher page with the voucher data for editing
     onClose();
     navigate('/vouchers', { state: { editVoucherId: entry.voucher_id } });
   };
 
   const handleDeleteVoucher = async () => {
     if (!deleteConfirm) return;
-    
     setDeleting(true);
     try {
       await axios.delete(`${API}/vouchers/${deleteConfirm.voucher_id}`);
       setDeleteConfirm(null);
-      fetchLedger(); // Refresh the ledger
+      fetchLedger();
     } catch (err) {
       alert(err.response?.data?.detail || 'Failed to delete voucher');
     } finally {
@@ -82,105 +87,116 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
   };
 
   const handleUnpostVoucher = async (voucherId) => {
-    if (!window.confirm('Are you sure you want to unpost this voucher? This will reverse all account balance updates.')) {
-      return;
-    }
-    
+    if (!window.confirm('Are you sure you want to unpost this voucher?')) return;
     try {
       await axios.post(`${API}/vouchers/${voucherId}/unpost`);
-      fetchLedger(); // Refresh the ledger
+      fetchLedger();
     } catch (err) {
       alert(err.response?.data?.detail || 'Failed to unpost voucher');
     }
   };
 
-  const handlePrint = () => {
-    if (!ledgerData) return;
-    
-    const printContent = `
-      <html>
-        <head>
-          <title>Ledger - ${account.code} ${account.name}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; font-size: 12px; }
-            .header { text-align: center; margin-bottom: 20px; }
-            .header h1 { font-size: 18px; margin: 0; }
-            .header h2 { font-size: 14px; margin: 5px 0; color: #666; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-            th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
-            th { background: #f5f5f5; font-weight: bold; }
-            .number { text-align: right; font-family: monospace; }
-            .positive { color: #22c55e; }
-            .negative { color: #ef4444; }
-            .footer { margin-top: 20px; border-top: 2px solid #333; padding-top: 10px; }
-            .footer-row { display: flex; justify-content: space-between; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>KAIROS - General Ledger</h1>
-            <h2>${account.code} - ${account.name}</h2>
-            ${account.name_ar ? `<h2 dir="rtl">${account.name_ar}</h2>` : ''}
-          </div>
-          <table>
-            <thead>
+  // Build the ledger HTML for print/PDF
+  const buildLedgerHtml = () => {
+    if (!ledgerData || !account) return '';
+    const ob = ledgerData.opening_balance || { usd: 0, lbp: 0 };
+    const cb = ledgerData.closing_balance || { usd: 0, lbp: 0 };
+    const dateRange = (fromDate || toDate) ? 
+      `<p style="font-size:12px;margin:3px 0;">Period: ${fromDate || '...'} to ${toDate || '...'}</p>` : '';
+
+    return `
+      <div style="font-family:Arial,sans-serif;padding:10px;font-size:12px;color:#000;background:#fff;">
+        <div style="text-align:center;margin-bottom:12px;border-bottom:2px solid #000;padding-bottom:8px;">
+          <h1 style="font-size:18px;margin:0;">Account Ledger - كشف حساب</h1>
+          <h2 style="font-size:14px;margin:4px 0;">${account.code} - ${account.name}${account.name_ar ? ' / ' + account.name_ar : ''}</h2>
+          ${dateRange}
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+          <thead>
+            <tr>
+              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:11px;">Date</th>
+              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:11px;">Voucher</th>
+              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:11px;">Description</th>
+              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:11px;text-align:right;">Debit (USD)</th>
+              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:11px;text-align:right;">Credit (USD)</th>
+              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:11px;text-align:right;">Balance (USD)</th>
+              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:11px;text-align:right;">Balance (LBP)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(ob.usd !== 0 || ob.lbp !== 0) ? `
+              <tr style="font-weight:bold;background:#f5f5f5;">
+                <td style="border:1px solid #000;padding:4px;" colspan="3">Opening Balance / رصيد سابق</td>
+                <td style="border:1px solid #000;padding:4px;text-align:right;">-</td>
+                <td style="border:1px solid #000;padding:4px;text-align:right;">-</td>
+                <td style="border:1px solid #000;padding:4px;text-align:right;font-family:monospace;">${formatUSD(ob.usd)}</td>
+                <td style="border:1px solid #000;padding:4px;text-align:right;font-family:monospace;">${formatLBP(ob.lbp)}</td>
+              </tr>` : ''}
+            ${ledgerData.entries.map(e => `
               <tr>
-                <th>Date</th>
-                <th>Voucher</th>
-                <th>Description</th>
-                <th class="number">Debit (USD)</th>
-                <th class="number">Credit (USD)</th>
-                <th class="number">Balance (USD)</th>
-                <th class="number">Balance (LBP)</th>
+                <td style="border:1px solid #000;padding:3px;font-size:11px;">${formatDate(e.date)}</td>
+                <td style="border:1px solid #000;padding:3px;font-size:11px;">${e.voucher_number}</td>
+                <td style="border:1px solid #000;padding:3px;font-size:11px;">${e.description}</td>
+                <td style="border:1px solid #000;padding:3px;text-align:right;font-family:monospace;font-size:11px;">${e.debit_usd > 0 ? formatUSD(e.debit_usd) : '-'}</td>
+                <td style="border:1px solid #000;padding:3px;text-align:right;font-family:monospace;font-size:11px;">${e.credit_usd > 0 ? formatUSD(e.credit_usd) : '-'}</td>
+                <td style="border:1px solid #000;padding:3px;text-align:right;font-family:monospace;font-size:11px;">${formatUSD(e.balance_usd)}</td>
+                <td style="border:1px solid #000;padding:3px;text-align:right;font-family:monospace;font-size:11px;">${formatLBP(e.balance_lbp)}</td>
               </tr>
-            </thead>
-            <tbody>
-              ${ledgerData.entries.map(entry => `
-                <tr>
-                  <td>${(() => { const d = new Date(entry.date); return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; })()}</td>
-                  <td>${entry.voucher_number}</td>
-                  <td>${entry.description}</td>
-                  <td class="number">${entry.debit_usd > 0 ? formatUSD(entry.debit_usd) : '-'}</td>
-                  <td class="number">${entry.credit_usd > 0 ? formatUSD(entry.credit_usd) : '-'}</td>
-                  <td class="number ${entry.balance_usd >= 0 ? 'positive' : 'negative'}">${formatUSD(entry.balance_usd)}</td>
-                  <td class="number">${formatLBP(entry.balance_lbp)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          <div class="footer">
-            <div class="footer-row">
-              <strong>Closing Balance:</strong>
-              <span>USD ${formatUSD(ledgerData.closing_balance.usd)} | LBP ${formatLBP(ledgerData.closing_balance.lbp)}</span>
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
-    
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(printContent);
-    printWindow.document.close();
-    printWindow.print();
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="font-weight:bold;border-top:2px solid #000;">
+              <td style="border:1px solid #000;padding:5px;" colspan="3">Closing Balance / الرصيد الختامي</td>
+              <td style="border:1px solid #000;padding:5px;text-align:right;">-</td>
+              <td style="border:1px solid #000;padding:5px;text-align:right;">-</td>
+              <td style="border:1px solid #000;padding:5px;text-align:right;font-family:monospace;">${formatUSD(cb.usd)}</td>
+              <td style="border:1px solid #000;padding:5px;text-align:right;font-family:monospace;">${formatLBP(cb.lbp)}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <p style="font-size:10px;margin-top:8px;text-align:right;color:#666;">Total entries: ${ledgerData.total_entries}</p>
+      </div>`;
   };
 
-  const handleExport = () => {
+  const handlePrint = () => {
+    const html = `<html><head><title>Ledger - ${account.code}</title>
+      <style>@page{size:A4 landscape;margin:8mm;}body{margin:0;}</style>
+      </head><body>${buildLedgerHtml()}<script>window.onload=function(){window.print();}</script></body></html>`;
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+  };
+
+  const handleExportPdf = async () => {
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.left = '-9999px';
+    container.style.width = '297mm';
+    container.innerHTML = buildLedgerHtml();
+    document.body.appendChild(container);
+    try {
+      await html2pdf().set({
+        margin: [8, 10, 8, 10],
+        filename: `Ledger_${account.code}_${fromDate || 'all'}_${toDate || 'all'}.pdf`,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      }).from(container.firstChild).save();
+    } finally {
+      document.body.removeChild(container);
+    }
+  };
+
+  const handleExportCsv = () => {
     if (!ledgerData) return;
-    
     const headers = ['Date', 'Voucher', 'Type', 'Description', 'Debit USD', 'Credit USD', 'Balance USD', 'Debit LBP', 'Credit LBP', 'Balance LBP'];
     const rows = ledgerData.entries.map(e => [
-      e.date,
-      e.voucher_number,
-      e.voucher_type,
+      e.date, e.voucher_number, e.voucher_type,
       `"${e.description}"`,
-      e.debit_usd,
-      e.credit_usd,
-      e.balance_usd,
-      e.debit_lbp,
-      e.credit_lbp,
-      e.balance_lbp
+      e.debit_usd, e.credit_usd, e.balance_usd,
+      e.debit_lbp, e.credit_lbp, e.balance_lbp
     ]);
-    
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -194,7 +210,7 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <List className="w-5 h-5" />
@@ -203,24 +219,64 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
           </DialogHeader>
 
           {account && (
-            <div className="p-3 bg-muted/30 rounded-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-              <div>
-                <span className="font-mono text-primary text-lg">{account.code}</span>
-                <span className="mx-2">-</span>
-                <span className="font-medium">{account.name}</span>
-                {account.name_ar && (
-                  <span className="text-muted-foreground ml-2">({account.name_ar})</span>
-                )}
+            <div className="space-y-3">
+              {/* Account info */}
+              <div className="p-3 bg-muted/30 rounded-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <div>
+                  <span className="font-mono text-primary text-lg">{account.code}</span>
+                  <span className="mx-2">-</span>
+                  <span className="font-medium">{account.name}</span>
+                  {account.name_ar && (
+                    <span className="text-muted-foreground ml-2">({account.name_ar})</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handlePrint} disabled={!ledgerData} data-testid="ledger-print-btn">
+                    <Printer className="w-4 h-4 mr-1" /> Print
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={!ledgerData} data-testid="ledger-pdf-btn">
+                    <FileDown className="w-4 h-4 mr-1" /> PDF
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={!ledgerData} data-testid="ledger-csv-btn">
+                    <Download className="w-4 h-4 mr-1" /> CSV
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handlePrint} disabled={!ledgerData}>
-                  <Printer className="w-4 h-4 mr-1" />
-                  Print
+
+              {/* Date range filter */}
+              <div className="flex items-end gap-3 px-1">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <label className="text-xs text-muted-foreground">From:</label>
+                  <Input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="h-8 w-[150px] text-xs"
+                    data-testid="ledger-from-date"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-muted-foreground">To:</label>
+                  <Input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="h-8 w-[150px] text-xs"
+                    data-testid="ledger-to-date"
+                  />
+                </div>
+                <Button size="sm" variant="outline" onClick={fetchLedger} className="h-8" data-testid="ledger-filter-btn">
+                  Filter
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleExport} disabled={!ledgerData}>
-                  <Download className="w-4 h-4 mr-1" />
-                  Export
-                </Button>
+                {(fromDate || toDate) && (
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setFromDate(''); setToDate(''); }} data-testid="ledger-clear-btn">
+                    Clear
+                  </Button>
+                )}
+                {ledgerData && (
+                  <span className="text-xs text-muted-foreground ml-auto">{ledgerData.total_entries} transactions</span>
+                )}
               </div>
             </div>
           )}
@@ -233,13 +289,11 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
             ) : error ? (
               <div className="text-center py-12 text-red-400">
                 <p>{error}</p>
-                <Button variant="outline" className="mt-4" onClick={fetchLedger}>
-                  Retry
-                </Button>
+                <Button variant="outline" className="mt-4" onClick={fetchLedger}>Retry</Button>
               </div>
             ) : ledgerData ? (
               <>
-                {ledgerData.entries.length === 0 ? (
+                {ledgerData.entries.length === 0 && (!ledgerData.opening_balance || (ledgerData.opening_balance.usd === 0 && ledgerData.opening_balance.lbp === 0)) ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <List className="w-12 h-12 mx-auto mb-3 opacity-50" />
                     <p>No transactions found for this account</p>
@@ -261,6 +315,21 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
                           </tr>
                         </thead>
                         <tbody>
+                          {/* Opening Balance Row */}
+                          {ledgerData.opening_balance && (ledgerData.opening_balance.usd !== 0 || ledgerData.opening_balance.lbp !== 0) && (
+                            <tr className="bg-muted/40 font-semibold">
+                              <td colSpan={3} className="text-sm">Opening Balance / رصيد سابق</td>
+                              <td className="text-right">-</td>
+                              <td className="text-right">-</td>
+                              <td className={`text-right font-mono ${getNumberClass(ledgerData.opening_balance.usd)}`}>
+                                {formatUSD(ledgerData.opening_balance.usd)}
+                              </td>
+                              <td className="text-right font-mono text-muted-foreground">
+                                {formatLBP(ledgerData.opening_balance.lbp)}
+                              </td>
+                              <td></td>
+                            </tr>
+                          )}
                           {ledgerData.entries.map((entry, idx) => (
                             <tr key={idx}>
                               <td className="text-muted-foreground">{formatDate(entry.date)}</td>
@@ -271,14 +340,10 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
                               </td>
                               <td className="max-w-[200px] truncate">{entry.description}</td>
                               <td className="text-right font-mono">
-                                {entry.debit_usd > 0 ? (
-                                  <span className="text-red-400">{formatUSD(entry.debit_usd)}</span>
-                                ) : '-'}
+                                {entry.debit_usd > 0 ? <span className="text-red-400">{formatUSD(entry.debit_usd)}</span> : '-'}
                               </td>
                               <td className="text-right font-mono">
-                                {entry.credit_usd > 0 ? (
-                                  <span className="text-green-400">{formatUSD(entry.credit_usd)}</span>
-                                ) : '-'}
+                                {entry.credit_usd > 0 ? <span className="text-green-400">{formatUSD(entry.credit_usd)}</span> : '-'}
                               </td>
                               <td className={`text-right font-mono ${getNumberClass(entry.balance_usd)}`}>
                                 {formatUSD(entry.balance_usd)}
@@ -288,45 +353,21 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
                               </td>
                               <td>
                                 <div className="flex justify-center gap-1">
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="h-7 px-2"
-                                    onClick={() => handleViewVoucher(entry)}
-                                    title="View"
-                                  >
+                                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => handleViewVoucher(entry)} title="View">
                                     <Eye className="w-3 h-3" />
                                   </Button>
                                   {canEdit && (
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-7 px-2"
-                                      onClick={() => handleEditVoucher(entry)}
-                                      title="Edit"
-                                    >
+                                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => handleEditVoucher(entry)} title="Edit">
                                       <Pencil className="w-3 h-3" />
                                     </Button>
                                   )}
                                   {isSuperAdmin && (
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-7 px-2 text-amber-400"
-                                      onClick={() => handleUnpostVoucher(entry.voucher_id)}
-                                      title="Unpost"
-                                    >
+                                    <Button variant="ghost" size="sm" className="h-7 px-2 text-amber-400" onClick={() => handleUnpostVoucher(entry.voucher_id)} title="Unpost">
                                       <AlertTriangle className="w-3 h-3" />
                                     </Button>
                                   )}
                                   {canDelete && (
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-7 px-2 text-red-400"
-                                      onClick={() => setDeleteConfirm(entry)}
-                                      title="Delete"
-                                    >
+                                    <Button variant="ghost" size="sm" className="h-7 px-2 text-red-400" onClick={() => setDeleteConfirm(entry)} title="Delete">
                                       <Trash2 className="w-3 h-3" />
                                     </Button>
                                   )}
@@ -341,7 +382,7 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
                     {/* Closing Balance */}
                     <div className="mt-4 p-4 bg-muted/30 rounded-sm border border-border">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium">Closing Balance:</span>
+                        <span className="font-medium">Closing Balance / الرصيد الختامي:</span>
                         <div className="flex gap-6">
                           <div>
                             <span className="text-muted-foreground text-sm mr-2">USD:</span>
@@ -372,86 +413,36 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
           <DialogHeader>
             <DialogTitle>Voucher Details</DialogTitle>
           </DialogHeader>
-          
           {viewVoucher && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded">
-                <div>
-                  <p className="text-xs text-muted-foreground">Voucher #</p>
-                  <p className="font-mono font-bold">{viewVoucher.voucher_number}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Type</p>
-                  <p className={`inline-block px-2 py-0.5 rounded text-xs voucher-${viewVoucher.voucher_type.toLowerCase()}`}>
-                    {viewVoucher.voucher_type}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Date</p>
-                  <p>{formatDate(viewVoucher.date)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Status</p>
-                  <p className={viewVoucher.is_posted ? 'status-posted' : 'status-draft'}>
-                    {viewVoucher.is_posted ? 'Posted' : 'Draft'}
-                  </p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-xs text-muted-foreground">Description</p>
-                  <p>{viewVoucher.description}</p>
-                </div>
-                {viewVoucher.reference && (
-                  <div className="col-span-2">
-                    <p className="text-xs text-muted-foreground">Reference</p>
-                    <p>{viewVoucher.reference}</p>
-                  </div>
-                )}
+                <div><p className="text-xs text-muted-foreground">Voucher #</p><p className="font-mono font-bold">{viewVoucher.voucher_number}</p></div>
+                <div><p className="text-xs text-muted-foreground">Type</p><p className={`inline-block px-2 py-0.5 rounded text-xs voucher-${viewVoucher.voucher_type.toLowerCase()}`}>{viewVoucher.voucher_type}</p></div>
+                <div><p className="text-xs text-muted-foreground">Date</p><p>{formatDate(viewVoucher.date)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Status</p><p className={viewVoucher.is_posted ? 'status-posted' : 'status-draft'}>{viewVoucher.is_posted ? 'Posted' : 'Draft'}</p></div>
+                <div className="col-span-2"><p className="text-xs text-muted-foreground">Description</p><p>{viewVoucher.description}</p></div>
+                {viewVoucher.reference && (<div className="col-span-2"><p className="text-xs text-muted-foreground">Reference</p><p>{viewVoucher.reference}</p></div>)}
               </div>
-              
               <div>
                 <h4 className="font-medium mb-2">Lines</h4>
                 <table className="data-table text-sm">
-                  <thead>
-                    <tr>
-                      <th>Account</th>
-                      <th>Description</th>
-                      <th className="text-right">Debit (USD)</th>
-                      <th className="text-right">Credit (USD)</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>Account</th><th>Description</th><th className="text-right">Debit (USD)</th><th className="text-right">Credit (USD)</th></tr></thead>
                   <tbody>
                     {viewVoucher.lines.map((line, idx) => (
                       <tr key={idx}>
-                        <td>
-                          <span className="font-mono text-xs">{line.account_code}</span>
-                          <span className="mx-1">-</span>
-                          <span className="text-muted-foreground">{line.account_name}</span>
-                        </td>
+                        <td><span className="font-mono text-xs">{line.account_code}</span><span className="mx-1">-</span><span className="text-muted-foreground">{line.account_name}</span></td>
                         <td className="text-muted-foreground">{line.description}</td>
-                        <td className="text-right font-mono">
-                          {line.debit_usd > 0 ? <span className="text-red-400">${formatUSD(line.debit_usd)}</span> : '-'}
-                        </td>
-                        <td className="text-right font-mono">
-                          {line.credit_usd > 0 ? <span className="text-green-400">${formatUSD(line.credit_usd)}</span> : '-'}
-                        </td>
+                        <td className="text-right font-mono">{line.debit_usd > 0 ? <span className="text-red-400">${formatUSD(line.debit_usd)}</span> : '-'}</td>
+                        <td className="text-right font-mono">{line.credit_usd > 0 ? <span className="text-green-400">${formatUSD(line.credit_usd)}</span> : '-'}</td>
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot>
-                    <tr className="border-t-2">
-                      <td colSpan={2} className="font-medium">Total</td>
-                      <td className="text-right font-mono font-bold">${formatUSD(viewVoucher.total_debit_usd)}</td>
-                      <td className="text-right font-mono font-bold">${formatUSD(viewVoucher.total_credit_usd)}</td>
-                    </tr>
-                  </tfoot>
+                  <tfoot><tr className="border-t-2"><td colSpan={2} className="font-medium">Total</td><td className="text-right font-mono font-bold">${formatUSD(viewVoucher.total_debit_usd)}</td><td className="text-right font-mono font-bold">${formatUSD(viewVoucher.total_credit_usd)}</td></tr></tfoot>
                 </table>
               </div>
             </div>
           )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewVoucher(null)}>Close</Button>
-          </DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setViewVoucher(null)}>Close</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -459,25 +450,16 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
       <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-400">
-              <AlertTriangle className="w-5 h-5" />
-              Delete Voucher
-            </DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-red-400"><AlertTriangle className="w-5 h-5" />Delete Voucher</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete voucher <strong>{deleteConfirm?.voucher_number}</strong>?
               <br /><br />
-              <span className="text-amber-400">
-                Warning: This will also unpost the voucher and reverse all account balance changes.
-              </span>
+              <span className="text-amber-400">Warning: This will also unpost the voucher and reverse all account balance changes.</span>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirm(null)} disabled={deleting}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteVoucher} disabled={deleting}>
-              {deleting ? 'Deleting...' : 'Delete Voucher'}
-            </Button>
+            <Button variant="outline" onClick={() => setDeleteConfirm(null)} disabled={deleting}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteVoucher} disabled={deleting}>{deleting ? 'Deleting...' : 'Delete Voucher'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
