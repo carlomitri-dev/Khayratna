@@ -383,19 +383,30 @@ const VoucherEntryPage = () => {
       date: v.date,
       reference: v.reference || '',
       description: v.description,
-      lines: v.lines.map(l => ({
-        account_code: l.account_code,
-        account_name: l.account_name,
-        description: l.description || '',
-        currency: l.currency || 'USD',
-        exchange_rate: l.exchange_rate || 1.0,
-        debit: l.debit || 0,
-        credit: l.credit || 0,
-        debit_lbp: l.debit_lbp || 0,
-        credit_lbp: l.credit_lbp || 0,
-        debit_usd: l.debit_usd || 0,
-        credit_usd: l.credit_usd || 0
-      }))
+      lines: v.lines.map(l => {
+        const currency = l.currency || 'USD';
+        const rate = l.exchange_rate || 1.0;
+        const dr_usd = l.debit_usd || l.debit || 0;
+        const cr_usd = l.credit_usd || l.credit || 0;
+        // For the editable debit/credit: use stored debit/credit if present, otherwise derive from USD
+        const debit = l.debit || dr_usd;
+        const credit = l.credit || cr_usd;
+        const dr_lbp = l.debit_lbp || (dr_usd * baseExchangeRate);
+        const cr_lbp = l.credit_lbp || (cr_usd * baseExchangeRate);
+        return {
+          account_code: l.account_code,
+          account_name: l.account_name,
+          description: l.description || '',
+          currency,
+          exchange_rate: rate,
+          debit,
+          credit,
+          debit_lbp: dr_lbp,
+          credit_lbp: cr_lbp,
+          debit_usd: dr_usd,
+          credit_usd: cr_usd
+        };
+      })
     });
     // Scroll to form
     window.scrollTo({ top: 0, behavior: 'smooth' });

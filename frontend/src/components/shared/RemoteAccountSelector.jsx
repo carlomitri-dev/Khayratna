@@ -67,6 +67,20 @@ const RemoteAccountSelector = ({
 
   const displaySelected = accounts.find(a => a.code === value) || selectedAccount;
 
+  // When value is set externally (e.g. editing a voucher) but accounts aren't loaded yet,
+  // fetch the specific account to display its code/name
+  useEffect(() => {
+    if (!value || !organizationId) return;
+    const alreadyFound = accounts.find(a => a.code === value) || selectedAccount;
+    if (alreadyFound) return;
+    const params = new URLSearchParams({ organization_id: organizationId, search: value });
+    if (fyId) params.set('fy_id', fyId);
+    axios.get(`${API}/accounts/movable/list?${params.toString()}`).then(res => {
+      const found = (Array.isArray(res.data) ? res.data : []).find(a => a.code === value);
+      if (found) setSelectedAccount(found);
+    }).catch(() => {});
+  }, [value, organizationId, fyId]);
+
   const formatBalance = (acc) => {
     const bal = acc.balance_usd || 0;
     if (bal === 0) return '$0.00';
