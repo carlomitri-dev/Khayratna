@@ -74,8 +74,19 @@ Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full
 - **POS Sales Analytics Dashboard** — Charts for trends, top items
 - **AccountSelector Refactored** — Shared RemoteAccountSelector component
 
+### March 19, 2026 (Session 8)
+- **Journal Module** — New `/journal` page displaying all posted vouchers:
+  - Sidebar link placed above "Trial Balance" as requested
+  - Date range filter (From/To) with fiscal year support
+  - Full voucher detail display: number, type, date, description, reference, all lines with account code/name/debit/credit in USD & LBP
+  - Unbalanced voucher detection (debit != credit) with red highlighting and "UNBALANCED" label
+  - Grand totals section showing debit/credit in both USD and LBP
+  - Action buttons: Edit (navigates to voucher editor), Unpost (super_admin), Delete (with confirmation dialog)
+  - Print and PDF export (landscape A4)
+
 ## Known Issues
 - None currently tracked.
 
 ## Backlog
-- No pending items.
+- Email Invoices (P1): Send PDF invoices directly to customers via email
+- Sales Quotations Workflow (P2): Potential enhancements to the existing quotations feature
