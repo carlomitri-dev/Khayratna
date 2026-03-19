@@ -20,8 +20,8 @@ import { formatLBP, formatUSD, formatDate } from '../lib/utils';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const JournalPage = () => {
-  const { user } = useAuth();
-  const { currentOrg, selectedFY } = useFiscalYear();
+  const { user, currentOrg } = useAuth();
+  const { selectedFY } = useFiscalYear();
   const navigate = useNavigate();
 
   const [fromDate, setFromDate] = useState('');
