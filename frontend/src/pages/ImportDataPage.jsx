@@ -135,6 +135,8 @@ const ImportDataPage = () => {
   const [itemsFile, setItemsFile] = useState(null);
   const [itemsResult, setItemsResult] = useState(null);
   const [itemsImporting, setItemsImporting] = useState(false);
+  const [fixTtcLoading, setFixTtcLoading] = useState(false);
+  const [fixTtcResult, setFixTtcResult] = useState(null);
 
   // Field mapping state
   const [mapperOpen, setMapperOpen] = useState(false);
@@ -191,6 +193,24 @@ const ImportDataPage = () => {
     } catch (err) {
       setVoucherResult({ error: true, message: err.response?.data?.detail || 'Import failed: ' + err.message });
       setVoucherImporting(false);
+    }
+  };
+
+  // Fix TTC prices on existing inventory
+  const handleFixTtcPrices = async () => {
+    if (!currentOrg) return;
+    if (!window.confirm('This will convert all taxable item prices from TTC to HT (÷ 1.11). Continue?')) return;
+    setFixTtcLoading(true);
+    setFixTtcResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('organization_id', currentOrg.id);
+      const r = await axios.post(`${API}/import/fix-ttc-prices`, formData);
+      setFixTtcResult(r.data);
+    } catch (err) {
+      setFixTtcResult({ error: true, message: err.response?.data?.detail || 'Fix failed' });
+    } finally {
+      setFixTtcLoading(false);
     }
   };
 
@@ -378,6 +398,18 @@ const ImportDataPage = () => {
               </Button>
             </div>
             <ResultDisplay result={itemsResult} />
+            <div className="border-t pt-3 mt-2">
+              <p className="text-xs text-muted-foreground mb-2">If imported prices are TTC (VAT included), use this to convert taxable items to HT (÷ 1.11):</p>
+              <Button variant="outline" size="sm" onClick={handleFixTtcPrices} disabled={fixTtcLoading} data-testid="fix-ttc-btn">
+                {fixTtcLoading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
+                {fixTtcLoading ? 'Fixing...' : 'Fix TTC → HT Prices'}
+              </Button>
+              {fixTtcResult && (
+                <div className={`mt-2 p-2 rounded text-xs ${fixTtcResult.error ? 'bg-red-50 border-red-200 text-red-600' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+                  {fixTtcResult.message || `Fixed ${fixTtcResult.items_fixed} items`}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

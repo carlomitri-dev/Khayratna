@@ -848,6 +848,12 @@ async def import_inventory(
                 except (ValueError, TypeError):
                     is_taxable = False
             
+            # Prices in Excel are TTC (VAT included). Convert to HT for taxable items.
+            if is_taxable and price > 0:
+                price = round(price / 1.11, 3)
+            if is_taxable and cost > 0:
+                cost = round(cost / 1.11, 3)
+            
             item_name = name_ar or description or f'Item {item_code}'
             
             item_doc = {
@@ -929,6 +935,43 @@ async def import_inventory(
         "total_processed": len(items_batch),
         "errors": errors[:20],
         "error_count": len(errors)
+    }
+
+
+# ================== FIX EXISTING TTC PRICES ==================
+
+@router.post("/import/fix-ttc-prices")
+async def fix_ttc_prices(
+    organization_id: str = Form(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """One-time fix: convert existing taxable inventory prices from TTC to HT (divide by 1.11)."""
+    if current_user['role'] not in ['super_admin', 'admin']:
+        raise HTTPException(status_code=403, detail="Only admins can run this fix")
+
+    items = await db.inventory_items.find(
+        {'organization_id': organization_id, 'is_taxable': True},
+        {'_id': 0, 'id': 1, 'item_code': 1, 'name': 1, 'price': 1, 'cost': 1}
+    ).to_list(None)
+
+    fixed = 0
+    for item in items:
+        updates = {}
+        if item.get('price', 0) > 0:
+            updates['price'] = round(item['price'] / 1.11, 3)
+        if item.get('cost', 0) > 0:
+            updates['cost'] = round(item['cost'] / 1.11, 3)
+        if updates:
+            await db.inventory_items.update_one(
+                {'id': item['id'], 'organization_id': organization_id},
+                {'$set': updates}
+            )
+            fixed += 1
+
+    return {
+        "message": f"Fixed {fixed} taxable items (TTC → HT, divided by 1.11)",
+        "items_fixed": fixed,
+        "total_taxable": len(items)
     }
 
 
