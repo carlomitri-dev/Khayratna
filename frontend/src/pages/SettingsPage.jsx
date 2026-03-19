@@ -266,6 +266,7 @@ const SettingsPage = () => {
   // Backup & Restore state
   const [backupInfo, setBackupInfo] = useState(null);
   const [backupLoading, setBackupLoading] = useState(false);
+  const [purgeLoading, setPurgeLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
   const [restoreFile, setRestoreFile] = useState(null);
@@ -624,6 +625,29 @@ const SettingsPage = () => {
       alert(error.response?.data?.detail || 'Failed to create backup');
     } finally {
       setBackupLoading(false);
+    }
+  };
+
+  const handlePurgeOrganization = async () => {
+    if (!currentOrg) return;
+    const confirmed = window.confirm(
+      `WARNING: This will permanently delete ALL data for "${currentOrg.name}" (accounts, vouchers, invoices, inventory, etc.).\n\nThe organization itself will be kept.\n\nAre you sure?`
+    );
+    if (!confirmed) return;
+    const doubleConfirm = window.confirm(
+      `FINAL CONFIRMATION: Delete all data for "${currentOrg.name}"?\n\nThis action CANNOT be undone.`
+    );
+    if (!doubleConfirm) return;
+
+    setPurgeLoading(true);
+    try {
+      const response = await axios.post(`${API}/organizations/${currentOrg.id}/purge`);
+      alert(`${response.data.message}\n\nDeleted: ${JSON.stringify(response.data.deleted, null, 2)}`);
+      fetchBackupInfo();
+    } catch (error) {
+      alert(error.response?.data?.detail || 'Failed to purge data');
+    } finally {
+      setPurgeLoading(false);
     }
   };
 
@@ -2220,6 +2244,38 @@ const SettingsPage = () => {
                   )}
                 </div>
               </div>
+
+              <div className="border-t border-border" />
+
+              {/* Purge Organization Data */}
+              {currentOrg && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Trash2 className="w-4 h-4 text-red-400" />
+                    <h3 className="font-semibold">Purge Organization Data</h3>
+                  </div>
+                  <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-sm">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-red-400">Danger Zone</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          This will permanently delete ALL data (accounts, vouchers, invoices, inventory, etc.) for <strong>{currentOrg.name}</strong>. The organization itself will be kept. This cannot be undone. Download a backup first.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="destructive" 
+                    onClick={handlePurgeOrganization} 
+                    disabled={purgeLoading}
+                    data-testid="purge-org-btn"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    {purgeLoading ? 'Purging...' : `Purge All Data for ${currentOrg.name}`}
+                  </Button>
+                </div>
+              )}
 
               <div className="border-t border-border" />
 

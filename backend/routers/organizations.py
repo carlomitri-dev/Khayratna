@@ -94,6 +94,39 @@ async def update_organization(org_id: str, org_data: OrganizationUpdate, current
     return OrganizationResponse(**updated)
 
 
+
+@router.post("/{org_id}/purge")
+async def purge_organization_data(org_id: str, current_user: dict = Depends(get_current_user)):
+    """Purge all data for an organization but keep the organization itself."""
+    if current_user['role'] not in ['super_admin', 'admin']:
+        raise HTTPException(status_code=403, detail="Only admins can purge organization data")
+
+    org = await db.organizations.find_one({'id': org_id})
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    collections_to_purge = [
+        'accounts', 'vouchers', 'fiscal_years', 'exchange_rates',
+        'crdb_notes', 'image_archive', 'inventory_categories', 'inventory_items',
+        'sales_invoices', 'sales_returns', 'purchase_invoices', 'purchase_returns',
+        'purchase_orders', 'pos_transactions', 'regions', 'receipt_settings',
+        'sales_quotations'
+    ]
+
+    deleted_counts = {}
+    for coll_name in collections_to_purge:
+        result = await db[coll_name].delete_many({'organization_id': org_id})
+        if result.deleted_count > 0:
+            deleted_counts[coll_name] = result.deleted_count
+
+    total_deleted = sum(deleted_counts.values())
+    return {
+        "message": f"Purged {total_deleted} documents from {org['name']}. Organization kept.",
+        "total_deleted": total_deleted,
+        "deleted": deleted_counts
+    }
+
+
 @router.delete("/{org_id}")
 async def delete_organization(org_id: str, current_user: dict = Depends(get_current_user)):
     """Delete an organization (with all dependent data)"""
