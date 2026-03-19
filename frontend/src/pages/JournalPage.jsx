@@ -31,6 +31,7 @@ const JournalPage = () => {
   const [error, setError] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [showUnbalancedOnly, setShowUnbalancedOnly] = useState(false);
 
   const canEdit = user?.role === 'super_admin' || user?.role === 'admin' || user?.role === 'accountant';
   const isSuperAdmin = user?.role === 'super_admin';
@@ -226,6 +227,15 @@ const JournalPage = () => {
             <Button size="sm" onClick={fetchJournal} disabled={loading} data-testid="journal-filter-btn">
               <Filter className="w-4 h-4 mr-1" /> {loading ? 'Loading...' : 'Load Journal'}
             </Button>
+            <Button
+              size="sm"
+              variant={showUnbalancedOnly ? 'default' : 'outline'}
+              onClick={() => setShowUnbalancedOnly(prev => !prev)}
+              className={showUnbalancedOnly ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+              data-testid="journal-unbalanced-filter-btn"
+            >
+              <AlertTriangle className="w-4 h-4 mr-1" /> {showUnbalancedOnly ? 'Unbalanced Only' : 'Not Balanced'}
+            </Button>
             {(fromDate || toDate) && (
               <Button size="sm" variant="ghost" onClick={() => { setFromDate(''); setToDate(''); }} className="text-xs">
                 Clear
@@ -233,7 +243,9 @@ const JournalPage = () => {
             )}
             {data && (
               <span className="text-sm text-muted-foreground ml-auto">
-                {data.total_vouchers} vouchers found
+                {showUnbalancedOnly
+                  ? `${data.vouchers.filter(v => !v.is_balanced_usd || !v.is_balanced_lbp).length} unbalanced of ${data.total_vouchers} vouchers`
+                  : `${data.total_vouchers} vouchers found`}
               </span>
             )}
           </div>
@@ -268,7 +280,10 @@ const JournalPage = () => {
             </div>
           ) : (
             <>
-              {data.vouchers.map((v) => {
+              {data.vouchers.filter(v => {
+                if (showUnbalancedOnly) return !v.is_balanced_usd || !v.is_balanced_lbp;
+                return true;
+              }).map((v) => {
                 const unbalanced = !v.is_balanced_usd || !v.is_balanced_lbp;
                 return (
                   <Card key={v.id} className={unbalanced ? 'border-red-500/50' : ''} data-testid={`journal-voucher-${v.id}`}>
