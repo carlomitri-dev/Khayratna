@@ -91,6 +91,7 @@ const Sidebar = ({ isOpen, onClose, collapsed, onToggleCollapse }) => {
     { path: '/pos-closing-report', icon: FileBarChart, label: 'POS Closing Report', requiresAdmin: true },
     { path: '/pos-analytics', icon: TrendingUp, label: 'POS Analytics', requiresAdmin: true },
     { path: '/exchange-rates', icon: DollarSign, label: 'Exchange Rates' },
+    { path: '/journal', icon: BookOpen, label: 'Journal' },
     { path: '/trial-balance', icon: FileBarChart, label: 'Trial Balance' },
     { path: '/income-statement', icon: TrendingUp, label: 'Income Statement' },
     { path: '/general-ledger', icon: List, label: 'General Ledger' },

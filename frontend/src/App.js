@@ -93,6 +93,7 @@ import CashierSessionsPage from './pages/CashierSessionsPage';
 import CashierLoginPage from './pages/CashierLoginPage';
 import POSClosingReportPage from './pages/POSClosingReportPage';
 import POSAnalyticsPage from './pages/POSAnalyticsPage';
+import JournalPage from './pages/JournalPage';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -171,6 +172,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ExchangeRatesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/journal"
+        element={
+          <ProtectedRoute>
+            <JournalPage />
           </ProtectedRoute>
         }
       />
