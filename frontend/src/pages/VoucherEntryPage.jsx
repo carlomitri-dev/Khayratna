@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useFiscalYear } from '../context/FiscalYearContext';
+import { useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -49,6 +50,7 @@ const CurrencySelector = ({ currencies, value, onChange }) => {
 const VoucherEntryPage = () => {
   const { currentOrg, user } = useAuth();
   const { selectedFY } = useFiscalYear();
+  const location = useLocation();
   const [accounts, setAccounts] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   const [vouchers, setVouchers] = useState([]);
@@ -105,6 +107,18 @@ const VoucherEntryPage = () => {
       fetchVouchers(true);
     }
   }, [searchTerm, filterType, filterStatus, selectedFY]);
+
+  // Handle editVoucherId from navigation state (e.g. from Journal page)
+  useEffect(() => {
+    const editId = location.state?.editVoucherId;
+    if (editId && currentOrg) {
+      axios.get(`${API}/vouchers/${editId}`).then(res => {
+        handleEdit(res.data);
+      }).catch(() => {});
+      // Clear the state so refreshing doesn't re-trigger
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state?.editVoucherId, currentOrg]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -292,7 +306,9 @@ const VoucherEntryPage = () => {
 
   const isVoucherBalanced = () => {
     const totals = calculateTotals();
-    return Math.abs(totals.totalDebitUsd - totals.totalCreditUsd) < 0.01;
+    const usdBalanced = Math.abs(totals.totalDebitUsd - totals.totalCreditUsd) < 0.01;
+    const lbpBalanced = Math.abs(totals.totalDebitLbp - totals.totalCreditLbp) < 0.5;
+    return usdBalanced && lbpBalanced;
   };
 
   const handleSave = async (shouldPost = false) => {
@@ -719,7 +735,14 @@ const VoucherEntryPage = () => {
           <div className={`flex items-center gap-2 p-3 rounded-sm ${isBalanced ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
             {isBalanced ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
             <span className="text-sm">
-              {isBalanced ? 'Voucher is balanced' : `Out of balance by $${formatUSD(Math.abs(totals.totalDebitUsd - totals.totalCreditUsd))}`}
+              {isBalanced ? 'Voucher is balanced' : (() => {
+                const usdDiff = Math.abs(totals.totalDebitUsd - totals.totalCreditUsd);
+                const lbpDiff = Math.abs(totals.totalDebitLbp - totals.totalCreditLbp);
+                const parts = [];
+                if (usdDiff >= 0.01) parts.push(`USD: $${formatUSD(usdDiff)}`);
+                if (lbpDiff >= 0.5) parts.push(`LBP: ${formatLBP(lbpDiff)}`);
+                return `Out of balance — ${parts.join(' | ')}`;
+              })()}
             </span>
           </div>
 
