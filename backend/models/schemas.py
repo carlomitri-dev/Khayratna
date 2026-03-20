@@ -388,6 +388,8 @@ class SalesInvoiceResponse(BaseModel):
     debit_account_id: str
     debit_account_code: Optional[str] = None
     debit_account_name: Optional[str] = None
+    customer_address: Optional[str] = None
+    customer_registration_number: Optional[str] = None
     credit_account_id: str
     credit_account_code: Optional[str] = None
     credit_account_name: Optional[str] = None
@@ -945,6 +947,8 @@ class SalesReturnResponse(BaseModel):
     credit_account_id: str
     credit_account_code: Optional[str] = None
     credit_account_name: Optional[str] = None
+    customer_address: Optional[str] = None
+    customer_registration_number: Optional[str] = None
     status: str = 'draft'
     is_posted: bool = False
     voucher_id: Optional[str] = None
