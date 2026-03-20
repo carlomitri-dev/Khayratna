@@ -9,7 +9,7 @@ import uuid
 
 from core.database import db
 from core.auth import get_current_user
-from models.schemas import VoucherCreate, VoucherResponse
+from models.schemas import VoucherCreate, VoucherResponse, VoucherUpdate
 
 router = APIRouter(tags=["Vouchers"])
 
@@ -245,12 +245,10 @@ async def post_voucher(voucher_id: str, current_user: dict = Depends(get_current
 @router.put("/vouchers/{voucher_id}", response_model=VoucherResponse)
 async def update_voucher(
     voucher_id: str,
-    date: Optional[str] = None,
-    reference: Optional[str] = None,
-    description: Optional[str] = None,
+    update_data: VoucherUpdate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Update a voucher (limited fields, draft only)"""
+    """Update a voucher. If posted, unpost first, update, then re-post."""
     if current_user['role'] not in ['super_admin', 'admin', 'accountant']:
         raise HTTPException(status_code=403, detail="Permission denied")
     
@@ -258,21 +256,110 @@ async def update_voucher(
     if not voucher:
         raise HTTPException(status_code=404, detail="Voucher not found")
     
-    if voucher.get('is_posted'):
-        raise HTTPException(status_code=400, detail="Cannot update a posted voucher")
+    was_posted = voucher.get('is_posted', False)
     
-    update_doc = {}
-    if date is not None:
-        update_doc['date'] = date
-    if reference is not None:
-        update_doc['reference'] = reference
-    if description is not None:
-        update_doc['description'] = description
+    # If voucher is posted, reverse its balances first
+    if was_posted:
+        accounts_list = await db.accounts.find(
+            {'organization_id': voucher['organization_id']},
+            {'_id': 0, 'id': 1, 'code': 1}
+        ).to_list(None)
+        code_to_id = {acc['code']: acc['id'] for acc in accounts_list}
+        
+        for line in voucher.get('lines', []):
+            account_code = line.get('account_code', '')
+            account = await db.accounts.find_one(
+                {'code': account_code, 'organization_id': voucher['organization_id']},
+                {'_id': 0}
+            )
+            if not account:
+                continue
+            
+            debit_lbp = line.get('debit_lbp', 0) or 0
+            credit_lbp = line.get('credit_lbp', 0) or 0
+            debit_usd = line.get('debit_usd', 0) or 0
+            credit_usd = line.get('credit_usd', 0) or 0
+            net_lbp = credit_lbp - debit_lbp
+            net_usd = credit_usd - debit_usd
+            
+            await db.accounts.update_one(
+                {'id': account['id']},
+                {'$inc': {'balance_lbp': net_lbp, 'balance_usd': net_usd}}
+            )
+            for i in range(1, len(account_code)):
+                parent_id = code_to_id.get(account_code[:i])
+                if parent_id:
+                    await db.accounts.update_one(
+                        {'id': parent_id},
+                        {'$inc': {'balance_lbp': net_lbp, 'balance_usd': net_usd}}
+                    )
     
-    update_doc['updated_at'] = datetime.now(timezone.utc).isoformat()
+    # Build update document
+    update_doc = {'updated_at': datetime.now(timezone.utc).isoformat()}
+    if update_data.voucher_type is not None:
+        update_doc['voucher_type'] = update_data.voucher_type
+    if update_data.date is not None:
+        update_doc['date'] = update_data.date
+    if update_data.reference is not None:
+        update_doc['reference'] = update_data.reference
+    if update_data.description is not None:
+        update_doc['description'] = update_data.description
+    if update_data.lines is not None:
+        lines_dicts = [l.model_dump() for l in update_data.lines]
+        update_doc['lines'] = lines_dicts
+        update_doc['total_debit_lbp'] = sum(l.debit_lbp for l in update_data.lines)
+        update_doc['total_credit_lbp'] = sum(l.credit_lbp for l in update_data.lines)
+        update_doc['total_debit_usd'] = sum(l.debit_usd for l in update_data.lines)
+        update_doc['total_credit_usd'] = sum(l.credit_usd for l in update_data.lines)
     
-    if update_doc:
-        await db.vouchers.update_one({'id': voucher_id}, {'$set': update_doc})
+    await db.vouchers.update_one({'id': voucher_id}, {'$set': update_doc})
+    
+    # If it was posted, re-post with new data
+    if was_posted:
+        updated_voucher = await db.vouchers.find_one({'id': voucher_id}, {'_id': 0})
+        accounts_list = await db.accounts.find(
+            {'organization_id': updated_voucher['organization_id']},
+            {'_id': 0, 'id': 1, 'code': 1}
+        ).to_list(None)
+        code_to_id = {acc['code']: acc['id'] for acc in accounts_list}
+        
+        for line in updated_voucher.get('lines', []):
+            account_code = line.get('account_code', '')
+            account = await db.accounts.find_one(
+                {'code': account_code, 'organization_id': updated_voucher['organization_id']},
+                {'_id': 0}
+            )
+            if not account:
+                continue
+            
+            debit_lbp = line.get('debit_lbp', 0) or 0
+            credit_lbp = line.get('credit_lbp', 0) or 0
+            debit_usd = line.get('debit_usd', 0) or 0
+            credit_usd = line.get('credit_usd', 0) or 0
+            net_lbp = debit_lbp - credit_lbp
+            net_usd = debit_usd - credit_usd
+            
+            await db.accounts.update_one(
+                {'id': account['id']},
+                {'$inc': {'balance_lbp': net_lbp, 'balance_usd': net_usd}}
+            )
+            for i in range(1, len(account_code)):
+                parent_id = code_to_id.get(account_code[:i])
+                if parent_id:
+                    await db.accounts.update_one(
+                        {'id': parent_id},
+                        {'$inc': {'balance_lbp': net_lbp, 'balance_usd': net_usd}}
+                    )
+        
+        await db.vouchers.update_one(
+            {'id': voucher_id},
+            {'$set': {
+                'is_posted': True,
+                'status': 'posted',
+                'posted_at': datetime.now(timezone.utc).isoformat(),
+                'posted_by': current_user['id']
+            }}
+        )
     
     updated = await db.vouchers.find_one({'id': voucher_id}, {'_id': 0})
     return VoucherResponse(**updated)
