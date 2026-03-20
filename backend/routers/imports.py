@@ -848,11 +848,7 @@ async def import_inventory(
                 except (ValueError, TypeError):
                     is_taxable = False
             
-            # Prices in Excel are TTC (VAT included). Convert to HT for taxable items.
-            if is_taxable and price > 0:
-                price = round(price / 1.11, 3)
-            if is_taxable and cost > 0:
-                cost = round(cost / 1.11, 3)
+            # Prices in Excel are already HT (excluding VAT). Import as-is.
             
             item_name = name_ar or description or f'Item {item_code}'
             
