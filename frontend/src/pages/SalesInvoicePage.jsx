@@ -267,17 +267,33 @@ const SalesInvoicePage = () => {
     }
     setSaving(true);
     try {
+      const cleanedData = {
+        ...formData,
+        lines: formData.lines.map(line => ({
+          ...line,
+          box: line.box === '' || line.box === null || line.box === undefined ? null : parseFloat(line.box) || null,
+          package: parseFloat(line.package) || 0,
+          quantity: parseFloat(line.quantity) || 0,
+          unit_price: parseFloat(line.unit_price) || 0,
+          discount_percent: parseFloat(line.discount_percent) || 0,
+          line_total: parseFloat(line.line_total) || 0,
+          line_total_usd: parseFloat(line.line_total_usd) || 0,
+          exchange_rate: parseFloat(line.exchange_rate) || 1,
+        }))
+      };
       if (editingInvoice) {
-        await axios.put(`${API}/sales-invoices/${editingInvoice.id}`, formData);
+        await axios.put(`${API}/sales-invoices/${editingInvoice.id}`, cleanedData);
         toast.success('Sales invoice updated');
       } else {
-        await axios.post(`${API}/sales-invoices`, formData);
+        await axios.post(`${API}/sales-invoices`, cleanedData);
         toast.success('Sales invoice created');
       }
       setShowForm(false);
       fetchInvoices(true);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to save');
+      const detail = error.response?.data?.detail;
+      const msg = Array.isArray(detail) ? detail.map(e => e.msg).join(', ') : (detail || 'Failed to save');
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
