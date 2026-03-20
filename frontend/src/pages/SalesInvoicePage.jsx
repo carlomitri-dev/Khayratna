@@ -56,7 +56,7 @@ const SalesInvoicePage = () => {
   
   const emptyLine = {
     inventory_item_id: '', item_name: '', item_name_ar: '', barcode: '',
-    box: 0, package: 0, pack_description: '', quantity: 0,
+    box: '', package: 0, pack_description: '', quantity: '',
     unit_price: 0, currency: 'USD',
     exchange_rate: 1, discount_percent: 0, line_total: 0, line_total_usd: 0,
     is_taxable: true
@@ -167,11 +167,24 @@ const SalesInvoicePage = () => {
   const handleLineChange = (index, field, value) => {
     const newLines = [...formData.lines];
     newLines[index] = { ...newLines[index], [field]: value };
-    // Auto-calculate qty when box changes
+    // When box changes → auto-calc qty
     if (field === 'box') {
       const box = parseFloat(value) || 0;
       const pkg = parseFloat(newLines[index].package) || 0;
-      newLines[index].quantity = pkg > 0 ? box * pkg : box;
+      if (box > 0 && pkg > 0) {
+        newLines[index].quantity = box * pkg;
+      } else if (box > 0) {
+        newLines[index].quantity = box;
+      }
+    }
+    // When qty changes → clear box if it doesn't match box*pkg
+    if (field === 'quantity') {
+      const qty = parseFloat(value) || 0;
+      const box = parseFloat(newLines[index].box) || 0;
+      const pkg = parseFloat(newLines[index].package) || 0;
+      if (box > 0 && pkg > 0 && qty !== box * pkg) {
+        newLines[index].box = '';
+      }
     }
     const { lineTotal, lineTotalUsd } = calculateLineTotal(newLines[index]);
     newLines[index].line_total = lineTotal;
@@ -183,8 +196,6 @@ const SalesInvoicePage = () => {
   const handleItemSelect = (index, item) => {
     const newLines = [...formData.lines];
     const pkg = item.package || 0;
-    const box = 1;
-    const qty = pkg > 0 ? box * pkg : box;
     newLines[index] = {
       ...newLines[index],
       inventory_item_id: item.id,
@@ -196,8 +207,8 @@ const SalesInvoicePage = () => {
       discount_percent: item.discount_percent || 0,
       package: pkg,
       pack_description: item.pack_description || '',
-      box: box,
-      quantity: qty
+      box: '',
+      quantity: ''
     };
     const { lineTotal, lineTotalUsd } = calculateLineTotal(newLines[index]);
     newLines[index].line_total = lineTotal;
@@ -577,13 +588,13 @@ const SalesInvoicePage = () => {
                           />
                         </td>
                         <td className="p-2">
-                          <Input type="number" value={line.box || ''} onChange={(e) => handleLineChange(index, 'box', e.target.value)} min="0" step="1" className="h-9 text-center" placeholder="0" />
+                          <Input type="number" value={line.box} onChange={(e) => handleLineChange(index, 'box', e.target.value)} min="0" step="1" className="h-9 text-center" placeholder="" />
                         </td>
                         <td className="p-2 text-center text-xs text-muted-foreground font-mono">
                           {line.package || '-'}
                         </td>
-                        <td className="p-2 text-center font-mono font-semibold">
-                          {line.quantity || 0}
+                        <td className="p-2">
+                          <Input type="number" value={line.quantity} onChange={(e) => handleLineChange(index, 'quantity', e.target.value)} min="0" step="0.01" className="h-9 text-center" placeholder="" />
                         </td>
                         <td className="p-2">
                           <Input type="number" value={line.unit_price} onChange={(e) => handleLineChange(index, 'unit_price', e.target.value)} min="0" step="0.01" className="h-9" />
