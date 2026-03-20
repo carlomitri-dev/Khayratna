@@ -70,7 +70,8 @@ const SalesReturnPage = () => {
   
   const emptyLine = {
     inventory_item_id: '', item_name: '', item_name_ar: '', barcode: '',
-    quantity: 1, unit: 'piece', unit_price: 0, currency: 'USD',
+    box: '', package: 0, pack_description: '', quantity: '',
+    unit_price: 0, currency: 'USD',
     exchange_rate: 1, discount_percent: 0, line_total: 0, line_total_usd: 0,
     is_taxable: true
   };
@@ -179,6 +180,25 @@ const SalesReturnPage = () => {
   const handleLineChange = (index, field, value) => {
     const newLines = [...formData.lines];
     newLines[index] = { ...newLines[index], [field]: value };
+    // When box changes → auto-calc qty
+    if (field === 'box') {
+      const box = parseFloat(value) || 0;
+      const pkg = parseFloat(newLines[index].package) || 0;
+      if (box > 0 && pkg > 0) {
+        newLines[index].quantity = box * pkg;
+      } else if (box > 0) {
+        newLines[index].quantity = box;
+      }
+    }
+    // When qty changes → clear box if it doesn't match box*pkg
+    if (field === 'quantity') {
+      const qty = parseFloat(value) || 0;
+      const box = parseFloat(newLines[index].box) || 0;
+      const pkg = parseFloat(newLines[index].package) || 0;
+      if (box > 0 && pkg > 0 && qty !== box * pkg) {
+        newLines[index].box = '';
+      }
+    }
     const { lineTotal, lineTotalUsd } = calculateLineTotal(newLines[index]);
     newLines[index].line_total = lineTotal;
     newLines[index].line_total_usd = lineTotalUsd;
@@ -188,15 +208,20 @@ const SalesReturnPage = () => {
   
   const handleItemSelect = (index, item) => {
     const newLines = [...formData.lines];
+    const pkg = item.package || 0;
     newLines[index] = {
       ...newLines[index],
       inventory_item_id: item.id,
       item_name: item.name, item_name_ar: item.name_ar || '',
-      barcode: item.barcode || '', unit: item.unit || 'piece',
+      barcode: item.barcode || '',
       unit_price: item.price || 0, currency: item.currency || 'USD',
       exchange_rate: item.currency === 'LBP' ? exchangeRate : 1,
       is_taxable: item.is_taxable !== false,
-      discount_percent: item.discount_percent || 0
+      discount_percent: item.discount_percent || 0,
+      package: pkg,
+      pack_description: item.pack_description || '',
+      box: '',
+      quantity: ''
     };
     const { lineTotal, lineTotalUsd } = calculateLineTotal(newLines[index]);
     newLines[index].line_total = lineTotal;
@@ -568,8 +593,9 @@ const SalesReturnPage = () => {
                   <thead>
                     <tr className="border-b bg-muted/30">
                       <th className="text-left p-2 min-w-[200px]">Item</th>
-                      <th className="text-left p-2 w-[80px]">Qty</th>
-                      <th className="text-left p-2 w-[80px]">Unit</th>
+                      <th className="text-center p-2 w-[100px]">Box</th>
+                      <th className="text-center p-2 w-[50px]">Pkg</th>
+                      <th className="text-center p-2 w-[100px]">Qty</th>
                       <th className="text-left p-2 w-[100px]">Price</th>
                       <th className="text-left p-2 w-[80px]">Currency</th>
                       <th className="text-left p-2 w-[80px]">Disc %</th>
@@ -592,10 +618,13 @@ const SalesReturnPage = () => {
                           />
                         </td>
                         <td className="p-2">
-                          <Input type="number" value={line.quantity} onChange={(e) => handleLineChange(index, 'quantity', e.target.value)} min="0" step="0.01" className="h-9" />
+                          <Input type="number" value={line.box} onChange={(e) => handleLineChange(index, 'box', e.target.value)} min="0" step="1" className="h-9 text-center" placeholder="" />
+                        </td>
+                        <td className="p-2 text-center text-xs text-muted-foreground font-mono">
+                          {line.package || '-'}
                         </td>
                         <td className="p-2">
-                          <Input value={line.unit} onChange={(e) => handleLineChange(index, 'unit', e.target.value)} className="h-9" />
+                          <Input type="number" value={line.quantity} onChange={(e) => handleLineChange(index, 'quantity', e.target.value)} min="0" step="1" className="h-9 text-center" placeholder="" />
                         </td>
                         <td className="p-2">
                           <Input type="number" value={line.unit_price} onChange={(e) => handleLineChange(index, 'unit_price', e.target.value)} min="0" step="0.01" className="h-9" />
