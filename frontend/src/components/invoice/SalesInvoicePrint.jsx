@@ -21,8 +21,9 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
   const discount = invoice?.discount_amount_usd || invoice?.discount_amount || 0;
   const customerName = customer?.name || invoice?.customer_name || '';
   const customerCode = customer?.code || invoice?.customer_code || '';
-  const customerAddress = customer?.address || invoice?.customer_address || '';
+  const customerRegNo = customer?.registration_number || invoice?.customer_registration_number || '';
 
+  const customerAddress = customer?.address || invoice?.customer_address || '';
   // Use absolute URL so the popup window can load the logo
   const logoUrl = `${window.location.origin}/assets/khayratna-logo.png`;
 
@@ -33,13 +34,15 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
     const itemRows = lines.map((line, i) => {
       const isTaxed = line.is_taxable !== false;
       const lineTotal = (line.quantity || 0) * (line.unit_price || line.price || 0) * (1 - (line.discount_percent || 0) / 100);
+      const pkg = line.package || 0;
       return `
         <tr>
           <td style="text-align:center;padding:3px 2px;border:1px solid #000;">${i + 1}</td>
           <td style="text-align:right;padding:3px 4px;border:1px solid #000;direction:rtl;">
             ${line.name_ar || line.item_name || line.name || ''}${isTaxed ? ' <span style="font-weight:bold;">*</span>' : ''}
           </td>
-          <td style="text-align:center;padding:3px 2px;border:1px solid #000;">${line.pack_description || line.package || '-'}</td>
+          <td style="text-align:center;padding:3px 2px;border:1px solid #000;">${line.pack_description || line.package_desc || '-'}</td>
+          <td style="text-align:center;padding:3px 2px;border:1px solid #000;">${pkg || '-'}</td>
           <td style="text-align:center;padding:3px 2px;border:1px solid #000;">${line.quantity || 0}</td>
           <td style="text-align:right;padding:3px 4px;border:1px solid #000;">${(line.unit_price || line.price || 0).toFixed(3)}</td>
           <td style="text-align:center;padding:3px 2px;border:1px solid #000;">${line.discount_percent ? line.discount_percent + '%' : '-'}</td>
@@ -52,6 +55,7 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
     const emptyRowsHtml = Array(emptyRows).fill(`
       <tr>
         <td style="padding:3px 2px;border:1px solid #000;">&nbsp;</td>
+        <td style="padding:3px 2px;border:1px solid #000;"></td>
         <td style="padding:3px 2px;border:1px solid #000;"></td>
         <td style="padding:3px 2px;border:1px solid #000;"></td>
         <td style="padding:3px 2px;border:1px solid #000;"></td>
@@ -167,7 +171,7 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
       <div class="customer-field"><span class="customer-label">Invoice #:</span> ${invoice?.invoice_number || ''}</div>
     </div>
     <div class="customer-right">
-      <div class="customer-field"><span class="customer-label">إسم الزبون:</span> ${customerName}</div>
+      <div class="customer-field"><span class="customer-label">إسم الزبون:</span> ${customerName}${customerRegNo ? ' &nbsp; <span class="customer-label">ض.ق.م:</span> ' + customerRegNo : ''}</div>
       <div class="customer-field"><span class="customer-label">رقم الزبون:</span> ${customerCode}</div>
       <div class="customer-field"><span class="customer-label">العنوان:</span> ${customerAddress}</div>
     </div>
@@ -178,7 +182,8 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
         <th style="width:30px;">الرقم<br/>#</th>
         <th style="width:auto;">الصنف<br/>Item</th>
         <th style="width:55px;">صندوق<br/>Box</th>
-        <th style="width:45px;">العدد<br/>Qty</th>
+        <th style="width:35px;">عدد<br/>Pkg</th>
+        <th style="width:45px;">الكمية<br/>Qty</th>
         <th style="width:60px;">السعر<br/>Price</th>
         <th style="width:45px;">حسم<br/>Disc</th>
         <th style="width:65px;">المجموع<br/>Total</th>

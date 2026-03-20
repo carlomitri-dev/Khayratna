@@ -19,15 +19,17 @@ router = APIRouter(prefix="/sales-returns", tags=["sales-returns"])
 async def enrich_sales_return(ret: dict) -> dict:
     """Enrich sales return with related account data"""
     if ret.get('debit_account_id'):
-        acc = await db.accounts.find_one({'id': ret['debit_account_id']}, {'name': 1, 'code': 1})
+        acc = await db.accounts.find_one({'id': ret['debit_account_id']}, {'name': 1, 'code': 1, '_id': 0})
         if acc:
             ret['debit_account_name'] = acc.get('name')
             ret['debit_account_code'] = acc.get('code')
     if ret.get('credit_account_id'):
-        acc = await db.accounts.find_one({'id': ret['credit_account_id']}, {'name': 1, 'code': 1})
+        acc = await db.accounts.find_one({'id': ret['credit_account_id']}, {'name': 1, 'code': 1, 'registration_number': 1, 'address': 1, 'vat_number': 1, '_id': 0})
         if acc:
             ret['credit_account_name'] = acc.get('name')
             ret['credit_account_code'] = acc.get('code')
+            ret['customer_address'] = acc.get('address', '')
+            ret['customer_registration_number'] = acc.get('registration_number') or acc.get('vat_number', '')
     return ret
 
 

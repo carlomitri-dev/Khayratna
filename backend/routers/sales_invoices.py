@@ -26,13 +26,15 @@ def init_router(database, auth_dependency):
 async def enrich_sales_invoice(invoice: dict) -> dict:
     """Enrich sales invoice with related data"""
     if invoice.get('debit_account_id'):
-        customer = await db.accounts.find_one({'id': invoice['debit_account_id']}, {'name': 1, 'code': 1})
+        customer = await db.accounts.find_one({'id': invoice['debit_account_id']}, {'name': 1, 'code': 1, 'registration_number': 1, 'address': 1, 'vat_number': 1, '_id': 0})
         if customer:
             invoice['customer_name'] = customer.get('name')
             invoice['customer_code'] = customer.get('code')
+            invoice['customer_address'] = customer.get('address', '')
+            invoice['customer_registration_number'] = customer.get('registration_number') or customer.get('vat_number', '')
     
     if invoice.get('credit_account_id'):
-        sales_account = await db.accounts.find_one({'id': invoice['credit_account_id']}, {'name': 1, 'code': 1})
+        sales_account = await db.accounts.find_one({'id': invoice['credit_account_id']}, {'name': 1, 'code': 1, '_id': 0})
         if sales_account:
             invoice['sales_account_name'] = sales_account.get('name')
             invoice['sales_account_code'] = sales_account.get('code')

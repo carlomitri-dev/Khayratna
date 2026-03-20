@@ -323,7 +323,8 @@ const SalesReturnPage = () => {
       customer: {
         name: ret.credit_account_name || '',
         code: ret.credit_account_code || '',
-        address: ''
+        address: ret.customer_address || '',
+        registration_number: ret.customer_registration_number || ''
       }
     });
     printInvoice();
@@ -342,7 +343,8 @@ const SalesReturnPage = () => {
       customer: {
         name: ret.credit_account_name || '',
         code: ret.credit_account_code || '',
-        address: ''
+        address: ret.customer_address || '',
+        registration_number: ret.customer_registration_number || ''
       }
     });
     downloadPdf();

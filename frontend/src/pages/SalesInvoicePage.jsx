@@ -183,7 +183,9 @@ const SalesInvoicePage = () => {
       unit_price: item.price || 0, currency: item.currency || 'USD',
       exchange_rate: item.currency === 'LBP' ? exchangeRate : 1,
       is_taxable: item.is_taxable !== false,
-      discount_percent: item.discount_percent || 0
+      discount_percent: item.discount_percent || 0,
+      package: item.package || 0,
+      pack_description: item.pack_description || ''
     };
     const { lineTotal, lineTotalUsd } = calculateLineTotal(newLines[index]);
     newLines[index].line_total = lineTotal;
@@ -304,7 +306,8 @@ const SalesInvoicePage = () => {
       customer: {
         name: inv.debit_account_name || inv.customer_name || '',
         code: inv.debit_account_code || inv.customer_code || '',
-        address: inv.customer_address || ''
+        address: inv.customer_address || '',
+        registration_number: inv.customer_registration_number || ''
       }
     });
     printInvoice();
@@ -317,7 +320,8 @@ const SalesInvoicePage = () => {
       customer: {
         name: inv.debit_account_name || inv.customer_name || '',
         code: inv.debit_account_code || inv.customer_code || '',
-        address: inv.customer_address || ''
+        address: inv.customer_address || '',
+        registration_number: inv.customer_registration_number || ''
       }
     });
     downloadPdf();
@@ -509,6 +513,7 @@ const SalesInvoicePage = () => {
                   <thead>
                     <tr className="border-b bg-muted/30">
                       <th className="text-left p-2 min-w-[200px]">Item</th>
+                      <th className="text-center p-2 w-[50px]">Pkg</th>
                       <th className="text-left p-2 w-[80px]">Qty</th>
                       <th className="text-left p-2 w-[80px]">Unit</th>
                       <th className="text-left p-2 w-[100px]">Price</th>
@@ -533,6 +538,9 @@ const SalesInvoicePage = () => {
                             apiUrl={API}
                             fallbackLabel={line.item_name || line.item_name_ar}
                           />
+                        </td>
+                        <td className="p-2 text-center text-xs text-muted-foreground font-mono">
+                          {line.package || '-'}
                         </td>
                         <td className="p-2">
                           <Input type="number" value={line.quantity} onChange={(e) => handleLineChange(index, 'quantity', e.target.value)} min="0" step="0.01" className="h-9" />
