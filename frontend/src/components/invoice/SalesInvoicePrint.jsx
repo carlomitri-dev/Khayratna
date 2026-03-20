@@ -68,7 +68,7 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
   const getStyles = () => `
     body, .invoice-container {
       font-family: Arial, sans-serif;
-      font-size: 13px;
+      font-size: 15px;
       color: #000;
       background: #fff;
       margin: 0;
@@ -85,12 +85,12 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
     .header-left { text-align: left; flex: 1; }
     .header-center { text-align: center; flex: 0 0 140px; display: flex; align-items: center; justify-content: center; }
     .header-right { text-align: right; flex: 1; direction: rtl; }
-    .header h2 { font-size: 16px; margin: 0 0 3px 0; color: #000; }
-    .header p { margin: 1px 0; font-size: 12px; color: #000; }
+    .header h2 { font-size: 18px; margin: 0 0 3px 0; color: #000; }
+    .header p { margin: 1px 0; font-size: 14px; color: #000; }
     .logo-img { max-height: 80px; max-width: 140px; }
     .invoice-title {
       text-align: center;
-      font-size: 20px;
+      font-size: 22px;
       font-weight: bold;
       color: #000;
       margin: 6px 0;
@@ -106,7 +106,7 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
     }
     .customer-left { text-align: left; }
     .customer-right { text-align: right; direction: rtl; }
-    .customer-field { margin: 2px 0; font-size: 13px; }
+    .customer-field { margin: 2px 0; font-size: 15px; }
     .customer-label { font-weight: bold; color: #000; }
     table.items {
       width: 100%;
@@ -118,23 +118,23 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
       background: #fff;
       color: #000;
       padding: 4px 3px;
-      font-size: 12px;
+      font-size: 14px;
       border: 1px solid #000;
       font-weight: bold;
     }
-    table.items td { font-size: 12px; }
+    table.items td { font-size: 14px; }
     table.items tbody tr { page-break-inside: avoid; }
     .totals-section { display: flex; justify-content: flex-end; margin-top: 4px; }
     .totals-table { width: 300px; border-collapse: collapse; }
-    .totals-table td { padding: 3px 8px; font-size: 13px; border: 1px solid #000; color: #000; }
+    .totals-table td { padding: 3px 8px; font-size: 15px; border: 1px solid #000; color: #000; }
     .totals-table .label { text-align: right; direction: rtl; font-weight: bold; background: #fff; }
     .totals-table .value { text-align: right; font-family: monospace; background: #fff; }
-    .totals-table .grand-total td { font-size: 15px; font-weight: bold; border: 2px solid #000; }
-    .star-note { font-size: 11px; color: #000; margin-top: 4px; direction: rtl; text-align: right; font-weight: bold; }
-    .footer { margin-top: 10px; font-size: 11px; color: #000; direction: rtl; text-align: right; }
+    .totals-table .grand-total td { font-size: 17px; font-weight: bold; border: 2px solid #000; }
+    .star-note { font-size: 13px; color: #000; margin-top: 4px; direction: rtl; text-align: right; font-weight: bold; }
+    .footer { margin-top: 10px; font-size: 13px; color: #000; direction: rtl; text-align: right; }
     .signature-area { display: flex; justify-content: space-between; margin-top: 16px; }
     .signature-box { width: 200px; text-align: center; }
-    .signature-line { border-top: 1px solid #000; margin-top: 35px; padding-top: 4px; font-size: 12px; }
+    .signature-line { border-top: 1px solid #000; margin-top: 35px; padding-top: 4px; font-size: 14px; }
   `;
 
   // Build invoice body HTML (without <html>/<head> wrapper)
