@@ -100,7 +100,8 @@ const CustomersPage = () => {
         contact_person: editCustomer.contact_person || '',
         email: editCustomer.email || '',
         notes: editCustomer.notes || '',
-        vat_number: editCustomer.vat_number || ''
+        vat_number: editCustomer.vat_number || '',
+        registration_number: editCustomer.registration_number || ''
       });
       
       alert('Customer information updated successfully!');
@@ -476,12 +477,12 @@ const CustomersPage = () => {
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Hash className="w-4 h-4" />
-                  VAT Number
+                  Registration #
                 </Label>
                 <Input
-                  placeholder="Enter VAT number..."
-                  value={editCustomer.vat_number || ''}
-                  onChange={(e) => setEditCustomer({ ...editCustomer, vat_number: e.target.value })}
+                  placeholder="Enter registration number..."
+                  value={editCustomer.registration_number || editCustomer.vat_number || ''}
+                  onChange={(e) => setEditCustomer({ ...editCustomer, registration_number: e.target.value })}
                 />
               </div>
               

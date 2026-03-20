@@ -564,7 +564,7 @@ async def update_account_contact_info(
     
     # Build update document from contact data
     update_doc = {}
-    allowed_fields = ['mobile', 'phone', 'email', 'address', 'contact_person', 'notes', 'tax_id', 'vat_number']
+    allowed_fields = ['mobile', 'phone', 'email', 'address', 'contact_person', 'notes', 'tax_id', 'vat_number', 'registration_number']
     
     for field in allowed_fields:
         if field in contact_data and contact_data[field] is not None:

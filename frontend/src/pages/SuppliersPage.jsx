@@ -99,7 +99,8 @@ const SuppliersPage = () => {
         contact_person: editSupplier.contact_person || '',
         email: editSupplier.email || '',
         notes: editSupplier.notes || '',
-        vat_number: editSupplier.vat_number || ''
+        vat_number: editSupplier.vat_number || '',
+        registration_number: editSupplier.registration_number || ''
       });
       
       alert('Supplier information updated successfully!');
@@ -473,12 +474,12 @@ const SuppliersPage = () => {
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Hash className="w-4 h-4" />
-                  VAT Number
+                  Registration #
                 </Label>
                 <Input
-                  placeholder="Enter VAT number..."
-                  value={editSupplier.vat_number || ''}
-                  onChange={(e) => setEditSupplier({ ...editSupplier, vat_number: e.target.value })}
+                  placeholder="Enter registration number..."
+                  value={editSupplier.registration_number || editSupplier.vat_number || ''}
+                  onChange={(e) => setEditSupplier({ ...editSupplier, registration_number: e.target.value })}
                 />
               </div>
               
