@@ -308,7 +308,8 @@ const SalesInvoicePage = () => {
         code: inv.debit_account_code || inv.customer_code || '',
         address: inv.customer_address || '',
         registration_number: inv.customer_registration_number || '',
-        balance_usd: inv.customer_balance_usd || 0
+        balance_usd: inv.customer_balance_usd || 0,
+        vat_balance_usd: inv.customer_vat_balance_usd || 0
       }
     });
     printInvoice();
@@ -323,7 +324,8 @@ const SalesInvoicePage = () => {
         code: inv.debit_account_code || inv.customer_code || '',
         address: inv.customer_address || '',
         registration_number: inv.customer_registration_number || '',
-        balance_usd: inv.customer_balance_usd || 0
+        balance_usd: inv.customer_balance_usd || 0,
+        vat_balance_usd: inv.customer_vat_balance_usd || 0
       }
     });
     downloadPdf();

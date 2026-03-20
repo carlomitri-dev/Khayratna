@@ -31,6 +31,14 @@ async def enrich_sales_return(ret: dict) -> dict:
             ret['customer_address'] = acc.get('address', '')
             ret['customer_registration_number'] = acc.get('registration_number') or acc.get('vat_number', '')
             ret['customer_balance_usd'] = acc.get('balance_usd', 0)
+            # Fetch VAT mirror account balance (4111 → 4114)
+            cust_code = acc.get('code', '')
+            if cust_code.startswith('4111') and len(cust_code) > 4:
+                vat_code = '4114' + cust_code[4:]
+                vat_acc = await db.accounts.find_one({'code': vat_code, 'organization_id': ret['organization_id']}, {'balance_usd': 1, '_id': 0})
+                ret['customer_vat_balance_usd'] = vat_acc.get('balance_usd', 0) if vat_acc else 0
+            else:
+                ret['customer_vat_balance_usd'] = 0
     return ret
 
 

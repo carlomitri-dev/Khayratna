@@ -25,6 +25,7 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
 
   const customerAddress = customer?.address || invoice?.customer_address || '';
   const customerBalance = customer?.balance_usd ?? invoice?.customer_balance_usd ?? 0;
+  const customerVatBalance = customer?.vat_balance_usd ?? invoice?.customer_vat_balance_usd ?? 0;
   // Use absolute URL so the popup window can load the logo
   const logoUrl = `${window.location.origin}/assets/khayratna-logo.png`;
 
@@ -198,9 +199,16 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
   <p class="star-note">* = خاضع للضريبة على القيمة المضافة (Subject to VAT)</p>
   <div class="totals-section">
     <div class="balance-left" style="flex:1;display:flex;align-items:flex-end;padding-bottom:4px;">
-      <div style="direction:rtl;font-size:15px;font-weight:bold;border:1px solid #000;padding:4px 10px;">
-        الرصيد الحالي : ${customerBalance.toFixed(3)}
-      </div>
+      <table style="border-collapse:collapse;font-size:14px;direction:rtl;">
+        <tr>
+          <td style="border:1px solid #000;padding:3px 10px;font-weight:bold;text-align:right;">رصيد الحساب (4111)</td>
+          <td style="border:1px solid #000;padding:3px 10px;font-family:monospace;text-align:right;">${customerBalance.toFixed(3)}</td>
+        </tr>
+        <tr>
+          <td style="border:1px solid #000;padding:3px 10px;font-weight:bold;text-align:right;">رصيد ض.ق.م (4114)</td>
+          <td style="border:1px solid #000;padding:3px 10px;font-family:monospace;text-align:right;">${customerVatBalance.toFixed(3)}</td>
+        </tr>
+      </table>
     </div>
     <table class="totals-table">
       <tr>
