@@ -561,9 +561,9 @@ const SalesInvoicePage = () => {
                   <thead>
                     <tr className="border-b bg-muted/30">
                       <th className="text-left p-2 min-w-[200px]">Item</th>
-                      <th className="text-center p-2 w-[70px]">Box</th>
+                      <th className="text-center p-2 w-[100px]">Box</th>
                       <th className="text-center p-2 w-[50px]">Pkg</th>
-                      <th className="text-center p-2 w-[70px]">Qty</th>
+                      <th className="text-center p-2 w-[100px]">Qty</th>
                       <th className="text-left p-2 w-[100px]">Price</th>
                       <th className="text-left p-2 w-[80px]">Currency</th>
                       <th className="text-left p-2 w-[80px]">Disc %</th>
@@ -594,7 +594,7 @@ const SalesInvoicePage = () => {
                           {line.package || '-'}
                         </td>
                         <td className="p-2">
-                          <Input type="number" value={line.quantity} onChange={(e) => handleLineChange(index, 'quantity', e.target.value)} min="0" step="0.01" className="h-9 text-center" placeholder="" />
+                          <Input type="number" value={line.quantity} onChange={(e) => handleLineChange(index, 'quantity', e.target.value)} min="0" step="1" className="h-9 text-center" placeholder="" />
                         </td>
                         <td className="p-2">
                           <Input type="number" value={line.unit_price} onChange={(e) => handleLineChange(index, 'unit_price', e.target.value)} min="0" step="0.01" className="h-9" />
