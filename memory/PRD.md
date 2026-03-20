@@ -1,92 +1,78 @@
-# KAIROS - Digital Invoicing System
+# Lebanese Accounting System - PRD
 
 ## Original Problem Statement
-Lebanese accounting/invoicing SaaS (KAIROS) with React + FastAPI + MongoDB. Full accounting, invoicing, inventory, POS, exchange rates.
+Full-scale invoicing and accounting system with modules for sales/purchase invoices, sales/purchase returns, chart of accounts, inventory management, data import/export, POS, and financial reports (Journal, Trial Balance). Built with React frontend + FastAPI backend + MongoDB.
 
-## Architecture
-- **Frontend**: React (port 3000), Shadcn/UI, Recharts
-- **Backend**: FastAPI (port 8001), MongoDB, modular routers in `/app/backend/routers/`
-- **Auth**: JWT-based, role-based (super_admin, admin, accountant, cashier)
+## Core Modules
+- Sales Invoices (with Box/Pkg/Qty system)
+- Purchase Invoices
+- Sales Returns (with Box/Pkg/Qty system)
+- Purchase Returns
+- Journal (all posted vouchers, unbalanced filter)
+- Trial Balance (date filters, orphan-code checker)
+- Chart of Accounts
+- Inventory Management
+- POS
+- Settings (data cleanup utilities)
 
-## Implemented Modules
-- Chart of Accounts (LCOA), Fiscal Years
-- Voucher Entry (journal, receipt, payment, sales, payroll)
-- Sales & Purchase Invoices (with print, post/unpost)
-- Sales & Purchase Returns (with print)
-- Purchase Orders (full workflow, post as invoice, print, mobile-friendly)
-- Credit/Debit Notes
-- Inventory Management (CSV/DBF import, batch/expiry)
-- POS Terminal (barcode scanner, quick items, cart, receipt print, void/delete transactions)
-- POS Receipt Customization (logo, header/footer, printer width, live preview)
-- Cashier System (sessions, PIN login, admin management)
-- POS Daily Closing Report + POS Sales Analytics Dashboard
-- Customer & Supplier Management (with VAT number, mirror account creation)
-- Exchange Rates (USD/LBP simplified)
-- Reports: Trial Balance, Income Statement, General Ledger
+## What's Been Implemented
 
-## Changes Log
+### Completed Features
+- Full CRUD for Sales/Purchase Invoices & Returns
+- Box/Pkg/Qty calculation system on Sales Invoice and Sales Return forms
+- Print templates with customer data, registration numbers, account balances
+- Journal module with unbalanced voucher filter
+- Trial Balance with date-range filtering and orphan-code check
+- Data import/export (CSV)
+- Fiscal year management
+- Organization cleanup utility
+- html2pdf.js for PDF generation
 
-### March 19, 2026 (Session 7)
-- **Database Cleanup** — Cleaned 35,209 orphaned documents (28K+ vouchers, 4K accounts, etc.) from deleted organization. DB reduced from 34MB to <1KB
-- **Background Voucher Import** — Refactored `/api/import/vouchers` to use `asyncio.create_task()` background processing:
-  - Returns immediately with `job_id` (no more timeout)
-  - New polling endpoint: `GET /api/import/vouchers/status/{job_id}` 
-  - Real-time progress bar on frontend (0-100%) with status messages
-  - Both Quick Import and Match Fields flows use background processing
-- **Organization Delete Fix** — Added missing collection cleanup (fiscal_years, regions, receipt_settings, sales_returns, purchase_returns, purchase_orders, sales_quotations) to the delete organization endpoint
+### Recent Fixes (Current Session - March 2026)
+- **Print Template**: Removed redundant "Unit/وحدة" column. New order: # | Item | Box | Pkg | Qty | Price | Disc | Total (8 columns)
+- **Data Persistence Bug**: Box/Package/PackDescription fields now correctly saved on Sales Invoices (schema was already fixed in prior session)
+- **SalesReturnLineItem Schema**: Added box, package, pack_description fields to prevent same data-loss bug on Sales Returns
 
-### March 17, 2026 (Session 6)
-- **Invoice Print Template Redesign** — Updated `SalesInvoicePrint.jsx` with:
-  - Replaced "MM" text logo with Khayratna Logo (served via URL from /assets/)
-  - Increased all font sizes by 2 points
-  - Converted template to full monochrome (white bg, black text) for laser printer optimization
-  - Expanded item table from 15 to 20 rows per page
-  - Added CSS `@media print` rules for multi-page support with repeating table headers
-  - Removed duplicate VAT notice line
-- **PDF Export/Download** — Added `html2pdf.js` integration:
-  - `downloadPdf()` function in `SalesInvoicePrint.jsx` generates PDF from the same monochrome template
-  - Download PDF buttons added to Sales Invoice list + view dialog
-  - Download PDF buttons added to Sales Return list + view dialog
-  - PDF files named `Invoice-{number}.pdf` with A4 format
-- **Codebase Cleanup** — Removed 9 unused offline library files (db.js, syncService.js, etc.)
+### Prior Session Fixes
+- Fixed customer address, VAT#, account balances on printed invoices
+- Fixed voucher editing from Journal page
+- Fixed imported voucher editing (account codes, amounts)
+- Fixed historical/posted voucher updates
+- Fixed missing item descriptions on invoice edit
+- Increased font sizes on print template
+- Corrected inventory import logic (prices as HT)
+- Added registration_number display on customer/supplier/inventory pages
 
-### March 17, 2026 (Session 5 continued)
-- **Sales Invoice Due Date Freeze Fix** — Fixed DateInput component
-- **Account Balance by Fiscal Year** — Added `fy_id` parameter to account endpoints
-- **Restored Custom Print Template** — SalesInvoicePrint component with bilingual headers
-- **Inventory Searchable Dropdowns** — Replaced dropdowns with searchable comboboxes
+## Prioritized Backlog
 
-### March 15, 2026 (Session 5)
-- **Auto Account Code Generation** — Fixed `/api/accounts/next-code` endpoint
-- **Exchange Rate Visibility in Cr/Db Notes** — Rate input visible and editable
-- **CrDb Notes handleSave Bug Fix** — Fixed save failures after refactoring
-- **z-index Dropdown Fix** — Added z-[60] to Header dropdown menus
-- **Dashboard React Warnings Fix** — Wrapped callbacks with useCallback
-- **Recent Transactions Widget** — 3-column quick-access widget on Dashboard
-- **Auto-Retry on Connection Error** — Global axios interceptor with retry button
-- **Global Loading Bar** — YouTube/GitHub-style loading bar during API calls
-- **Keyboard Shortcuts** — Power-user shortcuts with help dialog
+### P0 (Critical)
+- ~~Trial Balance Discrepancy~~ (DONE per user confirmation)
 
-### March 14, 2026 (Session 4)
-- **POS Transaction Void (Soft Delete)** — Void with reason, reverse balances
-- **Purchase Orders Module** — Full CRUD + workflow + post as invoice
-- **POS Receipt Customization** — Settings dialog with logo, header, footer
-- **POS Sales Analytics Dashboard** — Charts for trends, top items
-- **AccountSelector Refactored** — Shared RemoteAccountSelector component
+### P1 (High)
+- ~~Print Template Cleanup~~ (DONE - Unit column removed)
+- ~~Box/Package data persistence bug~~ (DONE - Schema fixed)
 
-### March 19, 2026 (Session 8)
-- **Journal Module** — New `/journal` page displaying all posted vouchers:
-  - Sidebar link placed above "Trial Balance" as requested
-  - Date range filter (From/To) with fiscal year support
-  - Full voucher detail display: number, type, date, description, reference, all lines with account code/name/debit/credit in USD & LBP
-  - Unbalanced voucher detection (debit != credit) with red highlighting and "UNBALANCED" label
-  - Grand totals section showing debit/credit in both USD and LBP
-  - Action buttons: Edit (navigates to voucher editor), Unpost (super_admin), Delete (with confirmation dialog)
-  - Print and PDF export (landscape A4)
+### P2 (Medium)
+- Apply Box/Pkg/Qty to Purchase Invoice and Purchase Return forms
+- Email PDF invoices to customers
 
-## Known Issues
-- None currently tracked.
+### P3 (Low)
+- Sales Quotations workflow enhancements
+- Refactor print data-fetching into shared hook
+- Centralize customer data fetching for print across Invoice/Return pages
 
-## Backlog
-- Email Invoices (P1): Send PDF invoices directly to customers via email
-- Sales Quotations Workflow (P2): Potential enhancements to the existing quotations feature
+## Tech Stack
+- Frontend: React, Shadcn UI, html2pdf.js
+- Backend: FastAPI, Pydantic, Motor (async MongoDB)
+- Database: MongoDB
+- Auth: JWT-based
+
+## Key Technical Notes
+- Pydantic models use `extra="ignore"` — new fields MUST be explicitly added to schemas
+- Print templates generate raw HTML strings rendered in popup windows
+- Frontend fetches customer data directly via API before printing (more reliable than backend enrichment)
+- All monetary values stored with USD precision (3 decimal places)
+
+## Credentials
+- Email: carlo.mitri@gmail.com
+- Password: Carinemi@28
