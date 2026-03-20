@@ -566,6 +566,7 @@ const SalesReturnPage = () => {
                             onChange={(val) => handleLineChange(index, 'inventory_item_id', val)}
                             onItemSelect={(item) => handleItemSelect(index, item)}
                             placeholder="Search item..."
+                            fallbackLabel={line.item_name || line.item_name_ar}
                           />
                         </td>
                         <td className="p-2">

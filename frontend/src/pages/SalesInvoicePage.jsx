@@ -531,6 +531,7 @@ const SalesInvoicePage = () => {
                             placeholder="Search item..."
                             organizationId={currentOrg?.id}
                             apiUrl={API}
+                            fallbackLabel={line.item_name || line.item_name_ar}
                           />
                         </td>
                         <td className="p-2">

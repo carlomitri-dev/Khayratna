@@ -21,7 +21,8 @@ const InventorySelector = ({
   organizationId, 
   apiUrl, 
   onItemSelect, 
-  onCreateNewItem 
+  onCreateNewItem,
+  fallbackLabel
 }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -117,6 +118,8 @@ const InventorySelector = ({
             <span className="truncate">
               {selectedItem.barcode ? `[${selectedItem.barcode}] ` : ''}{selectedItem.name}
             </span>
+          ) : value && fallbackLabel ? (
+            <span className="truncate">{fallbackLabel}</span>
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
           )}

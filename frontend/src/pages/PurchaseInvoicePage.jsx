@@ -575,6 +575,7 @@ const PurchaseInvoicePage = () => {
                             placeholder="Search item..."
                             organizationId={currentOrg?.id}
                             apiUrl={API}
+                            fallbackLabel={line.item_name || line.item_name_ar}
                           />
                           {line.inventory_item_id === '' && (
                             <Input placeholder="Item name (manual)" value={line.item_name} onChange={(e) => handleLineChange(index, 'item_name', e.target.value)} className="mt-1 h-8 text-xs" />
