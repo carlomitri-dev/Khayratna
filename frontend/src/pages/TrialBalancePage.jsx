@@ -3,11 +3,14 @@ import { useAuth } from '../context/AuthContext';
 import { useFiscalYear } from '../context/FiscalYearContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
-import { FileText, Download, Printer, Filter, RefreshCw } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { FileText, Download, Printer, Filter, RefreshCw, AlertTriangle, Plus, Search } from 'lucide-react';
 import axios from 'axios';
+import { toast } from 'sonner';
 import CompanyHeader from '../components/shared/CompanyHeader';
 import { formatLBP, formatUSD, getNumberClass } from '../lib/utils';
 import { printReport, exportTrialBalanceToCSV } from '../lib/reportUtils';
@@ -32,6 +35,12 @@ const TrialBalancePage = () => {
   const [level, setLevel] = useState('leaf');
   const [includeZeroBalance, setIncludeZeroBalance] = useState(false);
   const [showCumulative, setShowCumulative] = useState(false);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [checkingCodes, setCheckingCodes] = useState(false);
+  const [orphanedCodes, setOrphanedCodes] = useState([]);
+  const [showOrphanedDialog, setShowOrphanedDialog] = useState(false);
+  const [creatingAccounts, setCreatingAccounts] = useState(false);
 
   useEffect(() => {
     if (currentOrg) {
@@ -49,7 +58,9 @@ const TrialBalancePage = () => {
       if (level && level !== 'all') {
         params.append('level', level);
       }
-      if (selectedFY?.id) {
+      if (fromDate) params.append('from_date', fromDate);
+      if (toDate) params.append('to_date', toDate);
+      if (!fromDate && !toDate && selectedFY?.id) {
         params.append('fy_id', selectedFY.id);
       }
       const response = await axios.get(`${API}/reports/trial-balance?${params.toString()}`);
@@ -58,6 +69,41 @@ const TrialBalancePage = () => {
       console.error('Failed to fetch trial balance:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCheckCodes = async () => {
+    setCheckingCodes(true);
+    try {
+      const res = await axios.get(`${API}/reports/check-orphaned-codes?organization_id=${currentOrg.id}`);
+      const codes = res.data.orphaned_codes || [];
+      setOrphanedCodes(codes.map(c => ({ code: c, name: '' })));
+      setShowOrphanedDialog(true);
+      if (codes.length === 0) {
+        toast.success('All voucher account codes exist in chart of accounts');
+      }
+    } catch (error) {
+      toast.error('Failed to check codes');
+    } finally {
+      setCheckingCodes(false);
+    }
+  };
+
+  const handleCreateMissing = async () => {
+    setCreatingAccounts(true);
+    try {
+      const res = await axios.post(`${API}/reports/create-missing-accounts`, {
+        organization_id: currentOrg.id,
+        accounts: orphanedCodes.map(c => ({ code: c.code, name: c.name || `Auto: ${c.code}` }))
+      });
+      toast.success(res.data.message);
+      setShowOrphanedDialog(false);
+      setOrphanedCodes([]);
+      fetchTrialBalance();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to create accounts');
+    } finally {
+      setCreatingAccounts(false);
     }
   };
 
@@ -80,6 +126,7 @@ const TrialBalancePage = () => {
   }
 
   return (
+    <>
     <div className="space-y-4 lg:space-y-6" data-testid="trial-balance-page">
       <CompanyHeader 
         title="Trial Balance" 
@@ -162,6 +209,21 @@ const TrialBalancePage = () => {
                 Show Cumulative
               </Label>
             </div>
+
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium whitespace-nowrap">From:</Label>
+              <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-8 w-[150px] text-xs" data-testid="from-date" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium whitespace-nowrap">To:</Label>
+              <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-8 w-[150px] text-xs" data-testid="to-date" />
+            </div>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={fetchTrialBalance} disabled={loading} data-testid="apply-date-filter">
+              <Filter className="w-3 h-3 mr-1" /> Apply
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs border-orange-500/50 text-orange-400 hover:bg-orange-500/10" onClick={handleCheckCodes} disabled={checkingCodes} data-testid="check-codes-btn">
+              <Search className="w-3 h-3 mr-1" /> {checkingCodes ? 'Checking...' : 'Check Codes'}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -352,6 +414,49 @@ const TrialBalancePage = () => {
         </CardContent>
       </Card>
     </div>
+
+      {/* Orphaned Codes Dialog */}
+      <Dialog open={showOrphanedDialog} onOpenChange={setShowOrphanedDialog}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-orange-400" />
+              Missing Account Codes ({orphanedCodes.length})
+            </DialogTitle>
+          </DialogHeader>
+          {orphanedCodes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">All voucher codes exist in the chart of accounts.</p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                These codes exist in posted vouchers but are not in the chart of accounts. Add a name and create them.
+              </p>
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {orphanedCodes.map((item, i) => (
+                  <div key={item.code} className="flex items-center gap-2">
+                    <span className="font-mono text-sm w-[100px] flex-shrink-0">{item.code}</span>
+                    <Input
+                      placeholder={`Name for ${item.code}`}
+                      value={item.name}
+                      onChange={(e) => {
+                        const updated = [...orphanedCodes];
+                        updated[i] = { ...updated[i], name: e.target.value };
+                        setOrphanedCodes(updated);
+                      }}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button onClick={handleCreateMissing} disabled={creatingAccounts} className="w-full" data-testid="create-missing-btn">
+                <Plus className="w-4 h-4 mr-2" />
+                {creatingAccounts ? 'Creating...' : `Create All ${orphanedCodes.length} Accounts`}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

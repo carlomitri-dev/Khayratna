@@ -145,21 +145,27 @@ async def get_trial_balance(
     organization_id: str, 
     include_zero_balance: bool = False,
     level: str = None,
-    fy_id: str = None,  # Optional fiscal year filter
+    fy_id: str = None,
+    from_date: str = None,
+    to_date: str = None,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Get trial balance report with optional filtering.
-    If fy_id is provided, calculates balances from vouchers within that FY's date range.
+    from_date/to_date take priority over fy_id for date range.
     """
-    # If FY filter is specified, compute balances from vouchers in the FY date range
-    fy_start = None
-    fy_end = None
-    if fy_id:
+    # Determine date range
+    date_start = None
+    date_end = None
+    
+    if from_date or to_date:
+        date_start = from_date
+        date_end = to_date
+    elif fy_id:
         fy = await db.fiscal_years.find_one({'id': fy_id}, {'_id': 0})
         if fy:
-            fy_start = fy['start_date']
-            fy_end = fy['end_date']
+            date_start = fy['start_date']
+            date_end = fy['end_date']
     
     # Get active accounts
     accounts = await db.accounts.find(
@@ -174,8 +180,8 @@ async def get_trial_balance(
         {'_id': 0}
     ).sort('code', 1).to_list(None)
     
-    # If FY filter, recalculate balances from vouchers in that period
-    if fy_start and fy_end:
+    # If date range specified, recalculate balances from vouchers in that period
+    if date_start or date_end:
         # Reset all balances to 0
         for acc in accounts:
             acc['balance_lbp'] = 0
@@ -185,11 +191,17 @@ async def get_trial_balance(
         acc_lookup = {acc.get('code', ''): acc for acc in accounts}
         
         # Use MongoDB aggregation for efficient balance computation
+        date_match = {}
+        if date_start:
+            date_match['$gte'] = date_start
+        if date_end:
+            date_match['$lte'] = date_end
+        
         pipeline = [
             {'$match': {
                 'organization_id': organization_id,
                 'is_posted': True,
-                'date': {'$gte': fy_start, '$lte': fy_end}
+                'date': date_match
             }},
             {'$unwind': '$lines'},
             {'$group': {
@@ -336,6 +348,96 @@ async def get_trial_balance(
         'level_filter': level or 'all',
         'total_accounts_shown': len(trial_balance)
     }
+
+
+@router.get("/reports/check-orphaned-codes")
+async def check_orphaned_codes(
+    organization_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Find account codes in posted vouchers that don't exist in chart of accounts"""
+    # Get all account codes
+    accounts = await db.accounts.find(
+        {'organization_id': organization_id},
+        {'code': 1, '_id': 0}
+    ).to_list(None)
+    existing_codes = {acc['code'] for acc in accounts if acc.get('code')}
+    
+    # Get all unique codes from voucher lines
+    pipeline = [
+        {'$match': {'organization_id': organization_id, 'is_posted': True}},
+        {'$unwind': '$lines'},
+        {'$group': {'_id': '$lines.account_code'}},
+    ]
+    voucher_codes = set()
+    async for result in db.vouchers.aggregate(pipeline):
+        if result['_id']:
+            voucher_codes.add(result['_id'])
+    
+    # Find orphaned codes
+    orphaned = sorted(voucher_codes - existing_codes)
+    
+    return {
+        'orphaned_codes': orphaned,
+        'count': len(orphaned),
+        'total_voucher_codes': len(voucher_codes),
+        'total_account_codes': len(existing_codes)
+    }
+
+
+@router.post("/reports/create-missing-accounts")
+async def create_missing_accounts(
+    data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create accounts for codes found in vouchers but missing from chart of accounts"""
+    if current_user['role'] not in ['super_admin', 'admin']:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    
+    organization_id = data.get('organization_id')
+    accounts_to_create = data.get('accounts', [])  # [{code, name}]
+    
+    if not organization_id or not accounts_to_create:
+        raise HTTPException(status_code=400, detail="organization_id and accounts are required")
+    
+    created = []
+    for acc in accounts_to_create:
+        code = acc.get('code', '').strip()
+        name = acc.get('name', '').strip() or f'Auto-created: {code}'
+        
+        # Check if already exists
+        existing = await db.accounts.find_one({'code': code, 'organization_id': organization_id})
+        if existing:
+            continue
+        
+        # Determine account class from first digit
+        account_class = None
+        if code and code[0].isdigit():
+            account_class = int(code[0])
+        
+        import uuid
+        account_doc = {
+            'id': str(uuid.uuid4()),
+            'code': code,
+            'name': name,
+            'name_ar': name,
+            'account_class': account_class,
+            'account_type': 'detail',
+            'is_active': True,
+            'balance_lbp': 0,
+            'balance_usd': 0,
+            'organization_id': organization_id,
+            'created_at': datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.accounts.insert_one(account_doc)
+        created.append({'code': code, 'name': name})
+    
+    return {
+        'message': f'Created {len(created)} accounts',
+        'created': created
+    }
+
 
 
 # ================== INCOME STATEMENT ==================
