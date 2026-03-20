@@ -26,19 +26,21 @@ def init_router(database, auth_dependency):
 async def enrich_sales_invoice(invoice: dict) -> dict:
     """Enrich sales invoice with related data"""
     if invoice.get('debit_account_id'):
-        customer = await db.accounts.find_one({'id': invoice['debit_account_id']}, {'name': 1, 'code': 1, 'registration_number': 1, 'address': 1, 'vat_number': 1, 'balance_usd': 1, '_id': 0})
+        customer = await db.accounts.find_one({'id': invoice['debit_account_id']}, {'_id': 0})
         if customer:
             invoice['customer_name'] = customer.get('name')
             invoice['customer_code'] = customer.get('code')
-            invoice['customer_address'] = customer.get('address', '')
-            invoice['customer_registration_number'] = customer.get('registration_number') or customer.get('vat_number', '')
-            invoice['customer_balance_usd'] = customer.get('balance_usd', 0)
+            # Check both top-level and contact_info for address/registration
+            ci = customer.get('contact_info', {}) or {}
+            invoice['customer_address'] = customer.get('address') or ci.get('address', '') or ''
+            invoice['customer_registration_number'] = customer.get('registration_number') or customer.get('vat_number') or ci.get('registration_number', '') or ''
+            invoice['customer_balance_usd'] = customer.get('balance_usd', 0) or 0
             # Fetch VAT mirror account balance (4111 → 4114)
             cust_code = customer.get('code', '')
             if cust_code.startswith('4111') and len(cust_code) > 4:
                 vat_code = '4114' + cust_code[4:]
                 vat_acc = await db.accounts.find_one({'code': vat_code, 'organization_id': invoice['organization_id']}, {'balance_usd': 1, '_id': 0})
-                invoice['customer_vat_balance_usd'] = vat_acc.get('balance_usd', 0) if vat_acc else 0
+                invoice['customer_vat_balance_usd'] = (vat_acc.get('balance_usd', 0) or 0) if vat_acc else 0
             else:
                 invoice['customer_vat_balance_usd'] = 0
     

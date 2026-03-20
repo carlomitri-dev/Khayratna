@@ -25,18 +25,20 @@ async def enrich_sales_return(ret: dict) -> dict:
             ret['debit_account_code'] = acc.get('code')
     if ret.get('credit_account_id'):
         acc = await db.accounts.find_one({'id': ret['credit_account_id']}, {'name': 1, 'code': 1, 'registration_number': 1, 'address': 1, 'vat_number': 1, 'balance_usd': 1, '_id': 0})
+        acc = await db.accounts.find_one({'id': ret['credit_account_id']}, {'_id': 0})
         if acc:
             ret['credit_account_name'] = acc.get('name')
             ret['credit_account_code'] = acc.get('code')
-            ret['customer_address'] = acc.get('address', '')
-            ret['customer_registration_number'] = acc.get('registration_number') or acc.get('vat_number', '')
-            ret['customer_balance_usd'] = acc.get('balance_usd', 0)
+            ci = acc.get('contact_info', {}) or {}
+            ret['customer_address'] = acc.get('address') or ci.get('address', '') or ''
+            ret['customer_registration_number'] = acc.get('registration_number') or acc.get('vat_number') or ci.get('registration_number', '') or ''
+            ret['customer_balance_usd'] = acc.get('balance_usd', 0) or 0
             # Fetch VAT mirror account balance (4111 → 4114)
             cust_code = acc.get('code', '')
             if cust_code.startswith('4111') and len(cust_code) > 4:
                 vat_code = '4114' + cust_code[4:]
                 vat_acc = await db.accounts.find_one({'code': vat_code, 'organization_id': ret['organization_id']}, {'balance_usd': 1, '_id': 0})
-                ret['customer_vat_balance_usd'] = vat_acc.get('balance_usd', 0) if vat_acc else 0
+                ret['customer_vat_balance_usd'] = (vat_acc.get('balance_usd', 0) or 0) if vat_acc else 0
             else:
                 ret['customer_vat_balance_usd'] = 0
     return ret

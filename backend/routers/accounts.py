@@ -589,6 +589,25 @@ async def update_account_contact_info(
     return AccountResponse(**updated)
 
 
+@router.get("/accounts/debug/{account_code}")
+async def debug_account(account_code: str, organization_id: str, current_user: dict = Depends(get_current_user)):
+    """Debug: return raw account fields for a given code"""
+    acc = await db.accounts.find_one({'code': account_code, 'organization_id': organization_id}, {'_id': 0})
+    if not acc:
+        return {"error": "Account not found", "code": account_code}
+    return {
+        "code": acc.get('code'),
+        "name": acc.get('name'),
+        "address": acc.get('address'),
+        "registration_number": acc.get('registration_number'),
+        "vat_number": acc.get('vat_number'),
+        "balance_usd": acc.get('balance_usd'),
+        "balance_lbp": acc.get('balance_lbp'),
+        "contact_info": acc.get('contact_info'),
+        "all_keys": list(acc.keys())
+    }
+
+
 # ================== SEED CHART OF ACCOUNTS ==================
 
 @router.post("/accounts/seed-coa")
