@@ -1415,6 +1415,7 @@ const InventoryPage = () => {
                       <th>Name</th>
                       <th>Category</th>
                       <th>Supplier</th>
+                      <th className="text-center">Package</th>
                       <th className="text-right">Cost</th>
                       <th className="text-right">Price</th>
                       <th className="text-right">On Hand</th>
@@ -1454,6 +1455,11 @@ const InventoryPage = () => {
                         </td>
                         <td className="text-muted-foreground text-sm">{item.category_name || '-'}</td>
                         <td className="text-muted-foreground text-sm">{item.supplier_name || '-'}</td>
+                        <td className="text-center text-sm">
+                          {item.package ? (
+                            <span className="font-mono">{item.pack_description || 'Box'} × {item.package}</span>
+                          ) : '-'}
+                        </td>
                         <td className="text-right font-mono">{item.currency} {formatUSD(item.cost)}</td>
                         <td className="text-right font-mono">{item.currency} {formatUSD(item.price)}</td>
                         <td className={`text-right font-mono ${isLowStock(item) ? 'text-amber-400 font-bold' : ''}`}>

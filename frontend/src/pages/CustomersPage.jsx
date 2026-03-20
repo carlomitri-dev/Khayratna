@@ -291,7 +291,7 @@ const CustomersPage = () => {
                     <tr>
                       <th>Code</th>
                       <th>Name</th>
-                      <th>VAT Number</th>
+                      <th>Reg. #</th>
                       <th>Contact Person</th>
                       <th>Mobile</th>
                       <th>Email</th>
@@ -312,7 +312,7 @@ const CustomersPage = () => {
                             )}
                           </div>
                         </td>
-                        <td className="text-muted-foreground font-mono text-sm">{customer.vat_number || '-'}</td>
+                        <td className="text-muted-foreground font-mono text-sm">{customer.registration_number || customer.vat_number || '-'}</td>
                         <td className="text-muted-foreground">{customer.contact_person || '-'}</td>
                         <td className="text-muted-foreground">{customer.mobile || '-'}</td>
                         <td className="text-muted-foreground text-sm">{customer.email || '-'}</td>
@@ -403,12 +403,12 @@ const CustomersPage = () => {
                 <h4 className="font-medium text-sm border-b border-border pb-2">Contact Information</h4>
                 
                 <div className="grid gap-3">
-                  {viewCustomer.vat_number && (
+                  {(viewCustomer.registration_number || viewCustomer.vat_number) && (
                     <div className="flex items-center gap-3">
                       <Hash className="w-4 h-4 text-muted-foreground" />
                       <div>
-                        <p className="text-xs text-muted-foreground">VAT Number</p>
-                        <span className="text-sm font-mono">{viewCustomer.vat_number}</span>
+                        <p className="text-xs text-muted-foreground">Registration #</p>
+                        <span className="text-sm font-mono">{viewCustomer.registration_number || viewCustomer.vat_number}</span>
                       </div>
                     </div>
                   )}
