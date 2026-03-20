@@ -307,7 +307,8 @@ const SalesInvoicePage = () => {
         name: inv.debit_account_name || inv.customer_name || '',
         code: inv.debit_account_code || inv.customer_code || '',
         address: inv.customer_address || '',
-        registration_number: inv.customer_registration_number || ''
+        registration_number: inv.customer_registration_number || '',
+        balance_usd: inv.customer_balance_usd || 0
       }
     });
     printInvoice();
@@ -321,7 +322,8 @@ const SalesInvoicePage = () => {
         name: inv.debit_account_name || inv.customer_name || '',
         code: inv.debit_account_code || inv.customer_code || '',
         address: inv.customer_address || '',
-        registration_number: inv.customer_registration_number || ''
+        registration_number: inv.customer_registration_number || '',
+        balance_usd: inv.customer_balance_usd || 0
       }
     });
     downloadPdf();

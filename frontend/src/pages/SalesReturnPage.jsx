@@ -324,7 +324,8 @@ const SalesReturnPage = () => {
         name: ret.credit_account_name || '',
         code: ret.credit_account_code || '',
         address: ret.customer_address || '',
-        registration_number: ret.customer_registration_number || ''
+        registration_number: ret.customer_registration_number || '',
+        balance_usd: ret.customer_balance_usd || 0
       }
     });
     printInvoice();
@@ -344,7 +345,8 @@ const SalesReturnPage = () => {
         name: ret.credit_account_name || '',
         code: ret.credit_account_code || '',
         address: ret.customer_address || '',
-        registration_number: ret.customer_registration_number || ''
+        registration_number: ret.customer_registration_number || '',
+        balance_usd: ret.customer_balance_usd || 0
       }
     });
     downloadPdf();

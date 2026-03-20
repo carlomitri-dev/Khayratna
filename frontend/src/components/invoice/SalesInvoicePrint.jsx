@@ -24,6 +24,7 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
   const customerRegNo = customer?.registration_number || invoice?.customer_registration_number || '';
 
   const customerAddress = customer?.address || invoice?.customer_address || '';
+  const customerBalance = customer?.balance_usd ?? invoice?.customer_balance_usd ?? 0;
   // Use absolute URL so the popup window can load the logo
   const logoUrl = `${window.location.origin}/assets/khayratna-logo.png`;
 
@@ -196,6 +197,11 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
   </table>
   <p class="star-note">* = خاضع للضريبة على القيمة المضافة (Subject to VAT)</p>
   <div class="totals-section">
+    <div class="balance-left" style="flex:1;display:flex;align-items:flex-end;padding-bottom:4px;">
+      <div style="direction:rtl;font-size:15px;font-weight:bold;border:1px solid #000;padding:4px 10px;">
+        الرصيد الحالي : ${customerBalance.toFixed(3)}
+      </div>
+    </div>
     <table class="totals-table">
       <tr>
         <td class="label">المجموع / Subtotal</td>
