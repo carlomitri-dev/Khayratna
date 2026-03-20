@@ -323,6 +323,9 @@ class SalesInvoiceLineItem(BaseModel):
     item_name: str
     item_name_ar: Optional[str] = None
     barcode: Optional[str] = None
+    box: Optional[float] = None
+    package: Optional[float] = None
+    pack_description: Optional[str] = None
     quantity: float
     unit: str = 'piece'
     unit_price: float
@@ -884,6 +887,9 @@ class SalesReturnLineItem(BaseModel):
     item_name: str
     item_name_ar: Optional[str] = None
     barcode: Optional[str] = None
+    box: Optional[float] = None
+    package: Optional[float] = None
+    pack_description: Optional[str] = None
     quantity: float
     unit: str = 'piece'
     unit_price: float

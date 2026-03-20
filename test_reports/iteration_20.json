@@ -1,0 +1,92 @@
+{
+  "summary": "Tested bug fixes for Lebanese accounting system: (1) Print template cleanup - Unit/وحدة column removed, now has 8 columns, (2) Box/Package field persistence - fields now persist on invoice save. All 5 backend tests passed. Frontend UI verified with Box, Pkg, Qty columns visible in invoice form.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "/api/sales-accounts",
+        "issue": "Console error 'response.data.filter is not a function' when fetching sales accounts with empty data. Frontend may expect array but API returns empty array correctly.",
+        "priority": "LOW"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_box_package_persistence.py",
+    "/app/test_reports/pytest/box_package_persistence_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Print template (SalesInvoicePrint.jsx) verified:",
+    "1. NO 'Unit/وحدة' column found - column removed as required",
+    "2. Header has exactly 8 columns: #, Item, Box, Pkg, Qty, Price, Disc, Total",
+    "3. Item rows have 8 <td> elements each",
+    "4. Empty rows have 8 <td> elements each",
+    "",
+    "Schema verification (schemas.py):",
+    "1. SalesInvoiceLineItem (line 321-342) has: box: Optional[float], package: Optional[float], pack_description: Optional[str]",
+    "2. SalesReturnLineItem (line 885-902) has: box: Optional[float], package: Optional[float], pack_description: Optional[str]",
+    "",
+    "API persistence tested via pytest:",
+    "1. Create invoice with box=5.0, package=12.0, pack_description='12 pieces per box' - fields persist",
+    "2. GET invoice - box/package/pack_description fields returned correctly",
+    "3. Update invoice with changed box/package values - changes persist",
+    "",
+    "Frontend UI verified:",
+    "1. Sales Invoice form has Box, Pkg, Qty columns visible",
+    "2. Invoice creation modal shows all required fields"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_box_package_persistence.py"
+  ],
+  "success_rate": {
+    "backend": "100% (5/5 tests passed)",
+    "frontend": "100% (UI verified - Box/Pkg columns present)"
+  },
+  "test_credentials": {
+    "email": "carlo.mitri@gmail.com",
+    "password": "Carinemi@28"
+  },
+  "seed_data_creation": "Created test customer account (41110001) and sales account (71010001) for API testing. Test invoices created and deleted during test execution.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Box/Package persistence bug fix verified. Both SalesInvoiceLineItem and SalesReturnLineItem schemas now include box, package, pack_description fields. Print template has 8 columns (Unit column removed). Test accounts were created during testing: customer 41110001, sales 71010001.",
+  "features_tested": {
+    "print_template_no_unit_column": {
+      "status": "PASS",
+      "details": "Verified print template does NOT contain 'Unit' or 'وحدة' text. Column has been removed."
+    },
+    "print_template_8_columns": {
+      "status": "PASS",
+      "details": "Print template header has exactly 8 columns: #, Item, Box, Pkg, Qty, Price, Disc, Total"
+    },
+    "empty_rows_8_td": {
+      "status": "PASS",
+      "details": "Empty rows in print template have exactly 8 <td> elements"
+    },
+    "box_package_fields_in_schema": {
+      "status": "PASS",
+      "details": "SalesInvoiceLineItem schema has box: Optional[float], package: Optional[float], pack_description: Optional[str]"
+    },
+    "sales_return_line_item_schema": {
+      "status": "PASS",
+      "details": "SalesReturnLineItem schema has box: Optional[float], package: Optional[float], pack_description: Optional[str]"
+    },
+    "create_invoice_persists_box_package": {
+      "status": "PASS",
+      "details": "Creating invoice with box=5.0, package=12.0 - fields persist in create response and when fetched via GET"
+    },
+    "update_invoice_preserves_box_package": {
+      "status": "PASS",
+      "details": "Updating invoice with new box/package values - changes are persisted correctly"
+    },
+    "frontend_ui_has_box_pkg_columns": {
+      "status": "PASS",
+      "details": "Sales Invoice form UI has Box, Pkg, Qty columns visible in line items table"
+    }
+  }
+}

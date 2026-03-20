@@ -44,9 +44,8 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
           <td style="text-align:right;padding:3px 4px;border:1px solid #000;direction:rtl;">
             ${line.name_ar || line.item_name || line.name || ''}${isTaxed ? ' <span style="font-weight:bold;">*</span>' : ''}
           </td>
-          <td style="text-align:center;padding:3px 2px;border:1px solid #000;">${line.pack_description || line.package_desc || '-'}</td>
-          <td style="text-align:center;padding:3px 2px;border:1px solid #000;">${pkg || '-'}</td>
           <td style="text-align:center;padding:3px 2px;border:1px solid #000;">${box > 0 ? box : '-'}</td>
+          <td style="text-align:center;padding:3px 2px;border:1px solid #000;">${pkg || '-'}</td>
           <td style="text-align:center;padding:3px 2px;border:1px solid #000;">${line.quantity || 0}</td>
           <td style="text-align:right;padding:3px 4px;border:1px solid #000;">${(line.unit_price || line.price || 0).toFixed(3)}</td>
           <td style="text-align:center;padding:3px 2px;border:1px solid #000;">${line.discount_percent ? line.discount_percent + '%' : '-'}</td>
@@ -59,7 +58,6 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
     const emptyRowsHtml = Array(emptyRows).fill(`
       <tr>
         <td style="padding:3px 2px;border:1px solid #000;">&nbsp;</td>
-        <td style="padding:3px 2px;border:1px solid #000;"></td>
         <td style="padding:3px 2px;border:1px solid #000;"></td>
         <td style="padding:3px 2px;border:1px solid #000;"></td>
         <td style="padding:3px 2px;border:1px solid #000;"></td>
@@ -186,9 +184,8 @@ const SalesInvoicePrint = ({ invoice, organization, customer }) => {
       <tr>
         <th style="width:30px;">الرقم<br/>#</th>
         <th style="width:auto;">الصنف<br/>Item</th>
-        <th style="width:50px;">وحدة<br/>Unit</th>
-        <th style="width:35px;">عدد<br/>Pkg</th>
         <th style="width:40px;">صندوق<br/>Box</th>
+        <th style="width:35px;">عدد<br/>Pkg</th>
         <th style="width:45px;">الكمية<br/>Qty</th>
         <th style="width:60px;">السعر<br/>Price</th>
         <th style="width:45px;">حسم<br/>Disc</th>
