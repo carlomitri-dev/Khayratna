@@ -2279,6 +2279,38 @@ const SettingsPage = () => {
 
               <div className="border-t border-border" />
 
+              {/* Clean Orphaned Data */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Trash2 className="w-4 h-4 text-orange-400" />
+                  <h3 className="font-semibold">Clean Orphaned Data</h3>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Remove all accounts, vouchers, and other data that belong to deleted organizations. This cleans up leftover data from organizations that no longer exist.
+                </p>
+                <Button 
+                  variant="outline"
+                  className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+                  onClick={async () => {
+                    if (!window.confirm('This will delete all data belonging to deleted organizations. Continue?')) return;
+                    try {
+                      const res = await axios.post(`${API}/organizations/cleanup-orphaned`);
+                      const d = res.data;
+                      toast.success(`Cleaned ${d.message}. Details: ${JSON.stringify(d.details)}`);
+                      fetchBackupStats();
+                    } catch (err) {
+                      toast.error(err.response?.data?.detail || 'Failed to clean orphaned data');
+                    }
+                  }}
+                  data-testid="cleanup-orphaned-btn"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Clean Orphaned Data
+                </Button>
+              </div>
+
+              <div className="border-t border-border" />
+
               {/* Restore Section */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
