@@ -310,7 +310,36 @@ const SalesReturnPage = () => {
     }
   };
   
-  const handlePrint = (ret) => {
+  // Fetch customer account data by ID for printing
+  const fetchCustomerForPrint = async (accountId, accountCode) => {
+    try {
+      const res = await axios.get(`${API}/accounts/${accountId}`);
+      const acc = res.data;
+      const ci = acc.contact_info || {};
+      const custData = {
+        name: acc.name || '',
+        code: acc.code || accountCode || '',
+        address: acc.address || ci.address || '',
+        registration_number: acc.registration_number || acc.vat_number || ci.registration_number || '',
+        balance_usd: acc.balance_usd || 0,
+        vat_balance_usd: 0
+      };
+      const cCode = acc.code || accountCode || '';
+      if (cCode.startsWith('4111') && cCode.length > 4) {
+        const vatCode = '4114' + cCode.substring(4);
+        try {
+          const vatRes = await axios.get(`${API}/accounts/by-code/${vatCode}?organization_id=${currentOrg?.id}`);
+          custData.vat_balance_usd = vatRes.data?.balance_usd || 0;
+        } catch (e) { /* VAT account might not exist */ }
+      }
+      return custData;
+    } catch (e) {
+      return { name: '', code: accountCode || '', address: '', registration_number: '', balance_usd: 0, vat_balance_usd: 0 };
+    }
+  };
+
+  const handlePrint = async (ret) => {
+    const customer = await fetchCustomerForPrint(ret.credit_account_id, ret.credit_account_code);
     const { printInvoice } = SalesInvoicePrint({
       invoice: {
         ...ret,
@@ -320,19 +349,13 @@ const SalesReturnPage = () => {
         total_usd: ret.total_usd || ret.total || 0
       },
       organization: currentOrg,
-      customer: {
-        name: ret.credit_account_name || '',
-        code: ret.credit_account_code || '',
-        address: ret.customer_address || '',
-        registration_number: ret.customer_registration_number || '',
-        balance_usd: ret.customer_balance_usd || 0,
-        vat_balance_usd: ret.customer_vat_balance_usd || 0
-      }
+      customer
     });
     printInvoice();
   };
 
-  const handleDownloadPdf = (ret) => {
+  const handleDownloadPdf = async (ret) => {
+    const customer = await fetchCustomerForPrint(ret.credit_account_id, ret.credit_account_code);
     const { downloadPdf } = SalesInvoicePrint({
       invoice: {
         ...ret,
@@ -342,14 +365,7 @@ const SalesReturnPage = () => {
         total_usd: ret.total_usd || ret.total || 0
       },
       organization: currentOrg,
-      customer: {
-        name: ret.credit_account_name || '',
-        code: ret.credit_account_code || '',
-        address: ret.customer_address || '',
-        registration_number: ret.customer_registration_number || '',
-        balance_usd: ret.customer_balance_usd || 0,
-        vat_balance_usd: ret.customer_vat_balance_usd || 0
-      }
+      customer
     });
     downloadPdf();
   };

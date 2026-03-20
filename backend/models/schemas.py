@@ -141,6 +141,7 @@ class AccountResponse(BaseModel):
     email: Optional[str] = None
     notes: Optional[str] = None
     vat_number: Optional[str] = None
+    registration_number: Optional[str] = None
     created_at: Optional[str] = None  # Allow created_at field
 
 class ContactInfoUpdate(BaseModel):

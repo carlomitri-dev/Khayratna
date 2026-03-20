@@ -339,6 +339,15 @@ async def get_accounts_template_csv():
     )
 
 
+@router.get("/accounts/by-code/{code}", response_model=AccountResponse)
+async def get_account_by_code(code: str, organization_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a single account by code"""
+    account = await db.accounts.find_one({'code': code, 'organization_id': organization_id}, {'_id': 0})
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return AccountResponse(**account)
+
+
 @router.get("/accounts/{account_id}", response_model=AccountResponse)
 async def get_account(account_id: str, current_user: dict = Depends(get_current_user)):
     """Get a single account by ID"""
