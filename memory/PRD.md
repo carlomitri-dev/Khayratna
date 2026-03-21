@@ -23,34 +23,32 @@ Full-scale invoicing and accounting system with modules for sales/purchase invoi
 - Print templates with customer data, registration numbers, account balances
 - Journal module with unbalanced voucher filter
 - Trial Balance with date-range filtering and orphan-code check
-- Data import/export (CSV)
+- Data import/export (CSV/Excel)
 - Fiscal year management
 - Organization cleanup utility
 - html2pdf.js for PDF generation
 
 ### Recent Fixes (Current Session - March 2026)
 - **Print Template**: Removed redundant "Unit/وحدة" column. New order: # | Item | Box | Pkg | Qty | Price | Disc | Total (8 columns)
-- **Data Persistence Bug**: Box/Package/PackDescription fields now correctly saved on Sales Invoices (schema was already fixed in prior session)
-- **SalesReturnLineItem Schema**: Added box, package, pack_description fields to prevent same data-loss bug on Sales Returns
+- **Invoice Save Freeze Bug**: Fixed Pydantic 422 error caused by empty strings for box/quantity. Added data sanitization in handleSave for both SalesInvoicePage and SalesReturnPage.
+- **SalesReturnLineItem Schema**: Added box, package, pack_description fields to prevent data-loss bug
+- **Clean Orphaned Data Bug (CRITICAL)**: Fixed FastAPI route ordering — `/cleanup-orphaned` was blocked by `/{org_id}` catch-all route in server.py. Moved cleanup route BEFORE parameterized routes. This fix cleans ALL orphaned data (accounts, vouchers, invoices, etc.) from deleted organizations.
 
-### Prior Session Fixes
-- Fixed customer address, VAT#, account balances on printed invoices
-- Fixed voucher editing from Journal page
-- Fixed imported voucher editing (account codes, amounts)
-- Fixed historical/posted voucher updates
-- Fixed missing item descriptions on invoice edit
-- Increased font sizes on print template
-- Corrected inventory import logic (prices as HT)
-- Added registration_number display on customer/supplier/inventory pages
+### Data Integrity Finding (User's deployed site khayratna.com)
+- Total accounts: 8,696 (global) vs 4,348 (in org) → 4,348 orphaned
+- Total vouchers: 29,946 (global) vs ~14,979 (in org) → ~14,967 orphaned
+- After deploying the fix and running cleanup, these will be removed
 
 ## Prioritized Backlog
 
 ### P0 (Critical)
-- ~~Trial Balance Discrepancy~~ (DONE per user confirmation)
+- ~~Trial Balance Discrepancy~~ (DONE per user)
+- ~~Clean Orphaned Data not working~~ (DONE - route ordering fix)
 
 ### P1 (High)
 - ~~Print Template Cleanup~~ (DONE - Unit column removed)
 - ~~Box/Package data persistence bug~~ (DONE - Schema fixed)
+- ~~Invoice save freeze~~ (DONE - Data sanitization added)
 
 ### P2 (Medium)
 - Apply Box/Pkg/Qty to Purchase Invoice and Purchase Return forms
@@ -59,7 +57,6 @@ Full-scale invoicing and accounting system with modules for sales/purchase invoi
 ### P3 (Low)
 - Sales Quotations workflow enhancements
 - Refactor print data-fetching into shared hook
-- Centralize customer data fetching for print across Invoice/Return pages
 
 ## Tech Stack
 - Frontend: React, Shadcn UI, html2pdf.js
@@ -69,10 +66,14 @@ Full-scale invoicing and accounting system with modules for sales/purchase invoi
 
 ## Key Technical Notes
 - Pydantic models use `extra="ignore"` — new fields MUST be explicitly added to schemas
+- **IMPORTANT**: Organization routes are defined directly in server.py, NOT via the organizations.py router (which is not mounted). Always add org routes to server.py.
 - Print templates generate raw HTML strings rendered in popup windows
-- Frontend fetches customer data directly via API before printing (more reliable than backend enrichment)
+- Frontend fetches customer data directly via API before printing
 - All monetary values stored with USD precision (3 decimal places)
+- Clean empty strings before sending numeric fields to backend (Pydantic rejects empty strings for float fields)
 
 ## Credentials
 - Email: carlo.mitri@gmail.com
 - Password: Carinemi@28
+- Deployed site: https://khayratna.com/
+- Org ID (deployed): effee0de-5cf2-4388-b126-33ee67e836d5

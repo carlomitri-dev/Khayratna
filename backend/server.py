@@ -408,6 +408,43 @@ async def get_organizations(current_user: dict = Depends(get_current_user)):
             orgs = []
     return [OrganizationResponse(**org) for org in orgs]
 
+@api_router.post("/organizations/cleanup-orphaned")
+async def cleanup_orphaned_data(current_user: dict = Depends(get_current_user)):
+    """Remove all data belonging to organizations that no longer exist"""
+    if current_user['role'] != 'super_admin':
+        raise HTTPException(status_code=403, detail="Only super admin can cleanup orphaned data")
+    
+    existing_orgs = await db.organizations.find({}, {'id': 1, '_id': 0}).to_list(None)
+    valid_org_ids = {org['id'] for org in existing_orgs}
+    
+    collections = [
+        'accounts', 'vouchers', 'fiscal_years', 'exchange_rates',
+        'crdb_notes', 'image_archive', 'inventory_categories', 'inventory_items',
+        'sales_invoices', 'sales_returns', 'purchase_invoices', 'purchase_returns',
+        'purchase_orders', 'pos_transactions', 'regions', 'receipt_settings',
+        'sales_quotations', 'document_series', 'invoice_templates', 'services'
+    ]
+    
+    total_deleted = 0
+    details = {}
+    
+    for coll_name in collections:
+        coll = db[coll_name]
+        if valid_org_ids:
+            result = await coll.delete_many({'organization_id': {'$nin': list(valid_org_ids)}})
+        else:
+            result = await coll.delete_many({})
+        if result.deleted_count > 0:
+            details[coll_name] = result.deleted_count
+            total_deleted += result.deleted_count
+    
+    return {
+        "message": f"Cleaned up {total_deleted} orphaned documents",
+        "details": details,
+        "valid_organizations": len(valid_org_ids)
+    }
+
+
 @api_router.get("/organizations/{org_id}", response_model=OrganizationResponse)
 async def get_organization(org_id: str, current_user: dict = Depends(get_current_user)):
     org = await db.organizations.find_one({'id': org_id}, {'_id': 0})
