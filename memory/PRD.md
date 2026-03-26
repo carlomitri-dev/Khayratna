@@ -30,25 +30,18 @@ Full-scale invoicing and accounting system with modules for sales/purchase invoi
 
 ### Recent Fixes (Current Session - March 2026)
 - **Print Template**: Removed redundant "Unit/وحدة" column. New order: # | Item | Box | Pkg | Qty | Price | Disc | Total (8 columns)
-- **Invoice Save Freeze Bug**: Fixed Pydantic 422 error caused by empty strings for box/quantity. Added data sanitization in handleSave for both SalesInvoicePage and SalesReturnPage.
+- **Invoice Save Freeze Bug**: Fixed Pydantic 422 error caused by empty strings for box/quantity. Added data sanitization in handleSave.
 - **SalesReturnLineItem Schema**: Added box, package, pack_description fields to prevent data-loss bug
-- **Clean Orphaned Data Bug (CRITICAL)**: Fixed FastAPI route ordering — `/cleanup-orphaned` was blocked by `/{org_id}` catch-all route in server.py. Moved cleanup route BEFORE parameterized routes. This fix cleans ALL orphaned data (accounts, vouchers, invoices, etc.) from deleted organizations.
+- **Clean Orphaned Data Bug**: Fixed FastAPI route ordering in server.py — `/cleanup-orphaned` was blocked by `/{org_id}` catch-all route.
+- **VAT Posting Bug (CRITICAL)**: Fixed incorrect VAT split when posting invoices with all non-taxable items. The posting code was recalculating tax from total even when tax_amount=0. Fixed in both sales invoice and purchase invoice posting functions in invoices.py.
+- **Logo**: Replaced printed invoice logo with new Khayratna logo.
 
-### Data Integrity Finding (User's deployed site khayratna.com)
-- Total accounts: 8,696 (global) vs 4,348 (in org) → 4,348 orphaned
-- Total vouchers: 29,946 (global) vs ~14,979 (in org) → ~14,967 orphaned
-- After deploying the fix and running cleanup, these will be removed
+### Key Bug Details: VAT Posting
+- Root cause: Lines 454-461 in invoices.py checked `if tax_usd == 0 and tax_percent > 0` then forcibly recalculated tax, ignoring that tax_amount=0 means non-taxable items.
+- Fix: Trust the stored `tax_amount` from the invoice (already correctly calculated by frontend based on item taxability).
+- Same fix applied to purchase invoice posting (line 1028 area).
 
 ## Prioritized Backlog
-
-### P0 (Critical)
-- ~~Trial Balance Discrepancy~~ (DONE per user)
-- ~~Clean Orphaned Data not working~~ (DONE - route ordering fix)
-
-### P1 (High)
-- ~~Print Template Cleanup~~ (DONE - Unit column removed)
-- ~~Box/Package data persistence bug~~ (DONE - Schema fixed)
-- ~~Invoice save freeze~~ (DONE - Data sanitization added)
 
 ### P2 (Medium)
 - Apply Box/Pkg/Qty to Purchase Invoice and Purchase Return forms
@@ -66,11 +59,9 @@ Full-scale invoicing and accounting system with modules for sales/purchase invoi
 
 ## Key Technical Notes
 - Pydantic models use `extra="ignore"` — new fields MUST be explicitly added to schemas
-- **IMPORTANT**: Organization routes are defined directly in server.py, NOT via the organizations.py router (which is not mounted). Always add org routes to server.py.
-- Print templates generate raw HTML strings rendered in popup windows
-- Frontend fetches customer data directly via API before printing
-- All monetary values stored with USD precision (3 decimal places)
-- Clean empty strings before sending numeric fields to backend (Pydantic rejects empty strings for float fields)
+- Organization routes are defined directly in server.py, NOT via organizations.py router
+- Trust stored tax_amount — do NOT recalculate from tax_percent
+- Clean empty strings before sending numeric fields to backend
 
 ## Credentials
 - Email: carlo.mitri@gmail.com

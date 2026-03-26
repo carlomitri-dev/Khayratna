@@ -447,18 +447,13 @@ async def post_sales_invoice(invoice_id: str, current_user: dict = Depends(get_c
     org = await db.organizations.find_one({'id': invoice['organization_id']}, {'tax_percent': 1, '_id': 0})
     tax_percent = org.get('tax_percent', 11) if org else 11
     
-    # Calculate amounts
+    # Calculate amounts - trust the stored tax_amount from the invoice
+    # The frontend already calculates it correctly based on which items are taxable
     total_usd = invoice.get('total_usd') or invoice.get('total', 0)
-    tax_usd = invoice.get('tax_amount_usd') or invoice.get('tax_amount', 0)
-    
-    # If no separate tax amount, calculate from total and tax%
-    if tax_usd == 0 and tax_percent > 0:
-        subtotal_usd = invoice.get('subtotal_usd') or invoice.get('subtotal', 0)
-        if subtotal_usd > 0:
-            tax_usd = subtotal_usd * tax_percent / 100
-        else:
-            # Total includes tax, extract it
-            tax_usd = total_usd * tax_percent / (100 + tax_percent)
+    stored_tax = invoice.get('tax_amount_usd')
+    if stored_tax is None:
+        stored_tax = invoice.get('tax_amount')
+    tax_usd = stored_tax if stored_tax is not None else 0
     
     amount_without_vat_usd = total_usd - tax_usd
     
@@ -1030,16 +1025,12 @@ async def post_purchase_invoice(invoice_id: str, current_user: dict = Depends(ge
     org = await db.organizations.find_one({'id': invoice['organization_id']}, {'tax_percent': 1, '_id': 0})
     tax_percent = org.get('tax_percent', 11) if org else 11
     
-    # Calculate amounts
+    # Calculate amounts - trust the stored tax_amount from the invoice
     total_usd = invoice.get('total_usd') or invoice.get('total', 0)
-    tax_usd = invoice.get('tax_amount_usd') or invoice.get('tax_amount', 0)
-    
-    if tax_usd == 0 and tax_percent > 0:
-        subtotal_usd = invoice.get('subtotal_usd') or invoice.get('subtotal', 0)
-        if subtotal_usd > 0:
-            tax_usd = subtotal_usd * tax_percent / 100
-        else:
-            tax_usd = total_usd * tax_percent / (100 + tax_percent)
+    stored_tax = invoice.get('tax_amount_usd')
+    if stored_tax is None:
+        stored_tax = invoice.get('tax_amount')
+    tax_usd = stored_tax if stored_tax is not None else 0
     
     amount_without_vat_usd = total_usd - tax_usd
     amount_without_vat_lbp = amount_without_vat_usd * base_rate
