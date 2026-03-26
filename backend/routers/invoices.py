@@ -676,10 +676,16 @@ async def unpost_sales_invoice(invoice_id: str, current_user: dict = Depends(get
         if voucher:
             # Reverse account balances
             for line in voucher.get('lines', []):
+                account_code = line.get('account_code')
                 account_id = line.get('account_id')
+                query = {}
                 if account_id:
+                    query = {'id': account_id}
+                elif account_code:
+                    query = {'code': account_code, 'organization_id': invoice['organization_id']}
+                if query:
                     await db.accounts.update_one(
-                        {'id': account_id},
+                        query,
                         {'$inc': {
                             'balance_usd': -(line.get('debit_usd', 0) - line.get('credit_usd', 0)),
                             'balance_lbp': -(line.get('debit_lbp', 0) - line.get('credit_lbp', 0))
@@ -1253,18 +1259,25 @@ async def unpost_purchase_invoice(invoice_id: str, current_user: dict = Depends(
         if voucher:
             # Reverse account balances
             for line in voucher.get('lines', []):
-                debit_usd = line.get('debit_usd', 0)
-                credit_usd = line.get('credit_usd', 0)
-                debit_lbp = line.get('debit_lbp', 0)
-                credit_lbp = line.get('credit_lbp', 0)
-                
-                await db.accounts.update_one(
-                    {'id': line['account_id']},
-                    {'$inc': {
-                        'balance_usd': credit_usd - debit_usd,
-                        'balance_lbp': credit_lbp - debit_lbp
-                    }}
-                )
+                account_code = line.get('account_code')
+                account_id = line.get('account_id')
+                query = {}
+                if account_id:
+                    query = {'id': account_id}
+                elif account_code:
+                    query = {'code': account_code, 'organization_id': invoice['organization_id']}
+                if query:
+                    debit_usd = line.get('debit_usd', 0)
+                    credit_usd = line.get('credit_usd', 0)
+                    debit_lbp = line.get('debit_lbp', 0)
+                    credit_lbp = line.get('credit_lbp', 0)
+                    await db.accounts.update_one(
+                        query,
+                        {'$inc': {
+                            'balance_usd': credit_usd - debit_usd,
+                            'balance_lbp': credit_lbp - debit_lbp
+                        }}
+                    )
             
             # Delete voucher
             await db.vouchers.delete_one({'id': voucher_id})
