@@ -57,7 +57,7 @@ const PurchaseInvoicePage = () => {
     inventory_item_id: '', item_name: '', item_name_ar: '', barcode: '',
     quantity: 1, unit: 'piece', unit_price: 0, selling_price: 0, currency: 'USD',
     exchange_rate: 1, discount_percent: 0, line_total: 0, line_total_usd: 0,
-    is_taxable: true, batch_number: '', expiry_date: ''
+    is_taxable: true
   };
   
   const defaultFormData = {
@@ -154,9 +154,11 @@ const PurchaseInvoicePage = () => {
   
   const recalculateTotals = (lines, discountPercent, taxPercent) => {
     const subtotalUsd = lines.reduce((sum, l) => sum + (parseFloat(l.line_total_usd) || 0), 0);
+    const taxableUsd = lines.reduce((sum, l) => l.is_taxable !== false ? sum + (parseFloat(l.line_total_usd) || 0) : sum, 0);
     const discountAmount = subtotalUsd * (parseFloat(discountPercent) || 0) / 100;
     const afterDiscount = subtotalUsd - discountAmount;
-    const taxAmount = afterDiscount * (parseFloat(taxPercent) || 0) / 100;
+    const taxableAfterDiscount = taxableUsd * (1 - (parseFloat(discountPercent) || 0) / 100);
+    const taxAmount = taxableAfterDiscount * (parseFloat(taxPercent) || 0) / 100;
     const totalUsd = afterDiscount + taxAmount;
     return { subtotal: subtotalUsd, discountAmount, taxAmount, total: totalUsd, totalUsd };
   };
@@ -243,17 +245,32 @@ const PurchaseInvoicePage = () => {
     }
     setSaving(true);
     try {
+      const cleanedData = {
+        ...formData,
+        lines: formData.lines.map(line => ({
+          ...line,
+          quantity: parseFloat(line.quantity) || 0,
+          unit_price: parseFloat(line.unit_price) || 0,
+          selling_price: parseFloat(line.selling_price) || 0,
+          discount_percent: parseFloat(line.discount_percent) || 0,
+          line_total: parseFloat(line.line_total) || 0,
+          line_total_usd: parseFloat(line.line_total_usd) || 0,
+          exchange_rate: parseFloat(line.exchange_rate) || 1,
+        }))
+      };
       if (editingInvoice) {
-        await axios.put(`${API}/purchase-invoices/${editingInvoice.id}`, formData);
+        await axios.put(`${API}/purchase-invoices/${editingInvoice.id}`, cleanedData);
         toast.success('Purchase invoice updated');
       } else {
-        await axios.post(`${API}/purchase-invoices`, formData);
+        await axios.post(`${API}/purchase-invoices`, cleanedData);
         toast.success('Purchase invoice created');
       }
       setShowForm(false);
       fetchInvoices(true);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to save');
+      const detail = error.response?.data?.detail;
+      const msg = Array.isArray(detail) ? detail.map(e => e.msg).join(', ') : (detail || 'Failed to save');
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -550,16 +567,14 @@ const PurchaseInvoicePage = () => {
                   <thead>
                     <tr className="border-b bg-muted/30">
                       <th className="text-left p-2 min-w-[200px]">Item</th>
-                      <th className="text-left p-2 w-[70px]">Qty</th>
-                      <th className="text-left p-2 w-[70px]">Unit</th>
-                      <th className="text-left p-2 w-[90px]">Cost</th>
-                      <th className="text-left p-2 w-[90px] text-blue-400">Sell Price</th>
-                      <th className="text-left p-2 w-[70px]">Currency</th>
-                      <th className="text-left p-2 w-[60px]">Disc%</th>
-                      <th className="text-left p-2 w-[90px]">Batch</th>
-                      <th className="text-left p-2 w-[100px]">Expiry</th>
-                      <th className="text-right p-2 w-[90px]">Total</th>
-                      <th className="text-right p-2 w-[90px]">USD</th>
+                      <th className="text-left p-2 w-[90px]">Qty</th>
+                      <th className="text-left p-2 w-[80px]">Unit</th>
+                      <th className="text-left p-2 w-[110px]">Cost</th>
+                      <th className="text-left p-2 w-[110px] text-blue-400">Sell Price</th>
+                      <th className="text-left p-2 w-[80px]">Currency</th>
+                      <th className="text-left p-2 w-[80px]">Disc%</th>
+                      <th className="text-right p-2 w-[100px]">Total</th>
+                      <th className="text-right p-2 w-[100px]">USD</th>
                       <th className="p-2 w-[40px]"></th>
                     </tr>
                   </thead>
@@ -582,16 +597,16 @@ const PurchaseInvoicePage = () => {
                           )}
                         </td>
                         <td className="p-2">
-                          <Input type="number" value={line.quantity} onChange={(e) => handleLineChange(index, 'quantity', e.target.value)} min="0" step="0.01" className="h-9" />
+                          <Input type="number" value={line.quantity} onChange={(e) => handleLineChange(index, 'quantity', e.target.value)} min="0" step="1" className="h-9 text-sm" />
                         </td>
                         <td className="p-2">
-                          <Input value={line.unit} onChange={(e) => handleLineChange(index, 'unit', e.target.value)} className="h-9" />
+                          <Input value={line.unit} onChange={(e) => handleLineChange(index, 'unit', e.target.value)} className="h-9 text-sm" />
                         </td>
                         <td className="p-2">
-                          <Input type="number" value={line.unit_price} onChange={(e) => handleLineChange(index, 'unit_price', e.target.value)} min="0" step="0.01" className="h-9" />
+                          <Input type="number" value={line.unit_price} onChange={(e) => handleLineChange(index, 'unit_price', e.target.value)} min="0" step="0.01" className="h-9 text-sm" />
                         </td>
                         <td className="p-2">
-                          <Input type="number" value={line.selling_price || ''} onChange={(e) => handleLineChange(index, 'selling_price', e.target.value)} min="0" step="0.01" className="h-9 border-blue-500/30 focus:border-blue-500" placeholder="Sell" data-testid={`selling-price-${index}`} />
+                          <Input type="number" value={line.selling_price || ''} onChange={(e) => handleLineChange(index, 'selling_price', e.target.value)} min="0" step="0.01" className="h-9 text-sm border-blue-500/30 focus:border-blue-500" placeholder="Sell" data-testid={`selling-price-${index}`} />
                         </td>
                         <td className="p-2">
                           <Select value={line.currency} onValueChange={(val) => {
@@ -599,23 +614,17 @@ const PurchaseInvoicePage = () => {
                             if (val === 'LBP') handleLineChange(index, 'exchange_rate', exchangeRate);
                             else handleLineChange(index, 'exchange_rate', 1);
                           }}>
-                            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               {currencies.map(c => <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>)}
                             </SelectContent>
                           </Select>
                         </td>
                         <td className="p-2">
-                          <Input type="number" value={line.discount_percent} onChange={(e) => handleLineChange(index, 'discount_percent', e.target.value)} min="0" max="100" className="h-9" />
+                          <Input type="number" value={line.discount_percent} onChange={(e) => handleLineChange(index, 'discount_percent', e.target.value)} min="0" max="100" className="h-9 text-sm" />
                         </td>
-                        <td className="p-2">
-                          <Input value={line.batch_number || ''} onChange={(e) => handleLineChange(index, 'batch_number', e.target.value)} className="h-9" placeholder="Batch" />
-                        </td>
-                        <td className="p-2">
-                          <Input type="date" value={line.expiry_date || ''} onChange={(e) => handleLineChange(index, 'expiry_date', e.target.value)} className="h-9" />
-                        </td>
-                        <td className="p-2 text-right font-mono">{(line.line_total || 0).toFixed(3)}</td>
-                        <td className="p-2 text-right font-mono text-primary">{formatUSD(line.line_total_usd || 0)}</td>
+                        <td className="p-2 text-right font-mono text-sm">{(line.line_total || 0).toFixed(3)}</td>
+                        <td className="p-2 text-right font-mono text-primary text-sm">{formatUSD(line.line_total_usd || 0)}</td>
                         <td className="p-2">
                           {formData.lines.length > 1 && (
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeLine(index)}>

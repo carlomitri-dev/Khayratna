@@ -81,6 +81,15 @@ const AccountSelector = ({
     }
   }, [open, isRemote, initialLoaded, fetchAccounts]);
 
+  // When value is set in remote mode (e.g. on edit), fetch the account for display
+  useEffect(() => {
+    if (value && isRemote && !selectedCache) {
+      axios.get(`${API}/accounts/${value}`).then(res => {
+        setSelectedCache(res.data);
+      }).catch(() => {});
+    }
+  }, [value, isRemote]);
+
   // Debounced remote search
   useEffect(() => {
     if (!isRemote || !open) return;
