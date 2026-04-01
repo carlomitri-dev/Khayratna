@@ -53,6 +53,19 @@ const SalesInvoicePage = () => {
     { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل' }
   ]);
   const [exchangeRate, setExchangeRate] = useState(89500);
+  const [lastPrices, setLastPrices] = useState({});
+
+  const fetchLastPrice = async (customerId, inventoryItemId, lineIndex) => {
+    if (!customerId || !inventoryItemId || !currentOrg?.id) return;
+    try {
+      const res = await axios.get(`${API}/sales-invoices/last-price`, {
+        params: { customer_id: customerId, inventory_item_id: inventoryItemId, organization_id: currentOrg.id }
+      });
+      if (res.data) {
+        setLastPrices(prev => ({ ...prev, [lineIndex]: res.data }));
+      }
+    } catch {}
+  };
   
   const emptyLine = {
     inventory_item_id: '', item_name: '', item_name_ar: '', barcode: '',
@@ -215,6 +228,10 @@ const SalesInvoicePage = () => {
     newLines[index].line_total_usd = lineTotalUsd;
     const totals = recalculateTotals(newLines, formData.discount_percent, formData.tax_percent);
     setFormData({ ...formData, lines: newLines, subtotal: totals.subtotal, discount_amount: totals.discountAmount, tax_amount: totals.taxAmount, total: totals.total, total_usd: totals.totalUsd });
+    // Fetch last price for this customer+item
+    if (formData.debit_account_id && item.id) {
+      fetchLastPrice(formData.debit_account_id, item.id, index);
+    }
   };
   
   const addLine = () => {
@@ -226,6 +243,7 @@ const SalesInvoicePage = () => {
     const newLines = formData.lines.filter((_, i) => i !== index);
     const totals = recalculateTotals(newLines, formData.discount_percent, formData.tax_percent);
     setFormData({ ...formData, lines: newLines, subtotal: totals.subtotal, discount_amount: totals.discountAmount, tax_amount: totals.taxAmount, total: totals.total, total_usd: totals.totalUsd });
+    setLastPrices(prev => { const copy = {...prev}; delete copy[index]; return copy; });
   };
   
   const handleDiscountOrTaxChange = (field, value) => {
@@ -614,6 +632,16 @@ const SalesInvoicePage = () => {
                         </td>
                         <td className="p-2">
                           <Input type="number" value={line.unit_price} onChange={(e) => handleLineChange(index, 'unit_price', e.target.value)} min="0" step="0.01" className="h-9" />
+                          {lastPrices[index] && (
+                            <button
+                              type="button"
+                              className="text-[10px] text-blue-400 hover:text-blue-300 cursor-pointer mt-0.5 block truncate"
+                              title={`Last: ${lastPrices[index].unit_price?.toFixed(3)} on ${lastPrices[index].invoice_number} (${lastPrices[index].date})`}
+                              onClick={() => handleLineChange(index, 'unit_price', lastPrices[index].unit_price)}
+                            >
+                              Last: {lastPrices[index].unit_price?.toFixed(3)} ({lastPrices[index].invoice_number})
+                            </button>
+                          )}
                         </td>
                         <td className="p-2">
                           <Select value={line.currency} onValueChange={(val) => {

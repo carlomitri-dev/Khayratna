@@ -73,6 +73,50 @@ async def recalculate_fy_balances(accounts: list, organization_id: str, fy_id: s
 
 
 
+@router.get("/sales-invoices/last-price")
+async def get_last_price(
+    customer_id: str,
+    inventory_item_id: str,
+    organization_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get the last price given to a customer for a specific item from posted sales invoices"""
+    pipeline = [
+        {'$match': {
+            'organization_id': organization_id,
+            'debit_account_id': customer_id,
+            'is_posted': True,
+            'lines.inventory_item_id': inventory_item_id
+        }},
+        {'$sort': {'date': -1, 'created_at': -1}},
+        {'$limit': 1},
+        {'$unwind': '$lines'},
+        {'$match': {'lines.inventory_item_id': inventory_item_id}},
+        {'$project': {
+            '_id': 0,
+            'invoice_number': 1,
+            'date': 1,
+            'unit_price': '$lines.unit_price',
+            'discount_percent': '$lines.discount_percent',
+            'quantity': '$lines.quantity',
+            'currency': '$lines.currency'
+        }}
+    ]
+    result = await db.sales_invoices.aggregate(pipeline).to_list(1)
+    if result:
+        return result[0]
+    
+    # Also check sales returns (debit/credit are reversed)
+    pipeline[0]['$match']['debit_account_id'] = {'$exists': True}
+    pipeline[0]['$match'].pop('debit_account_id')
+    pipeline[0]['$match']['credit_account_id'] = customer_id
+    result_return = await db.sales_returns.aggregate(pipeline).to_list(1)
+    if result_return:
+        return result_return[0]
+    
+    return None
+
+
 async def generate_next_invoice_number(organization_id: str, doc_type: str = 'sales_invoice') -> str:
     """
     Generate the next invoice number based on organization's invoice_series settings.
@@ -281,39 +325,6 @@ async def get_sales_invoice(invoice_id: str, current_user: dict = Depends(get_cu
     return SalesInvoiceResponse(**invoice)
 
 
-@router.get("/sales-invoices/last-price/{customer_account_id}/{item_id}")
-async def get_last_price_for_customer(
-    customer_account_id: str, 
-    item_id: str, 
-    current_user: dict = Depends(get_current_user)
-):
-    """Get the last price for an item sold to a customer"""
-    pipeline = [
-        {'$match': {'debit_account_id': customer_account_id, 'is_posted': True}},
-        {'$sort': {'date': -1, 'created_at': -1}},
-        {'$unwind': '$lines'},
-        {'$match': {'lines.inventory_item_id': item_id}},
-        {'$limit': 1},
-        {'$project': {
-            'unit_price': '$lines.unit_price',
-            'currency': '$lines.currency',
-            'date': 1,
-            'invoice_number': 1
-        }}
-    ]
-    
-    result = await db.sales_invoices.aggregate(pipeline).to_list(1)
-    
-    if result:
-        return {
-            'found': True,
-            'unit_price': result[0].get('unit_price'),
-            'currency': result[0].get('currency'),
-            'date': result[0].get('date'),
-            'invoice_number': result[0].get('invoice_number')
-        }
-    
-    return {'found': False}
 
 
 @router.post("/sales-invoices", response_model=SalesInvoiceResponse)
