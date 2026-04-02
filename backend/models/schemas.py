@@ -200,6 +200,8 @@ class InventoryItemCreate(BaseModel):
     show_image_in_pos: bool = True  # Display image in POS Quick Items
     country_of_origin: Optional[str] = None  # Country of origin/origine
     discount_percent: float = 0  # Default discount percentage
+    package: Optional[float] = None
+    pack_description: Optional[str] = None
     organization_id: str
 
 class InventoryItemUpdate(BaseModel):
@@ -226,6 +228,8 @@ class InventoryItemUpdate(BaseModel):
     show_image_in_pos: Optional[bool] = None  # Display image in POS Quick Items
     country_of_origin: Optional[str] = None  # Country of origin/origine
     discount_percent: Optional[float] = None  # Default discount percentage
+    package: Optional[float] = None
+    pack_description: Optional[str] = None
 
 # Batch/Lot model for inventory items with expiry tracking
 class InventoryBatch(BaseModel):
@@ -267,6 +271,8 @@ class InventoryItemResponse(BaseModel):
     show_image_in_pos: Optional[bool] = True  # Display image in POS Quick Items
     country_of_origin: Optional[str] = None  # Country of origin/origine
     discount_percent: Optional[float] = 0  # Default discount percentage
+    package: Optional[float] = None
+    pack_description: Optional[str] = None
     organization_id: str
     created_at: str
     updated_at: Optional[str] = None

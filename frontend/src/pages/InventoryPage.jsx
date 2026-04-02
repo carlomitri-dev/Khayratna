@@ -190,7 +190,9 @@ const InventoryPage = () => {
     is_taxable: true,
     is_active: true,
     is_pos_item: false,
-    show_image_in_pos: true
+    show_image_in_pos: true,
+    package: '',
+    pack_description: ''
   });
 
   useEffect(() => {
@@ -645,7 +647,9 @@ const InventoryPage = () => {
       is_taxable: true,
       is_active: true,
       is_pos_item: false,
-      show_image_in_pos: true
+      show_image_in_pos: true,
+      package: '',
+      pack_description: ''
     });
     setEditingItem(null);
   };
@@ -672,7 +676,9 @@ const InventoryPage = () => {
         is_taxable: item.is_taxable !== false,
         is_active: item.is_active,
         is_pos_item: item.is_pos_item || false,
-        show_image_in_pos: item.show_image_in_pos !== false
+        show_image_in_pos: item.show_image_in_pos !== false,
+        package: item.package?.toString() || '',
+        pack_description: item.pack_description || ''
       });
     } else {
       resetForm();
@@ -689,6 +695,8 @@ const InventoryPage = () => {
       price: parseFloat(formData.price) || 0,
       min_qty: parseFloat(formData.min_qty) || 0,
       on_hand_qty: parseFloat(formData.on_hand_qty) || 0,
+      package: formData.package ? parseFloat(formData.package) : null,
+      pack_description: formData.pack_description || null,
       category_id: formData.category_id || null,
       supplier_id: formData.supplier_id || null,
       expiry_date: formData.expiry_date || null,
@@ -1761,6 +1769,25 @@ const InventoryPage = () => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Package</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  placeholder="e.g. 12"
+                  value={formData.package}
+                  onChange={(e) => setFormData({ ...formData, package: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Pack Desc</Label>
+                <Input
+                  placeholder="e.g. Box, Carton"
+                  value={formData.pack_description}
+                  onChange={(e) => setFormData({ ...formData, pack_description: e.target.value })}
+                />
               </div>
             </div>
 
