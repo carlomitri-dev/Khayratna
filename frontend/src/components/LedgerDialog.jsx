@@ -102,59 +102,99 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
     const ob = ledgerData.opening_balance || { usd: 0, lbp: 0 };
     const cb = ledgerData.closing_balance || { usd: 0, lbp: 0 };
     const dateRange = (fromDate || toDate) ? 
-      `<p style="font-size:12px;margin:3px 0;">Period: ${fromDate || '...'} to ${toDate || '...'}</p>` : '';
+      `<p style="font-size:16px;margin:3px 0;">Period: ${fromDate || '...'} to ${toDate || '...'}</p>` : '';
+
+    // Company info (same as SalesInvoicePrint)
+    const companyEn = 'Michel Matar Trading Est.';
+    const companyAr = 'مؤسسة ميشال مطر التجارية';
+    const addressEn = 'Kafarakka El-Koura';
+    const addressAr = 'كفر عقا - الكورة';
+    const phone = '06/950751';
+    const email = 'ets.michelmatar@hotmail.com';
+    const regNumber = '601-585164';
 
     return `
-      <div style="font-family:Arial,sans-serif;padding:10px;font-size:12px;color:#000;background:#fff;">
-        <div style="text-align:center;margin-bottom:12px;border-bottom:2px solid #000;padding-bottom:8px;">
-          <h1 style="font-size:18px;margin:0;">Account Ledger - كشف حساب</h1>
-          <h2 style="font-size:14px;margin:4px 0;">${account.code} - ${account.name}${account.name_ar ? ' / ' + account.name_ar : ''}</h2>
-          ${dateRange}
+      <div style="font-family:Arial,sans-serif;padding:10px;font-size:16px;color:#000;background:#fff;">
+        <!-- Company Header (same as invoice, no logo) -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;border-bottom:2px solid #000;padding-bottom:6px;">
+          <div style="text-align:left;flex:1;">
+            <h2 style="font-size:22px;margin:0 0 3px 0;color:#000;font-weight:bold;">${companyEn}</h2>
+            <p style="margin:1px 0;font-size:18px;color:#000;">${addressEn}</p>
+            <p style="margin:1px 0;font-size:18px;color:#000;">Tel: ${phone}</p>
+            <p style="margin:1px 0;font-size:18px;color:#000;">Email: ${email}</p>
+            <p style="margin:1px 0;font-size:18px;color:#000;">T.V.A.: ${regNumber}</p>
+          </div>
+          <div style="text-align:right;flex:1;direction:rtl;">
+            <h2 style="font-size:22px;margin:0 0 3px 0;color:#000;font-weight:bold;">${companyAr}</h2>
+            <p style="margin:1px 0;font-size:18px;color:#000;">${addressAr}</p>
+            <p style="margin:1px 0;font-size:18px;color:#000;">تلفون: ${phone}</p>
+            <p style="margin:1px 0;font-size:18px;color:#000;">بريد: ${email}</p>
+            <p style="margin:1px 0;font-size:18px;color:#000;">ض.ق.م.: ${regNumber}</p>
+          </div>
         </div>
+
+        <!-- Title -->
+        <div style="text-align:center;font-size:26px;font-weight:bold;color:#000;margin:6px 0;border:2px solid #000;padding:3px;">
+          كشف حساب - Ledger Account
+        </div>
+
+        <!-- Account Info -->
+        <div style="display:flex;justify-content:space-between;margin:6px 0;border:1px solid #000;padding:6px 8px;">
+          <div style="text-align:left;">
+            <div style="margin:2px 0;font-size:18px;"><span style="font-weight:bold;">Account Code:</span> ${account.code}</div>
+            <div style="margin:2px 0;font-size:18px;"><span style="font-weight:bold;">Account Name:</span> ${account.name}</div>
+            ${dateRange}
+          </div>
+          <div style="text-align:right;direction:rtl;">
+            <div style="margin:2px 0;font-size:18px;"><span style="font-weight:bold;">رمز الحساب:</span> ${account.code}</div>
+            <div style="margin:2px 0;font-size:18px;"><span style="font-weight:bold;">إسم الحساب:</span> ${account.name_ar || account.name}</div>
+          </div>
+        </div>
+
         <table style="width:100%;border-collapse:collapse;margin-top:8px;">
           <thead>
             <tr>
-              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:11px;">Date</th>
-              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:11px;">Voucher</th>
-              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:11px;">Description</th>
-              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:11px;text-align:right;">Debit (USD)</th>
-              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:11px;text-align:right;">Credit (USD)</th>
-              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:11px;text-align:right;">Balance (USD)</th>
-              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:11px;text-align:right;">Balance (LBP)</th>
+              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:15px;">Date</th>
+              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:15px;">Voucher</th>
+              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:15px;">Description</th>
+              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:15px;text-align:right;">Debit (USD)</th>
+              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:15px;text-align:right;">Credit (USD)</th>
+              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:15px;text-align:right;">Balance (USD)</th>
+              <th style="border:1px solid #000;padding:4px;background:#fff;font-size:15px;text-align:right;">Balance (LBP)</th>
             </tr>
           </thead>
           <tbody>
             ${(ob.usd !== 0 || ob.lbp !== 0) ? `
               <tr style="font-weight:bold;background:#f5f5f5;">
-                <td style="border:1px solid #000;padding:4px;" colspan="3">Opening Balance / رصيد سابق</td>
-                <td style="border:1px solid #000;padding:4px;text-align:right;">-</td>
-                <td style="border:1px solid #000;padding:4px;text-align:right;">-</td>
-                <td style="border:1px solid #000;padding:4px;text-align:right;font-family:monospace;">${formatUSD(ob.usd)}</td>
-                <td style="border:1px solid #000;padding:4px;text-align:right;font-family:monospace;">${formatLBP(ob.lbp)}</td>
+                <td style="border:1px solid #000;padding:4px;font-size:15px;" colspan="3">Opening Balance / رصيد سابق</td>
+                <td style="border:1px solid #000;padding:4px;text-align:right;font-size:15px;">-</td>
+                <td style="border:1px solid #000;padding:4px;text-align:right;font-size:15px;">-</td>
+                <td style="border:1px solid #000;padding:4px;text-align:right;font-family:monospace;font-size:15px;">${formatUSD(ob.usd)}</td>
+                <td style="border:1px solid #000;padding:4px;text-align:right;font-family:monospace;font-size:15px;">${formatLBP(ob.lbp)}</td>
               </tr>` : ''}
             ${ledgerData.entries.map(e => `
               <tr>
-                <td style="border:1px solid #000;padding:3px;font-size:11px;">${formatDate(e.date)}</td>
-                <td style="border:1px solid #000;padding:3px;font-size:11px;">${e.voucher_number}</td>
-                <td style="border:1px solid #000;padding:3px;font-size:11px;">${e.description}</td>
-                <td style="border:1px solid #000;padding:3px;text-align:right;font-family:monospace;font-size:11px;">${e.debit_usd > 0 ? formatUSD(e.debit_usd) : '-'}</td>
-                <td style="border:1px solid #000;padding:3px;text-align:right;font-family:monospace;font-size:11px;">${e.credit_usd > 0 ? formatUSD(e.credit_usd) : '-'}</td>
-                <td style="border:1px solid #000;padding:3px;text-align:right;font-family:monospace;font-size:11px;">${formatUSD(e.balance_usd)}</td>
-                <td style="border:1px solid #000;padding:3px;text-align:right;font-family:monospace;font-size:11px;">${formatLBP(e.balance_lbp)}</td>
+                <td style="border:1px solid #000;padding:3px;font-size:15px;">${formatDate(e.date)}</td>
+                <td style="border:1px solid #000;padding:3px;font-size:15px;">${e.voucher_number}</td>
+                <td style="border:1px solid #000;padding:3px;font-size:15px;">${e.description}</td>
+                <td style="border:1px solid #000;padding:3px;text-align:right;font-family:monospace;font-size:15px;">${e.debit_usd > 0 ? formatUSD(e.debit_usd) : '-'}</td>
+                <td style="border:1px solid #000;padding:3px;text-align:right;font-family:monospace;font-size:15px;">${e.credit_usd > 0 ? formatUSD(e.credit_usd) : '-'}</td>
+                <td style="border:1px solid #000;padding:3px;text-align:right;font-family:monospace;font-size:15px;">${formatUSD(e.balance_usd)}</td>
+                <td style="border:1px solid #000;padding:3px;text-align:right;font-family:monospace;font-size:15px;">${formatLBP(e.balance_lbp)}</td>
               </tr>
             `).join('')}
           </tbody>
           <tfoot>
             <tr style="font-weight:bold;border-top:2px solid #000;">
-              <td style="border:1px solid #000;padding:5px;" colspan="3">Closing Balance / الرصيد الختامي</td>
-              <td style="border:1px solid #000;padding:5px;text-align:right;">-</td>
-              <td style="border:1px solid #000;padding:5px;text-align:right;">-</td>
-              <td style="border:1px solid #000;padding:5px;text-align:right;font-family:monospace;">${formatUSD(cb.usd)}</td>
-              <td style="border:1px solid #000;padding:5px;text-align:right;font-family:monospace;">${formatLBP(cb.lbp)}</td>
+              <td style="border:1px solid #000;padding:5px;font-size:16px;" colspan="3">Closing Balance / الرصيد الختامي</td>
+              <td style="border:1px solid #000;padding:5px;text-align:right;font-size:16px;">-</td>
+              <td style="border:1px solid #000;padding:5px;text-align:right;font-size:16px;">-</td>
+              <td style="border:1px solid #000;padding:5px;text-align:right;font-family:monospace;font-size:16px;">${formatUSD(cb.usd)}</td>
+              <td style="border:1px solid #000;padding:5px;text-align:right;font-family:monospace;font-size:16px;">${formatLBP(cb.lbp)}</td>
             </tr>
           </tfoot>
         </table>
-        <p style="font-size:10px;margin-top:8px;text-align:right;color:#666;">Total entries: ${ledgerData.total_entries}</p>
+        <p style="font-size:14px;margin-top:8px;text-align:right;color:#666;">Total entries: ${ledgerData.total_entries}</p>
       </div>`;
   };
 
