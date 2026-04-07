@@ -9,6 +9,7 @@ import uuid
 import asyncio
 import logging
 from datetime import datetime, timezone
+from pymongo.errors import DuplicateKeyError, BulkWriteError
 
 from core.database import db
 from core.auth import get_current_user
@@ -57,7 +58,7 @@ PRIORITY_ORDER = [
 DUP_FIELD = {
     "accounts": "code",
     "inventory_categories": "name",
-    "inventory_items": "code",
+    "inventory_items": "item_code",
     "regions": "name",
     "services": "name",
     "vouchers": "voucher_number",
@@ -240,7 +241,10 @@ async def _run_import(job_id: str, req: ImportRequest):
                             target_account_codes.add(code)
                             auto_created.append(code)
                     if accounts_to_insert:
-                        await db.accounts.insert_many(accounts_to_insert)
+                        try:
+                            await db.accounts.insert_many(accounts_to_insert, ordered=False)
+                        except BulkWriteError as bwe:
+                            logger.warning(f"Import {job_id}: auto-create accounts had {len(bwe.details.get('writeErrors', []))} duplicates")
 
             # Filter duplicates and prepare batch
             to_insert = []
@@ -257,13 +261,20 @@ async def _run_import(job_id: str, req: ImportRequest):
                 new_doc["imported_from_org"] = req.source_org_id
                 to_insert.append(new_doc)
 
-            # Batch insert in chunks
+            # Batch insert in chunks with duplicate error handling
             imported = 0
             BATCH_SIZE = 500
             for i in range(0, len(to_insert), BATCH_SIZE):
                 batch = to_insert[i:i + BATCH_SIZE]
-                await db[table_key].insert_many(batch)
-                imported += len(batch)
+                try:
+                    await db[table_key].insert_many(batch, ordered=False)
+                    imported += len(batch)
+                except BulkWriteError as bwe:
+                    # Some docs inserted, some failed due to unique constraints
+                    imported += bwe.details.get("nInserted", 0)
+                    dup_errors = len(bwe.details.get("writeErrors", []))
+                    skipped += dup_errors
+                    logger.warning(f"Import {job_id}: {table_key} batch had {dup_errors} duplicate errors")
 
             job["results"][table_key] = {"imported": imported, "skipped": skipped}
             job["progress"][table_key] = "done"
