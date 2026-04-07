@@ -36,7 +36,8 @@ import {
   RotateCcw,
   Monitor,
   UserCheck,
-  ClipboardList
+  ClipboardList,
+  FolderInput
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -96,6 +97,7 @@ const Sidebar = ({ isOpen, onClose, collapsed, onToggleCollapse }) => {
     { path: '/income-statement', icon: TrendingUp, label: 'Income Statement' },
     { path: '/general-ledger', icon: List, label: 'General Ledger' },
     { path: '/import-data', icon: Upload, label: 'Import Data', requiresAdmin: true },
+    { path: '/import-org', icon: FolderInput, label: 'Import from Org', requiresSuperAdmin: true },
     { path: '/settings', icon: Settings, label: 'Settings', requiresSuperAdmin: true },
   ];
 

@@ -6759,6 +6759,12 @@ purchase_orders_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(purchase_orders_module)
 api_router.include_router(purchase_orders_module.router)
 
+# Import Org router - ENABLED
+spec = importlib.util.spec_from_file_location("import_org_router", "/app/backend/routers/import_org.py")
+import_org_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(import_org_module)
+api_router.include_router(import_org_module.router)
+
 app.include_router(api_router)
 
 app.add_middleware(

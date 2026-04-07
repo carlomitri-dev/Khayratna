@@ -94,6 +94,7 @@ import CashierLoginPage from './pages/CashierLoginPage';
 import POSClosingReportPage from './pages/POSClosingReportPage';
 import POSAnalyticsPage from './pages/POSAnalyticsPage';
 import JournalPage from './pages/JournalPage';
+import ImportOrgPage from './pages/ImportOrgPage';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -300,6 +301,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ImportDataPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/import-org"
+        element={
+          <ProtectedRoute>
+            <ImportOrgPage />
           </ProtectedRoute>
         }
       />
