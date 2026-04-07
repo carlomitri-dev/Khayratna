@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
-import { FolderInput, Calendar, Loader2, CheckCircle, AlertTriangle, Eye, Play } from 'lucide-react';
+import { FolderInput, Calendar, Loader2, CheckCircle, AlertTriangle, Eye, Play, XCircle } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 
@@ -28,9 +28,12 @@ const ImportOrgPage = () => {
 
   const [previewData, setPreviewData] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [importLoading, setImportLoading] = useState(false);
-  const [importResult, setImportResult] = useState(null);
 
+  const [jobId, setJobId] = useState(null);
+  const [jobStatus, setJobStatus] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
+
+  const pollingRef = useRef(null);
   const headers = { Authorization: `Bearer ${token}` };
 
   // Fetch table list
@@ -49,12 +52,17 @@ const ImportOrgPage = () => {
     fetchTables();
   }, []);
 
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+  }, []);
+
   const sourceOrgs = organizations.filter(o => o.id !== currentOrg?.id);
 
   const toggleTable = (key) => {
     setSelectedTables(prev => ({ ...prev, [key]: !prev[key] }));
     setPreviewData(null);
-    setImportResult(null);
+    setJobStatus(null);
   };
 
   const selectAll = () => {
@@ -62,7 +70,7 @@ const ImportOrgPage = () => {
     tables.forEach(t => { all[t.key] = true; });
     setSelectedTables(all);
     setPreviewData(null);
-    setImportResult(null);
+    setJobStatus(null);
   };
 
   const deselectAll = () => {
@@ -70,7 +78,7 @@ const ImportOrgPage = () => {
     tables.forEach(t => { none[t.key] = false; });
     setSelectedTables(none);
     setPreviewData(null);
-    setImportResult(null);
+    setJobStatus(null);
   };
 
   const getSelectedKeys = useCallback(() => {
@@ -84,7 +92,7 @@ const ImportOrgPage = () => {
 
     setPreviewLoading(true);
     setPreviewData(null);
-    setImportResult(null);
+    setJobStatus(null);
     try {
       const res = await axios.post(`${API}/import-org/preview`, {
         source_org_id: sourceOrgId,
@@ -101,13 +109,34 @@ const ImportOrgPage = () => {
     }
   };
 
+  const pollStatus = useCallback(async (jid) => {
+    try {
+      const res = await axios.get(`${API}/import-org/status/${jid}`, { headers });
+      setJobStatus(res.data);
+      if (res.data.status === 'completed') {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        pollingRef.current = null;
+        setImportLoading(false);
+        toast.success('Import completed successfully');
+      } else if (res.data.status === 'failed') {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        pollingRef.current = null;
+        setImportLoading(false);
+        toast.error(`Import failed: ${res.data.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      // Keep polling, might be transient
+    }
+  }, [token]);
+
   const handleImport = async () => {
     const selected = getSelectedKeys();
     if (!sourceOrgId) return toast.error('Select a source organization');
     if (selected.length === 0) return toast.error('Select at least one table');
 
     setImportLoading(true);
-    setImportResult(null);
+    setJobStatus(null);
+    setJobId(null);
     try {
       const res = await axios.post(`${API}/import-org/execute`, {
         source_org_id: sourceOrgId,
@@ -116,12 +145,16 @@ const ImportOrgPage = () => {
         from_date: fromDate || null,
         to_date: toDate || null,
       }, { headers });
-      setImportResult(res.data);
-      toast.success('Import completed successfully');
+
+      const jid = res.data.job_id;
+      setJobId(jid);
+      toast.info('Import started... Polling for progress.');
+
+      // Start polling every 2 seconds
+      pollingRef.current = setInterval(() => pollStatus(jid), 2000);
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Import failed');
-    } finally {
       setImportLoading(false);
+      toast.error(err.response?.data?.detail || 'Failed to start import');
     }
   };
 
@@ -129,6 +162,10 @@ const ImportOrgPage = () => {
 
   const tableLabelMap = {};
   tables.forEach(t => { tableLabelMap[t.key] = t.label; });
+
+  const isRunning = jobStatus?.status === 'running';
+  const isCompleted = jobStatus?.status === 'completed';
+  const isFailed = jobStatus?.status === 'failed';
 
   return (
     <div className="space-y-4 p-4 lg:p-6" data-testid="import-org-page">
@@ -143,11 +180,10 @@ const ImportOrgPage = () => {
           <CardTitle className="text-base">Configuration</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Source Org + Date Range */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Source Organization</label>
-              <Select value={sourceOrgId} onValueChange={(v) => { setSourceOrgId(v); setPreviewData(null); setImportResult(null); }}>
+              <Select value={sourceOrgId} onValueChange={(v) => { setSourceOrgId(v); setPreviewData(null); setJobStatus(null); }}>
                 <SelectTrigger data-testid="source-org-select">
                   <SelectValue placeholder="Select source org..." />
                 </SelectTrigger>
@@ -211,7 +247,7 @@ const ImportOrgPage = () => {
 
       {/* Actions */}
       <div className="flex gap-3">
-        <Button onClick={handlePreview} disabled={previewLoading || !sourceOrgId || getSelectedKeys().length === 0}
+        <Button onClick={handlePreview} disabled={previewLoading || importLoading || !sourceOrgId || getSelectedKeys().length === 0}
           variant="outline" data-testid="preview-btn">
           {previewLoading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Eye className="w-4 h-4 mr-1" />}
           Preview
@@ -219,7 +255,7 @@ const ImportOrgPage = () => {
         <Button onClick={handleImport} disabled={importLoading || !sourceOrgId || getSelectedKeys().length === 0}
           data-testid="execute-import-btn">
           {importLoading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Play className="w-4 h-4 mr-1" />}
-          Execute Import
+          {importLoading ? 'Importing...' : 'Execute Import'}
         </Button>
       </div>
 
@@ -245,8 +281,28 @@ const ImportOrgPage = () => {
         </Card>
       )}
 
-      {/* Import Results */}
-      {importResult && (
+      {/* Running Status */}
+      {isRunning && jobStatus && (
+        <Card data-testid="import-running" className="border-blue-500/30">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+              <div>
+                <p className="text-sm font-medium">Importing: {jobStatus.current_table || '...'}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Completed: {Object.keys(jobStatus.results || {}).length} tables
+                  {Object.entries(jobStatus.results || {}).map(([k, v]) => (
+                    <span key={k} className="ml-2">{tableLabelMap[k]}: {v.imported}</span>
+                  ))}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Completed Results */}
+      {isCompleted && jobStatus && (
         <Card data-testid="import-results" className="border-green-500/30">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2 text-green-500">
@@ -254,9 +310,9 @@ const ImportOrgPage = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-sm">{importResult.source_org} &rarr; {importResult.target_org}</p>
+            <p className="text-sm">{jobStatus.source_org} &rarr; {jobStatus.target_org}</p>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-              {Object.entries(importResult.results).map(([key, res]) => (
+              {Object.entries(jobStatus.results || {}).map(([key, res]) => (
                 <div key={key} className="p-2 rounded border text-sm">
                   <div className="font-medium">{tableLabelMap[key] || key}</div>
                   <div className="flex gap-3 text-xs mt-1">
@@ -266,16 +322,38 @@ const ImportOrgPage = () => {
                 </div>
               ))}
             </div>
-            {importResult.auto_created_accounts?.length > 0 && (
+            {jobStatus.auto_created_accounts?.length > 0 && (
               <div className="mt-2 p-2 rounded border border-amber-500/30 bg-amber-500/5">
                 <div className="flex items-center gap-1 text-sm font-medium text-amber-500">
-                  <AlertTriangle className="w-4 h-4" /> Auto-created {importResult.auto_created_accounts.length} missing accounts
+                  <AlertTriangle className="w-4 h-4" /> Auto-created {jobStatus.auto_created_accounts.length} missing accounts
                 </div>
                 <p className="text-xs mt-1 text-muted-foreground">
-                  Codes: {importResult.auto_created_accounts.join(', ')}
+                  Codes: {jobStatus.auto_created_accounts.join(', ')}
                 </p>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Failed */}
+      {isFailed && jobStatus && (
+        <Card data-testid="import-failed" className="border-red-500/30">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3">
+              <XCircle className="w-5 h-5 text-red-500" />
+              <div>
+                <p className="text-sm font-medium text-red-500">Import Failed</p>
+                <p className="text-xs text-muted-foreground mt-1">{jobStatus.error}</p>
+                {Object.keys(jobStatus.results || {}).length > 0 && (
+                  <p className="text-xs mt-1">
+                    Partial results: {Object.entries(jobStatus.results).map(([k, v]) =>
+                      `${tableLabelMap[k]}: ${v.imported} imported`
+                    ).join(', ')}
+                  </p>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

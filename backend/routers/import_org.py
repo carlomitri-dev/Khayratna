@@ -1,17 +1,23 @@
 """
 Import data from one organization to another.
-Super-admin only.
+Super-admin only. Uses background tasks to avoid HTTP timeouts on large datasets.
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 import uuid
+import asyncio
+import logging
 from datetime import datetime, timezone
 
 from core.database import db
 from core.auth import get_current_user
 
 router = APIRouter(prefix="/import-org", tags=["Import Org"])
+logger = logging.getLogger(__name__)
+
+# In-memory job status store
+_import_jobs: Dict[str, dict] = {}
 
 IMPORTABLE_TABLES = [
     {"key": "accounts",             "label": "Chart of Accounts",    "has_date": False},
@@ -37,6 +43,7 @@ IMPORTABLE_TABLES = [
 
 TABLE_KEYS = {t["key"] for t in IMPORTABLE_TABLES}
 DATE_TABLES = {t["key"] for t in IMPORTABLE_TABLES if t["has_date"]}
+TABLE_LABELS = {t["key"]: t["label"] for t in IMPORTABLE_TABLES}
 
 PRIORITY_ORDER = [
     "accounts", "inventory_categories", "regions", "services",
@@ -47,7 +54,7 @@ PRIORITY_ORDER = [
     "sales_quotations", "pos_transactions", "crdb_notes"
 ]
 
-DUP_CHECK = {
+DUP_FIELD = {
     "accounts": "code",
     "inventory_categories": "name",
     "inventory_items": "code",
@@ -60,6 +67,12 @@ DUP_CHECK = {
     "purchase_returns": "return_number",
     "purchase_orders": "order_number",
     "sales_quotations": "quotation_number",
+}
+
+TRANSACTIONAL_TABLES = {
+    "vouchers", "sales_invoices", "purchase_invoices",
+    "sales_returns", "purchase_returns", "crdb_notes",
+    "purchase_orders", "sales_quotations"
 }
 
 
@@ -76,6 +89,18 @@ def require_super_admin(user: dict):
         raise HTTPException(status_code=403, detail="Super admin access required")
 
 
+def build_query(source_org_id: str, table_key: str, from_date=None, to_date=None):
+    query = {"organization_id": source_org_id}
+    if table_key in DATE_TABLES and (from_date or to_date):
+        date_filter = {}
+        if from_date:
+            date_filter["$gte"] = from_date
+        if to_date:
+            date_filter["$lte"] = to_date
+        query["date"] = date_filter
+    return query
+
+
 @router.get("/tables")
 async def list_importable_tables(current_user: dict = Depends(get_current_user)):
     require_super_admin(current_user)
@@ -85,7 +110,6 @@ async def list_importable_tables(current_user: dict = Depends(get_current_user))
 @router.post("/preview")
 async def preview_import(req: ImportRequest, current_user: dict = Depends(get_current_user)):
     require_super_admin(current_user)
-
     source_org = await db.organizations.find_one({"id": req.source_org_id}, {"_id": 0})
     if not source_org:
         raise HTTPException(status_code=404, detail="Source organization not found")
@@ -94,14 +118,7 @@ async def preview_import(req: ImportRequest, current_user: dict = Depends(get_cu
     for table_key in req.tables:
         if table_key not in TABLE_KEYS:
             continue
-        query = {"organization_id": req.source_org_id}
-        if table_key in DATE_TABLES and (req.from_date or req.to_date):
-            date_filter = {}
-            if req.from_date:
-                date_filter["$gte"] = req.from_date
-            if req.to_date:
-                date_filter["$lte"] = req.to_date
-            query["date"] = date_filter
+        query = build_query(req.source_org_id, table_key, req.from_date, req.to_date)
         count = await db[table_key].count_documents(query)
         counts[table_key] = count
 
@@ -110,6 +127,7 @@ async def preview_import(req: ImportRequest, current_user: dict = Depends(get_cu
 
 @router.post("/execute")
 async def execute_import(req: ImportRequest, current_user: dict = Depends(get_current_user)):
+    """Start import as a background job. Returns job_id for polling."""
     require_super_admin(current_user)
 
     if req.source_org_id == req.target_org_id:
@@ -118,97 +136,145 @@ async def execute_import(req: ImportRequest, current_user: dict = Depends(get_cu
     source_org = await db.organizations.find_one({"id": req.source_org_id}, {"_id": 0})
     if not source_org:
         raise HTTPException(status_code=404, detail="Source organization not found")
-
     target_org = await db.organizations.find_one({"id": req.target_org_id}, {"_id": 0})
     if not target_org:
         raise HTTPException(status_code=404, detail="Target organization not found")
 
-    ordered = [t for t in PRIORITY_ORDER if t in req.tables and t in TABLE_KEYS]
+    job_id = str(uuid.uuid4())
+    _import_jobs[job_id] = {
+        "status": "running",
+        "current_table": "",
+        "progress": {},
+        "results": {},
+        "auto_created_accounts": [],
+        "error": None,
+        "source_org": source_org.get("name"),
+        "target_org": target_org.get("name"),
+    }
 
-    results = {}
-    auto_created_accounts = []
+    # Launch background task
+    asyncio.ensure_future(_run_import(job_id, req))
 
-    for table_key in ordered:
-        query = {"organization_id": req.source_org_id}
-        if table_key in DATE_TABLES and (req.from_date or req.to_date):
-            date_filter = {}
-            if req.from_date:
-                date_filter["$gte"] = req.from_date
-            if req.to_date:
-                date_filter["$lte"] = req.to_date
-            query["date"] = date_filter
+    return {"job_id": job_id, "status": "started"}
 
-        docs = await db[table_key].find(query, {"_id": 0}).to_list(None)
-        if not docs:
-            results[table_key] = {"imported": 0, "skipped": 0}
-            continue
 
-        imported = 0
-        skipped = 0
+@router.get("/status/{job_id}")
+async def get_import_status(job_id: str, current_user: dict = Depends(get_current_user)):
+    require_super_admin(current_user)
+    job = _import_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
-        for doc in docs:
-            new_doc = dict(doc)
-            new_doc["organization_id"] = req.target_org_id
 
-            # Duplicate check
-            dup_field = DUP_CHECK.get(table_key)
-            if dup_field and new_doc.get(dup_field):
-                existing = await db[table_key].find_one({
-                    "organization_id": req.target_org_id,
-                    dup_field: new_doc[dup_field]
-                })
-                if existing:
-                    skipped += 1
-                    continue
+async def _run_import(job_id: str, req: ImportRequest):
+    """Background import worker."""
+    job = _import_jobs[job_id]
+    try:
+        ordered = [t for t in PRIORITY_ORDER if t in req.tables and t in TABLE_KEYS]
+        now_str = datetime.now(timezone.utc).isoformat()
 
-            # New unique id
-            if "id" in new_doc:
-                new_doc["id"] = str(uuid.uuid4())
+        # Pre-fetch target account codes
+        target_account_codes = set()
+        async for acct in db.accounts.find({"organization_id": req.target_org_id}, {"code": 1, "_id": 0}):
+            if acct.get("code"):
+                target_account_codes.add(acct["code"])
 
-            # Auto-create missing accounts for transactional tables
-            if table_key in ("vouchers", "sales_invoices", "purchase_invoices",
-                             "sales_returns", "purchase_returns", "crdb_notes",
-                             "purchase_orders", "sales_quotations"):
-                account_codes = set()
-                for line in new_doc.get("lines", []):
-                    code = line.get("account_code")
-                    if code:
-                        account_codes.add(code)
-                for field in ("debit_account_code", "credit_account_code"):
-                    code = new_doc.get(field)
-                    if code:
-                        account_codes.add(code)
+        # Pre-fetch source accounts map for auto-creation
+        source_accounts_map = {}
+        if any(t in TRANSACTIONAL_TABLES for t in ordered):
+            source_accts = await db.accounts.find({"organization_id": req.source_org_id}, {"_id": 0}).to_list(None)
+            for sa in source_accts:
+                if sa.get("code"):
+                    source_accounts_map[sa["code"]] = sa
 
-                for code in account_codes:
-                    exists = await db.accounts.find_one({
-                        "organization_id": req.target_org_id, "code": code
-                    })
-                    if not exists:
-                        source_acct = await db.accounts.find_one({
-                            "organization_id": req.source_org_id, "code": code
-                        }, {"_id": 0})
+        auto_created = []
+
+        for table_key in ordered:
+            job["current_table"] = TABLE_LABELS.get(table_key, table_key)
+            logger.info(f"Import job {job_id}: processing {table_key}")
+
+            query = build_query(req.source_org_id, table_key, req.from_date, req.to_date)
+            docs = await db[table_key].find(query, {"_id": 0}).to_list(None)
+
+            if not docs:
+                job["results"][table_key] = {"imported": 0, "skipped": 0}
+                job["progress"][table_key] = "done"
+                continue
+
+            # Pre-fetch existing keys for duplicate detection
+            dup_field = DUP_FIELD.get(table_key)
+            existing_keys = set()
+            if dup_field:
+                async for doc in db[table_key].find({"organization_id": req.target_org_id}, {dup_field: 1, "_id": 0}):
+                    val = doc.get(dup_field)
+                    if val:
+                        existing_keys.add(val)
+
+            # Auto-create missing accounts (batch)
+            if table_key in TRANSACTIONAL_TABLES:
+                needed_codes = set()
+                for doc in docs:
+                    for line in doc.get("lines", []):
+                        code = line.get("account_code")
+                        if code and code not in target_account_codes:
+                            needed_codes.add(code)
+                    for field in ("debit_account_code", "credit_account_code"):
+                        code = doc.get(field)
+                        if code and code not in target_account_codes:
+                            needed_codes.add(code)
+
+                if needed_codes:
+                    accounts_to_insert = []
+                    for code in needed_codes:
+                        source_acct = source_accounts_map.get(code)
                         if source_acct:
                             new_acct = dict(source_acct)
                             new_acct["organization_id"] = req.target_org_id
                             new_acct["id"] = str(uuid.uuid4())
                             new_acct["balance_usd"] = 0
                             new_acct["balance_lbp"] = 0
-                            await db.accounts.insert_one(new_acct)
-                            auto_created_accounts.append(code)
+                            new_acct["imported_at"] = now_str
+                            new_acct["imported_from_org"] = req.source_org_id
+                            accounts_to_insert.append(new_acct)
+                            target_account_codes.add(code)
+                            auto_created.append(code)
+                    if accounts_to_insert:
+                        await db.accounts.insert_many(accounts_to_insert)
 
-            now_str = datetime.now(timezone.utc).isoformat()
-            new_doc["imported_at"] = now_str
-            new_doc["imported_from_org"] = req.source_org_id
+            # Filter duplicates and prepare batch
+            to_insert = []
+            skipped = 0
+            for doc in docs:
+                if dup_field and doc.get(dup_field) in existing_keys:
+                    skipped += 1
+                    continue
+                new_doc = dict(doc)
+                new_doc["organization_id"] = req.target_org_id
+                if "id" in new_doc:
+                    new_doc["id"] = str(uuid.uuid4())
+                new_doc["imported_at"] = now_str
+                new_doc["imported_from_org"] = req.source_org_id
+                to_insert.append(new_doc)
 
-            await db[table_key].insert_one(new_doc)
-            imported += 1
+            # Batch insert in chunks
+            imported = 0
+            BATCH_SIZE = 500
+            for i in range(0, len(to_insert), BATCH_SIZE):
+                batch = to_insert[i:i + BATCH_SIZE]
+                await db[table_key].insert_many(batch)
+                imported += len(batch)
 
-        results[table_key] = {"imported": imported, "skipped": skipped}
+            job["results"][table_key] = {"imported": imported, "skipped": skipped}
+            job["progress"][table_key] = "done"
+            logger.info(f"Import job {job_id}: {table_key} done - {imported} imported, {skipped} skipped")
 
-    return {
-        "message": "Import completed",
-        "results": results,
-        "auto_created_accounts": list(set(auto_created_accounts)),
-        "source_org": source_org.get("name", req.source_org_id),
-        "target_org": target_org.get("name", req.target_org_id)
-    }
+        job["auto_created_accounts"] = list(set(auto_created))
+        job["status"] = "completed"
+        job["current_table"] = ""
+        logger.info(f"Import job {job_id}: completed successfully")
+
+    except Exception as e:
+        logger.error(f"Import job {job_id} failed: {str(e)}", exc_info=True)
+        job["status"] = "failed"
+        job["error"] = str(e)
