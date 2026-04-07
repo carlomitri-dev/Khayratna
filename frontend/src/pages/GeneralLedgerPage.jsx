@@ -9,7 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../components/ui/popover';
-import { List, Download, Printer, Search, ChevronsUpDown, Check } from 'lucide-react';
+import { List, Download, Printer, Search, ChevronsUpDown, Check, Calendar, Filter } from 'lucide-react';
 import axios from 'axios';
 import { formatLBP, formatUSD, formatDate, getNumberClass } from '../lib/utils';
 import { printReport, exportGeneralLedgerToCSV } from '../lib/reportUtils';
@@ -111,6 +111,8 @@ const GeneralLedgerPage = () => {
   const { selectedFY } = useFiscalYear();
   const [accounts, setAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [ledgerData, setLedgerData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -125,10 +127,11 @@ const GeneralLedgerPage = () => {
     }
   }, [currentOrg]);
 
+  // Reset data when fiscal year changes so user re-loads with new context
   useEffect(() => {
     if (selectedAccount && currentOrg) {
+      setLedgerData(null);
       setCurrentSkip(0);
-      fetchLedger(selectedAccount, true);
     }
   }, [selectedFY]);
 
@@ -163,6 +166,8 @@ const GeneralLedgerPage = () => {
         limit: PAGE_SIZE
       });
       if (selectedFY?.id) params.append('fy_id', selectedFY.id);
+      if (fromDate) params.append('from_date', fromDate);
+      if (toDate) params.append('to_date', toDate);
       
       const response = await axios.get(`${API}/reports/general-ledger/${accountCode}?${params.toString()}`);
       const data = response.data;
@@ -190,7 +195,13 @@ const GeneralLedgerPage = () => {
   const handleAccountChange = (value) => {
     setSelectedAccount(value);
     setCurrentSkip(0);
-    fetchLedger(value, true);
+    setLedgerData(null);
+  };
+
+  const handleLoadLedger = () => {
+    if (selectedAccount) {
+      fetchLedger(selectedAccount, true);
+    }
   };
 
   const handleLoadMore = () => {
@@ -247,9 +258,9 @@ const GeneralLedgerPage = () => {
         )}
       </div>
 
-      {/* Account Selector with Search */}
+      {/* Account Selector with Search + Date Range */}
       <Card data-testid="account-selector">
-        <CardContent className="p-3 lg:p-4">
+        <CardContent className="p-3 lg:p-4 space-y-3">
           <div className="space-y-2">
             <label className="text-xs lg:text-sm font-medium">Select Account</label>
             <AccountSearchSelector
@@ -258,6 +269,27 @@ const GeneralLedgerPage = () => {
               onChange={handleAccountChange}
               loading={accountsLoading}
             />
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+              <label className="text-xs text-muted-foreground">From:</label>
+              <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+                className="h-8 w-[160px] text-xs" data-testid="gl-from-date" />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground">To:</label>
+              <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
+                className="h-8 w-[160px] text-xs" data-testid="gl-to-date" />
+            </div>
+            <Button size="sm" onClick={handleLoadLedger} disabled={loading || !selectedAccount} data-testid="gl-load-btn">
+              <Filter className="w-4 h-4 mr-1" /> {loading ? 'Loading...' : 'Load Ledger'}
+            </Button>
+            {(fromDate || toDate) && (
+              <Button size="sm" variant="ghost" onClick={() => { setFromDate(''); setToDate(''); setLedgerData(null); }} className="text-xs">
+                Clear
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -286,9 +318,10 @@ const GeneralLedgerPage = () => {
                 <div className="spinner" />
               </div>
             ) : !ledgerData ? (
-              <div className="text-center py-12">
-                <Search className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Select an account to view its ledger</p>
+              <div className="text-center py-16">
+                <List className="w-16 h-16 mx-auto text-muted-foreground mb-4 opacity-30" />
+                <p className="text-lg text-muted-foreground">Select a date range and click "Load Ledger"</p>
+                <p className="text-xs text-muted-foreground mt-1">Leave dates empty to load all transactions</p>
               </div>
             ) : ledgerData.entries.length === 0 ? (
               <div className="text-center py-12">
@@ -428,10 +461,10 @@ const GeneralLedgerPage = () => {
         </Card>
       ) : (
         <Card>
-          <CardContent className="py-12">
+          <CardContent className="py-16">
             <div className="text-center">
-              <List className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Select an account to view its general ledger</p>
+              <List className="w-16 h-16 mx-auto text-muted-foreground mb-4 opacity-30" />
+              <p className="text-lg text-muted-foreground">Select an account, set dates, and click "Load Ledger"</p>
             </div>
           </CardContent>
         </Card>

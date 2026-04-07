@@ -52,11 +52,15 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
     }
   }, [account, organizationId, fyId, fromDate, toDate]);
 
+  // Reset state when dialog opens - don't auto-fetch, wait for user to set dates and click Load
   useEffect(() => {
-    if (open && account && organizationId) {
-      fetchLedger();
+    if (open && account) {
+      setLedgerData(null);
+      setError(null);
+      setFromDate('');
+      setToDate('');
     }
-  }, [open, account, organizationId, fyId, fetchLedger]);
+  }, [open, account]);
 
   const handleViewVoucher = async (entry) => {
     try {
@@ -289,8 +293,8 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
                 </div>
               </div>
 
-              {/* Date range filter */}
-              <div className="flex items-end gap-3 px-1">
+              {/* Date range filter - must set dates and click Load */}
+              <div className="flex flex-wrap items-end gap-3 px-1">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
                   <label className="text-xs text-muted-foreground">From:</label>
@@ -312,11 +316,11 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
                     data-testid="ledger-to-date"
                   />
                 </div>
-                <Button size="sm" variant="outline" onClick={fetchLedger} className="h-8" data-testid="ledger-filter-btn">
-                  Filter
+                <Button size="sm" onClick={fetchLedger} disabled={loading} data-testid="ledger-filter-btn">
+                  <List className="w-4 h-4 mr-1" /> {loading ? 'Loading...' : 'Load Ledger'}
                 </Button>
                 {(fromDate || toDate) && (
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setFromDate(''); setToDate(''); }} data-testid="ledger-clear-btn">
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setFromDate(''); setToDate(''); setLedgerData(null); }} data-testid="ledger-clear-btn">
                     Clear
                   </Button>
                 )}
@@ -336,6 +340,12 @@ const LedgerDialog = ({ account, organizationId, open, onClose, userRole, fyId }
               <div className="text-center py-12 text-red-400">
                 <p>{error}</p>
                 <Button variant="outline" className="mt-4" onClick={fetchLedger}>Retry</Button>
+              </div>
+            ) : !ledgerData ? (
+              <div className="text-center py-16 text-muted-foreground">
+                <List className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                <p className="text-lg">Select a date range and click "Load Ledger"</p>
+                <p className="text-xs mt-1">Leave dates empty to load all transactions</p>
               </div>
             ) : ledgerData ? (
               <>

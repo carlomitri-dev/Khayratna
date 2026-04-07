@@ -10,20 +10,11 @@ Full-scale invoicing and accounting system with modules for sales/purchase invoi
 - Journal module, Trial Balance with date filters, Data import/export, POS
 - Last Price feature on Sales Invoice and Sales Return
 - Ledger Account custom print header (matching invoice header style, no logo)
+- Date-first Ledger loading (like Journal): LedgerDialog + General Ledger Page
 
 ## Recent Fixes (Current Session - Apr 2026)
-- **Ledger Print Header**: Redesigned `buildLedgerHtml()` in `LedgerDialog.jsx` to use the same company header layout as the Sales Invoice print (English left, Arabic right, no center logo). Title changed to "كشف حساب - Ledger Account". Account info section added with code/name in both languages. All font sizes increased by 4 points.
-
-## Previous Session Fixes
-- Print Template: Removed Unit column, 8 columns
-- Invoice Save Freeze: Data sanitization for all save handlers
-- Clean Orphaned Data: Fixed route ordering in server.py
-- VAT Posting: Trust stored tax_amount, no forced recalculation
-- Unpost Bug: Fall back to account_code when account_id missing
-- Purchase Invoice: Removed Batch/Expiry, wider fields, integer qty steps, VAT only on taxable items
-- **Last Price Feature**: New `GET /api/sales-invoices/last-price` endpoint + UI in Sales Invoice and Sales Return
-- **Sales Return Item Search**: Added `organizationId` and `apiUrl` props to InventorySelector
-- **Supplier Name on Edit**: AccountSelector auto-fetches account by ID in remote mode
+- **Ledger Print Header**: Redesigned `buildLedgerHtml()` in `LedgerDialog.jsx` to use the same company header layout as the Sales Invoice print (English left, Arabic right, no center logo). Title changed to "كشف حساب - Ledger Account". Account info section added. Font sizes +4px.
+- **Date-First Ledger Loading**: Modified `LedgerDialog.jsx` and `GeneralLedgerPage.jsx` so data does NOT auto-load. User must set dates and click "Load Ledger" first, same pattern as Journal page. Affects Customers, Suppliers, Chart of Accounts (LedgerDialog) and the General Ledger standalone page.
 
 ## Key Technical Notes
 - Organization routes in server.py, NOT organizations.py
