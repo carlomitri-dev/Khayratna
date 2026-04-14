@@ -495,6 +495,7 @@ class PurchaseInvoiceLineItem(BaseModel):
     discount_percent: float = 0
     line_total: float
     line_total_usd: Optional[float] = None
+    is_taxable: bool = False
     batch_number: Optional[str] = None
     expiry_date: Optional[str] = None
 
@@ -993,6 +994,7 @@ class PurchaseReturnLineItem(BaseModel):
     discount_percent: float = 0
     line_total: float
     line_total_usd: Optional[float] = None
+    is_taxable: bool = False
     batch_number: Optional[str] = None
     expiry_date: Optional[str] = None
 
