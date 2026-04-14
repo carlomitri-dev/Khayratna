@@ -57,7 +57,7 @@ const PurchaseInvoicePage = () => {
     inventory_item_id: '', item_name: '', item_name_ar: '', barcode: '',
     quantity: 1, unit: 'piece', unit_price: 0, selling_price: 0, currency: 'USD',
     exchange_rate: 1, discount_percent: 0, line_total: 0, line_total_usd: 0,
-    is_taxable: true
+    is_taxable: false
   };
   
   const defaultFormData = {
@@ -154,7 +154,7 @@ const PurchaseInvoicePage = () => {
   
   const recalculateTotals = (lines, discountPercent, taxPercent) => {
     const subtotalUsd = lines.reduce((sum, l) => sum + (parseFloat(l.line_total_usd) || 0), 0);
-    const taxableUsd = lines.reduce((sum, l) => l.is_taxable !== false ? sum + (parseFloat(l.line_total_usd) || 0) : sum, 0);
+    const taxableUsd = lines.reduce((sum, l) => l.is_taxable === true ? sum + (parseFloat(l.line_total_usd) || 0) : sum, 0);
     const discountAmount = subtotalUsd * (parseFloat(discountPercent) || 0) / 100;
     const afterDiscount = subtotalUsd - discountAmount;
     const taxableAfterDiscount = taxableUsd * (1 - (parseFloat(discountPercent) || 0) / 100);
@@ -184,7 +184,7 @@ const PurchaseInvoicePage = () => {
       selling_price: item.price || 0,
       currency: item.currency || 'USD',
       exchange_rate: item.currency === 'LBP' ? exchangeRate : 1,
-      is_taxable: item.is_taxable !== false,
+      is_taxable: item.is_taxable === true,
       discount_percent: item.discount_percent || 0
     };
     const { lineTotal, lineTotalUsd } = calculateLineTotal(newLines[index]);
@@ -573,6 +573,7 @@ const PurchaseInvoicePage = () => {
                       <th className="text-left p-2 w-[110px] text-blue-400">Sell Price</th>
                       <th className="text-left p-2 w-[80px]">Currency</th>
                       <th className="text-left p-2 w-[80px]">Disc%</th>
+                      <th className="text-center p-2 w-[50px]">Tax</th>
                       <th className="text-right p-2 w-[100px]">Total</th>
                       <th className="text-right p-2 w-[100px]">USD</th>
                       <th className="p-2 w-[40px]"></th>
@@ -622,6 +623,9 @@ const PurchaseInvoicePage = () => {
                         </td>
                         <td className="p-2">
                           <Input type="number" value={line.discount_percent} onChange={(e) => handleLineChange(index, 'discount_percent', e.target.value)} min="0" max="100" className="h-9 text-sm" />
+                        </td>
+                        <td className="p-2 text-center">
+                          <input type="checkbox" checked={line.is_taxable === true} onChange={(e) => handleLineChange(index, 'is_taxable', e.target.checked)} className="w-4 h-4 cursor-pointer" data-testid={`taxable-${index}`} />
                         </td>
                         <td className="p-2 text-right font-mono text-sm">{(line.line_total || 0).toFixed(3)}</td>
                         <td className="p-2 text-right font-mono text-primary text-sm">{formatUSD(line.line_total_usd || 0)}</td>

@@ -181,7 +181,7 @@ const SalesReturnPage = () => {
   
   const recalculateTotals = (lines, discountPercent, taxPercent) => {
     const subtotalUsd = lines.reduce((sum, l) => sum + (parseFloat(l.line_total_usd) || 0), 0);
-    const taxableUsd = lines.reduce((sum, l) => l.is_taxable !== false ? sum + (parseFloat(l.line_total_usd) || 0) : sum, 0);
+    const taxableUsd = lines.reduce((sum, l) => l.is_taxable === true ? sum + (parseFloat(l.line_total_usd) || 0) : sum, 0);
     const discountAmount = subtotalUsd * (parseFloat(discountPercent) || 0) / 100;
     const afterDiscount = subtotalUsd - discountAmount;
     const taxableAfterDiscount = taxableUsd * (1 - (parseFloat(discountPercent) || 0) / 100);
@@ -229,7 +229,7 @@ const SalesReturnPage = () => {
       barcode: item.barcode || '',
       unit_price: item.price || 0, currency: item.currency || 'USD',
       exchange_rate: item.currency === 'LBP' ? exchangeRate : 1,
-      is_taxable: item.is_taxable !== false,
+      is_taxable: item.is_taxable === true,
       discount_percent: item.discount_percent || 0,
       package: pkg,
       pack_description: item.pack_description || '',
@@ -633,6 +633,7 @@ const SalesReturnPage = () => {
                       <th className="text-left p-2 w-[100px]">Price</th>
                       <th className="text-left p-2 w-[80px]">Currency</th>
                       <th className="text-left p-2 w-[80px]">Disc %</th>
+                      <th className="text-center p-2 w-[50px]">Tax</th>
                       <th className="text-right p-2 w-[100px]">Total</th>
                       <th className="text-right p-2 w-[100px]">USD</th>
                       <th className="p-2 w-[40px]"></th>
@@ -689,6 +690,9 @@ const SalesReturnPage = () => {
                         </td>
                         <td className="p-2">
                           <Input type="number" value={line.discount_percent} onChange={(e) => handleLineChange(index, 'discount_percent', e.target.value)} min="0" max="100" className="h-9" />
+                        </td>
+                        <td className="p-2 text-center">
+                          <input type="checkbox" checked={line.is_taxable === true} onChange={(e) => handleLineChange(index, 'is_taxable', e.target.checked)} className="w-4 h-4 cursor-pointer" data-testid={`sr-taxable-${index}`} />
                         </td>
                         <td className="p-2 text-right font-mono">{(line.line_total || 0).toFixed(3)}</td>
                         <td className="p-2 text-right font-mono text-primary">{formatUSD(line.line_total_usd || 0)}</td>
