@@ -6817,6 +6817,12 @@ import_org_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(import_org_module)
 api_router.include_router(import_org_module.router)
 
+# Purchase Expenses router - ENABLED
+spec = importlib.util.spec_from_file_location("purchase_expenses_router", "/app/backend/routers/purchase_expenses.py")
+purchase_expenses_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(purchase_expenses_module)
+api_router.include_router(purchase_expenses_module.router)
+
 app.include_router(api_router)
 
 app.add_middleware(

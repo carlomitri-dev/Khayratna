@@ -18,11 +18,12 @@ import {
 import { Badge } from '../components/ui/badge';
 import {
   FileText, Search, Plus, Edit, Trash2, Send, Eye, Printer,
-  Filter, Undo2, X, Save
+  Filter, Undo2, X, Save, Receipt
 } from 'lucide-react';
 import axios from 'axios';
 import { formatUSD, formatDate } from '../lib/utils';
 import { toast } from 'sonner';
+import PurchaseExpenseDialog from '../components/PurchaseExpenseDialog';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const PAGE_SIZE = 20;
@@ -47,6 +48,7 @@ const PurchaseInvoicePage = () => {
   
   const [purchaseAccounts, setPurchaseAccounts] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
+  const [expenseInvoice, setExpenseInvoice] = useState(null);
   const [currencies] = useState([
     { code: 'USD', name: 'US Dollar', symbol: '$' },
     { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل' }
@@ -488,6 +490,9 @@ const PurchaseInvoicePage = () => {
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handlePrint(inv)} data-testid={`print-invoice-${inv.id}`}>
                             <Printer className="w-4 h-4" />
                           </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpenseInvoice(inv)} title="Purchase Expenses" data-testid={`expenses-invoice-${inv.id}`}>
+                            <Receipt className="w-4 h-4 text-blue-500" />
+                          </Button>
                           {!inv.is_posted && canEdit() && (
                             <>
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditForm(inv)}>
@@ -754,7 +759,10 @@ const PurchaseInvoicePage = () => {
                     ))}
                   </tbody>
                 </table>
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => { setExpenseInvoice(viewInvoice); setViewInvoice(null); }} data-testid="expenses-from-view-btn">
+                    <Receipt className="w-4 h-4 mr-2" /> Expenses
+                  </Button>
                   <Button onClick={() => handlePrint(viewInvoice)} data-testid="print-from-view-btn">
                     <Printer className="w-4 h-4 mr-2" /> Print Invoice
                   </Button>
@@ -764,6 +772,15 @@ const PurchaseInvoicePage = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Purchase Expense Dialog */}
+      <PurchaseExpenseDialog
+        open={!!expenseInvoice}
+        onOpenChange={(open) => { if (!open) setExpenseInvoice(null); }}
+        invoice={expenseInvoice}
+        organizationId={currentOrg?.id}
+        onSaved={() => fetchInvoices(true)}
+      />
     </div>
   );
 };

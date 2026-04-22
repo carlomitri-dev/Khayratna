@@ -1156,3 +1156,61 @@ class PurchaseOrderResponse(BaseModel):
     sent_at: Optional[str] = None
     received_at: Optional[str] = None
     posted_at: Optional[str] = None
+
+
+
+# ================== PURCHASE EXPENSE (LANDED COST) MODELS ==================
+
+class PurchaseExpenseLine(BaseModel):
+    account_id: Optional[str] = None
+    account_code: str
+    account_name: Optional[str] = None
+    description: Optional[str] = None
+    reference: Optional[str] = None
+    currency: str = 'USD'
+    exchange_rate: float = 1.0
+    amount_usd: float = 0
+    amount_lbp: float = 0
+
+class PurchaseExpenseCreate(BaseModel):
+    purchase_invoice_id: str
+    date: str
+    exchange_rate: float = 89500
+    debit_lines: List[PurchaseExpenseLine]
+    credit_lines: List[PurchaseExpenseLine]
+    total_usd: float = 0
+    total_lbp: float = 0
+    notes: Optional[str] = None
+    organization_id: str
+
+class PurchaseExpenseUpdate(BaseModel):
+    date: Optional[str] = None
+    exchange_rate: Optional[float] = None
+    debit_lines: Optional[List[PurchaseExpenseLine]] = None
+    credit_lines: Optional[List[PurchaseExpenseLine]] = None
+    total_usd: Optional[float] = None
+    total_lbp: Optional[float] = None
+    notes: Optional[str] = None
+
+class PurchaseExpenseResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    expense_number: str
+    purchase_invoice_id: str
+    purchase_invoice_number: Optional[str] = None
+    date: str
+    exchange_rate: float = 89500
+    debit_lines: List[dict]
+    credit_lines: List[dict]
+    total_usd: float = 0
+    total_lbp: float = 0
+    notes: Optional[str] = None
+    is_posted: bool = False
+    status: str = 'draft'
+    distribution: Optional[List[dict]] = None
+    organization_id: str
+    created_by: Optional[str] = None
+    created_at: Optional[str] = None
+    posted_at: Optional[str] = None
+    posted_by: Optional[str] = None
+    voucher_id: Optional[str] = None
