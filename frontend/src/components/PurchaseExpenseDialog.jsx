@@ -139,10 +139,10 @@ const PurchaseExpenseDialog = ({ open, onOpenChange, invoice, organizationId, on
       toast.error('Total debit must equal total credit');
       return;
     }
-    const hasDebit = formData.debit_lines.some(l => l.account_code && parseFloat(l.amount_usd) > 0);
-    const hasCredit = formData.credit_lines.some(l => l.account_code && parseFloat(l.amount_usd) > 0);
+    const hasDebit = formData.debit_lines.some(l => (l.account_code || l.account_id) && parseFloat(l.amount_usd) > 0);
+    const hasCredit = formData.credit_lines.some(l => (l.account_code || l.account_id) && parseFloat(l.amount_usd) > 0);
     if (!hasDebit || !hasCredit) {
-      toast.error('Add at least one debit and one credit line with amounts');
+      toast.error('Add at least one debit and one credit line with accounts and amounts');
       return;
     }
     setSaving(true);
@@ -151,11 +151,11 @@ const PurchaseExpenseDialog = ({ open, onOpenChange, invoice, organizationId, on
         purchase_invoice_id: invoice.id,
         date: formData.date,
         exchange_rate: parseFloat(formData.exchange_rate) || 89500,
-        debit_lines: formData.debit_lines.filter(l => l.account_code).map(l => ({
+        debit_lines: formData.debit_lines.filter(l => (l.account_code || l.account_id) && parseFloat(l.amount_usd) > 0).map(l => ({
           ...l, amount_usd: parseFloat(l.amount_usd) || 0, amount_lbp: parseFloat(l.amount_lbp) || 0,
           exchange_rate: parseFloat(formData.exchange_rate) || 89500,
         })),
-        credit_lines: formData.credit_lines.filter(l => l.account_code).map(l => ({
+        credit_lines: formData.credit_lines.filter(l => (l.account_code || l.account_id) && parseFloat(l.amount_usd) > 0).map(l => ({
           ...l, amount_usd: parseFloat(l.amount_usd) || 0, amount_lbp: parseFloat(l.amount_lbp) || 0,
           exchange_rate: parseFloat(formData.exchange_rate) || 89500,
         })),
@@ -268,14 +268,20 @@ const PurchaseExpenseDialog = ({ open, onOpenChange, invoice, organizationId, on
                     value={line.account_id}
                     onChange={(id) => {
                       axios.get(`${API}/accounts/${id}`).then(res => {
-                        updateFn(idx, 'account_id', id);
-                        const lines2 = type === 'debit' ? [...formData.debit_lines] : [...formData.credit_lines];
-                        lines2[idx] = { ...lines2[idx], account_id: id, account_code: res.data.code, account_name: res.data.name };
-                        setFormData(prev => ({
-                          ...prev,
-                          [type === 'debit' ? 'debit_lines' : 'credit_lines']: lines2
-                        }));
-                      }).catch(() => updateFn(idx, 'account_id', id));
+                        setFormData(prev => {
+                          const key = type === 'debit' ? 'debit_lines' : 'credit_lines';
+                          const updated = [...prev[key]];
+                          updated[idx] = { ...updated[idx], account_id: id, account_code: res.data.code, account_name: res.data.name };
+                          return { ...prev, [key]: updated };
+                        });
+                      }).catch(() => {
+                        setFormData(prev => {
+                          const key = type === 'debit' ? 'debit_lines' : 'credit_lines';
+                          const updated = [...prev[key]];
+                          updated[idx] = { ...updated[idx], account_id: id };
+                          return { ...prev, [key]: updated };
+                        });
+                      });
                     }}
                     placeholder="Select..."
                     showBalance={false}

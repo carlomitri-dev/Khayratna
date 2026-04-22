@@ -264,15 +264,29 @@ async def post_purchase_expense(
     voucher_lines = []
     desc = f"Purchase Expense {expense.get('expense_number', '')} for {invoice.get('invoice_number', '')}"
     
+    # Helper to resolve account_code from account_id if needed
+    async def resolve_account(line_data):
+        code = line_data.get('account_code', '')
+        name = line_data.get('account_name', '')
+        if not code and line_data.get('account_id'):
+            acc = await db.accounts.find_one({'id': line_data['account_id']}, {'_id': 0, 'code': 1, 'name': 1})
+            if acc:
+                code = acc['code']
+                name = name or acc['name']
+        return code, name
+    
     # Debit lines (expenses)
     for dl in expense.get('debit_lines', []):
         if dl.get('amount_usd', 0) == 0 and dl.get('amount_lbp', 0) == 0:
             continue
+        acct_code, acct_name = await resolve_account(dl)
+        if not acct_code:
+            continue
         amt_usd = dl.get('amount_usd', 0)
         amt_lbp = dl.get('amount_lbp', 0) or (amt_usd * ex_rate)
         voucher_lines.append({
-            'account_code': dl['account_code'],
-            'account_name': dl.get('account_name', ''),
+            'account_code': acct_code,
+            'account_name': acct_name,
             'description': dl.get('description') or desc,
             'debit_usd': amt_usd,
             'credit_usd': 0,
@@ -285,11 +299,14 @@ async def post_purchase_expense(
     for cl in expense.get('credit_lines', []):
         if cl.get('amount_usd', 0) == 0 and cl.get('amount_lbp', 0) == 0:
             continue
+        acct_code, acct_name = await resolve_account(cl)
+        if not acct_code:
+            continue
         amt_usd = cl.get('amount_usd', 0)
         amt_lbp = cl.get('amount_lbp', 0) or (amt_usd * ex_rate)
         voucher_lines.append({
-            'account_code': cl['account_code'],
-            'account_name': cl.get('account_name', ''),
+            'account_code': acct_code,
+            'account_name': acct_name,
             'description': cl.get('description') or desc,
             'debit_usd': 0,
             'credit_usd': amt_usd,
@@ -302,6 +319,9 @@ async def post_purchase_expense(
     total_credit_usd = sum(l['credit_usd'] for l in voucher_lines)
     total_debit_lbp = sum(l['debit_lbp'] for l in voucher_lines)
     total_credit_lbp = sum(l['credit_lbp'] for l in voucher_lines)
+    
+    if not voucher_lines:
+        raise HTTPException(status_code=400, detail="No valid lines to post. Ensure all lines have account codes and amounts.")
     
     # Generate voucher number
     year = datetime.now().year
