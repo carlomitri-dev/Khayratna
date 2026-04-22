@@ -83,10 +83,32 @@ async def create_purchase_expense(
     if abs(total_debit_usd - total_credit_usd) > 0.01:
         raise HTTPException(status_code=400, detail=f"Debit total ({total_debit_usd:.2f}) must equal credit total ({total_credit_usd:.2f})")
     
-    # Generate expense number
-    count = await db.purchase_expenses.count_documents({'organization_id': data.organization_id})
+    # Generate expense number using configurable series
     year = datetime.now().year
-    expense_number = f"PEXP-{year}-{str(count + 1).zfill(5)}"
+    org = await db.organizations.find_one({'id': data.organization_id}, {'invoice_series': 1, '_id': 0})
+    series = (org or {}).get('invoice_series', {}).get('purchase_expense', {})
+    prefix = series.get('prefix', 'PEXP-')
+    include_year = series.get('include_year', True)
+    full_prefix = f"{prefix}{year}-" if include_year else prefix
+    
+    # Find last expense with this prefix
+    escaped_prefix = full_prefix.replace('-', r'\-').replace('.', r'\.')
+    last_exp = await db.purchase_expenses.find_one(
+        {'organization_id': data.organization_id, 'expense_number': {'$regex': f'^{escaped_prefix}'}},
+        {'expense_number': 1}, sort=[('expense_number', -1)]
+    )
+    if last_exp:
+        try:
+            last_num = int(last_exp['expense_number'].replace(full_prefix, ''))
+            next_num = last_num + 1
+        except ValueError:
+            next_num = 1
+    else:
+        next_num = 1
+    manual_next = series.get('next_number')
+    if manual_next and manual_next > next_num:
+        next_num = manual_next
+    expense_number = f"{full_prefix}{next_num:05d}"
     
     expense = {
         'id': str(uuid.uuid4()),

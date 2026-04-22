@@ -11,7 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '../components/ui/dialog';
 import {
-  Plus, Trash2, Send, Eye, Undo2, Save, Receipt, X, Loader2, ChevronDown, ChevronUp
+  Plus, Trash2, Send, Eye, Undo2, Save, Receipt, X, Loader2, ChevronDown, ChevronUp, Edit
 } from 'lucide-react';
 import axios from 'axios';
 import { formatUSD } from '../lib/utils';
@@ -184,11 +184,12 @@ const PurchaseExpenseDialog = ({ open, onOpenChange, invoice, organizationId, on
   };
 
   const handlePost = async (expId) => {
+    if (!window.confirm('Post this expense? This will create a journal voucher and update inventory costs.')) return;
     setPosting(true);
     try {
       const res = await axios.post(`${API}/purchase-expenses/${expId}/post`);
-      toast.success('Expense posted & inventory costs updated');
-      fetchExpenses();
+      toast.success(`Posted! Voucher: ${res.data.voucher_number}`);
+      await fetchExpenses();
       if (onSaved) onSaved();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to post');
@@ -368,6 +369,7 @@ const PurchaseExpenseDialog = ({ open, onOpenChange, invoice, organizationId, on
                           <div className="text-xs text-muted-foreground mt-0.5">
                             Debit: {exp.debit_lines?.length || 0} lines | Credit: {exp.credit_lines?.length || 0} lines
                           </div>
+                          {exp.voucher_id && <div className="text-xs text-muted-foreground mt-0.5">Voucher: <span className="font-mono text-cyan-400">{exp.voucher_id.slice(0, 8)}...</span></div>}
                           {exp.notes && <div className="text-xs text-muted-foreground mt-0.5 italic">{exp.notes}</div>}
                         </div>
                         <div className="flex gap-1">
@@ -376,7 +378,7 @@ const PurchaseExpenseDialog = ({ open, onOpenChange, invoice, organizationId, on
                           </Button>
                           {!exp.is_posted && (
                             <>
-                              <Button variant="ghost" size="sm" onClick={() => openEditForm(exp)} title="Edit"><Save className="w-4 h-4" /></Button>
+                              <Button variant="ghost" size="sm" onClick={() => openEditForm(exp)} title="Edit" data-testid={`edit-expense-${exp.id}`}><Edit className="w-4 h-4" /></Button>
                               <Button variant="ghost" size="sm" onClick={() => handlePost(exp.id)} disabled={posting} title="Post" className="text-green-500 hover:text-green-700" data-testid={`post-expense-${exp.id}`}>
                                 <Send className="w-4 h-4" />
                               </Button>

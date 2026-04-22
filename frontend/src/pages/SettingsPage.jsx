@@ -312,7 +312,8 @@ const SettingsPage = () => {
     purchase_invoice: { prefix: 'PUR-', next_number: '', include_year: true },
     pos: { prefix: 'POS-', next_number: '', include_year: true },
     dbcr: { prefix: 'DBCR-', next_number: '', include_year: true },
-    quotation: { prefix: 'QUO-', next_number: '', include_year: true }
+    quotation: { prefix: 'QUO-', next_number: '', include_year: true },
+    purchase_expense: { prefix: 'PEXP-', next_number: '', include_year: true }
   });
   const [seriesSaving, setSeriesSaving] = useState(false);
 
@@ -462,6 +463,11 @@ const SettingsPage = () => {
           prefix: currentOrg.invoice_series.quotation?.prefix || 'QUO-',
           next_number: currentOrg.invoice_series.quotation?.next_number || '',
           include_year: currentOrg.invoice_series.quotation?.include_year ?? true
+        },
+        purchase_expense: {
+          prefix: currentOrg.invoice_series.purchase_expense?.prefix || 'PEXP-',
+          next_number: currentOrg.invoice_series.purchase_expense?.next_number || '',
+          include_year: currentOrg.invoice_series.purchase_expense?.include_year ?? true
         }
       });
     } else {
@@ -470,7 +476,8 @@ const SettingsPage = () => {
         purchase_invoice: { prefix: 'PUR-', next_number: '', include_year: true },
         pos: { prefix: 'POS-', next_number: '', include_year: true },
         dbcr: { prefix: 'DBCR-', next_number: '', include_year: true },
-        quotation: { prefix: 'QUO-', next_number: '', include_year: true }
+        quotation: { prefix: 'QUO-', next_number: '', include_year: true },
+        purchase_expense: { prefix: 'PEXP-', next_number: '', include_year: true }
       });
     }
   }, [currentOrg]);
@@ -2051,6 +2058,60 @@ const SettingsPage = () => {
                     </div>
                     <p className="text-xs text-cyan-500 mt-2">
                       Preview: {invoiceSeries.quotation.prefix}{invoiceSeries.quotation.include_year ? `${new Date().getFullYear()}-` : ''}{String(invoiceSeries.quotation.next_number || 1).padStart(5, '0')}
+                    </p>
+                  </div>
+
+                  {/* Purchase Expense Series */}
+                  <div className="p-4 border rounded-lg bg-muted/30">
+                    <h4 className="font-semibold mb-3 flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      Purchase Expense Series
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label className="text-xs">Prefix</Label>
+                        <Input
+                          value={invoiceSeries.purchase_expense.prefix}
+                          onChange={(e) => setInvoiceSeries({
+                            ...invoiceSeries,
+                            purchase_expense: { ...invoiceSeries.purchase_expense, prefix: e.target.value }
+                          })}
+                          placeholder="PEXP-"
+                          className="mt-1"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">e.g., PEXP-, EXP-, LNDCST-</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Next Number (Override)</Label>
+                        <Input
+                          type="number"
+                          value={invoiceSeries.purchase_expense.next_number}
+                          onChange={(e) => setInvoiceSeries({
+                            ...invoiceSeries,
+                            purchase_expense: { ...invoiceSeries.purchase_expense, next_number: e.target.value }
+                          })}
+                          placeholder="Auto"
+                          className="mt-1"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Leave empty for auto-increment</p>
+                      </div>
+                      <div className="flex items-end">
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={invoiceSeries.purchase_expense.include_year}
+                            onChange={(e) => setInvoiceSeries({
+                              ...invoiceSeries,
+                              purchase_expense: { ...invoiceSeries.purchase_expense, include_year: e.target.checked }
+                            })}
+                            className="rounded"
+                          />
+                          Include Year
+                        </label>
+                      </div>
+                    </div>
+                    <p className="text-xs text-cyan-500 mt-2">
+                      Preview: {invoiceSeries.purchase_expense.prefix}{invoiceSeries.purchase_expense.include_year ? `${new Date().getFullYear()}-` : ''}{String(invoiceSeries.purchase_expense.next_number || 1).padStart(5, '0')}
                     </p>
                   </div>
 
