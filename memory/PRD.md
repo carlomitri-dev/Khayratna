@@ -1,41 +1,74 @@
-# Lebanese Accounting System - PRD
+# KAIROS Digital Invoicing - Product Requirements Document
 
 ## Original Problem Statement
-Full-scale invoicing and accounting system with modules for sales/purchase invoices, sales/purchase returns, chart of accounts, inventory management, data import/export, POS, and financial reports.
+Comprehensive invoicing and accounting system (Lebanese Accounting) with support for:
+- Sales/Purchase Invoices, Returns, Journal, Trial Balance, General Ledger, Inventory Management
+- Box, Package, and Quantity metrics on items
+- Cross-organization data import with table-level selection, background polling, and date filters
+- Dynamic Default Posting Accounts per organization that auto-populate when creating new invoices/returns
 
-## What's Been Implemented
-- Full CRUD for Sales/Purchase Invoices & Returns
-- Box/Pkg/Qty calculation on Sales Invoice and Sales Return forms
-- Print templates with customer data, registration numbers, account balances
-- Journal module, Trial Balance with date filters, Data import/export, POS
-- Last Price feature on Sales Invoice and Sales Return
-- Ledger Account custom print header (matching invoice header style, no logo)
-- Date-first Ledger loading (like Journal): LedgerDialog + General Ledger Page
-- Import from Organization module (super_admin only): background job with polling
-- Per-line-item Tax checkbox on Purchase Invoice, Sales Invoice, Sales Return
-- **Default Posting Accounts** in Settings (per org, 7 accounts, searchable dropdown)
+## Tech Stack
+- Frontend: React + Shadcn UI
+- Backend: FastAPI (Python)
+- Database: MongoDB
+- PDF: html2pdf.js
 
-## Recent Changes (Current Session - Apr 2026)
-- **Ledger Print Header**: Company header, no logo, "كشف حساب - Ledger Account", +4px fonts
-- **Date-First Ledger Loading**: LedgerDialog + GeneralLedgerPage require "Load Ledger" click
-- **Import from Organization**: Background async job with polling, 19 tables, batch insert
-- **Deployment Fix**: Fixed DuplicateKeyError for inventory_items, added BulkWriteError handling
-- **VAT/Tax Fix**: Changed `is_taxable` from `!== false` to `=== true`. Added Tax checkbox per line. Fixed Pydantic schemas for PurchaseInvoiceLineItem and PurchaseReturnLineItem.
-- **Default Posting Accounts**: New Settings tab with 7 configurable accounts per org (Sales/Purchase VAT, Sales/Purchase Account, Sales/Purchase Return, Cash/Bank). Stored in `organization_settings` collection. Backend: GET/PUT `/api/settings/default-accounts`.
+## Completed Features
+- Full Chart of Accounts (Lebanese standard, Class 1-7)
+- Sales/Purchase Invoices with line items, VAT, discounts
+- Sales/Purchase Returns
+- Journal/Vouchers with debit/credit lines
+- Trial Balance, Income Statement, General Ledger
+- POS Terminal with cashier sessions
+- Inventory management with categories
+- Customer/Supplier management with contact info
+- Fiscal Year management
+- Currency management with exchange rates
+- Backup/Restore functionality
+- Ledger Account custom print header (no logo, larger font, Arabic/English)
+- Date-first required filtering for General Ledger
+- Cross-organization data import module with table selection and date filters
+- Background polling job for data import (10,000+ records)
+- Fixed DuplicateKeyError during inventory import
+- Fixed Purchase Invoice VAT logic (is_taxable per line item)
+- Tax checkbox per line item on all invoice/return forms
+- Fixed Pydantic schema for is_taxable on Purchase Invoices/Returns
+- **Default Accounts Settings tab with 7 searchable dropdowns (DONE)**
+- **Auto-population of Default Accounts in invoice/return creation forms (DONE - Apr 22, 2026)**
 
-## Key Technical Notes
-- `is_taxable` must use strict `=== true` check, NOT `!== false`
-- Pydantic `extra="ignore"` silently strips unknown fields — always add new fields to schemas
-- Organization routes in server.py, NOT organizations.py
-- Route Shadowing: server.py overrides modular routers
-- Default accounts stored in `organization_settings` collection with type="default_accounts"
+## Architecture
+/app/
+├── backend/
+│   ├── models/schemas.py
+│   ├── routers/ (accounts, invoices, import_org, etc.)
+│   └── server.py (main API + catch-all routes)
+└── frontend/
+    └── src/
+        ├── components/selectors/AccountSelector.jsx
+        ├── pages/SettingsPage.jsx (Default Accounts tab)
+        └── pages/*InvoicePage.jsx, *ReturnPage.jsx
 
-## Backlog
-### P0: Recalculate Balances for Trial Balance (account balance sync from vouchers)
-### P1: Wire default accounts to auto-populate on new invoices
-### P2: Box/Pkg/Qty to Purchase Invoice/Return, Email PDF invoices
-### P3: Sales Quotations enhancements
+## Key API Endpoints
+- GET/PUT /api/settings/default-accounts - Manage default posting accounts
+- GET /api/accounts - List accounts with search/pagination
+- POST /api/import-org/execute - Trigger cross-org import
+- GET /api/import-org/status/{job_id} - Poll import status
 
-## Credentials
-- carlo.mitri@gmail.com / Carinemi@28
-- Deployed: https://khayratna.com/
+## Default Account Mapping
+- Sales Invoice: credit_account_id ← sales_account
+- Purchase Invoice: debit_account_id ← purchase_account
+- Sales Return: debit_account_id ← sales_return_account
+- Purchase Return: credit_account_id ← purchase_return_account
+
+## Pending Issues
+- P1: "الرصيد:" balance label incorrect on Print Template (SalesInvoicePrint.jsx)
+- P2: Recalculate Balances endpoint for Trial Balance sync
+
+## Upcoming Tasks
+- Apply Box/Pkg/Qty to Purchase Forms (P2)
+- Email PDF invoices to customers (P1)
+- Sales Quotations workflow enhancements (P2)
+
+## Refactoring Needed
+- Move remaining routes from bloated server.py into dedicated router files
+- server.py catch-all routes cause route shadowing issues

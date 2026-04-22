@@ -31,6 +31,7 @@ const AccountSelector = ({
   fetchUrl = null,       // e.g., '/customer-accounts' or '/accounts/movable/list'
   fetchParams = {},      // e.g., { organization_id: '...' }
   minSearchLength = 1,   // minimum chars before searching remotely
+  'data-testid': testId,
 }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -169,7 +170,7 @@ const AccountSelector = ({
             role="combobox"
             className="w-full justify-between h-9 text-sm"
             disabled={disabled}
-            data-testid="account-selector-trigger"
+            data-testid={testId || "account-selector-trigger"}
           >
             <span className="truncate flex items-center gap-2">
               {selectedAccount ? (
