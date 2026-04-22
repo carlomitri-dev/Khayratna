@@ -501,7 +501,7 @@ const DashboardPage = () => {
                     </div>
                     <div className="text-right flex-shrink-0 ml-2">
                       <p className="font-mono text-xs font-medium">
-                        {inv.currency === 'LBP' ? formatLBP(inv.total_amount || 0) + ' L' : '$' + formatUSD(inv.total_amount || 0)}
+                        {inv.currency === 'LBP' ? formatLBP(inv.total || 0) + ' L' : '$' + formatUSD(inv.total_usd || inv.total || 0)}
                       </p>
                       <span className={`text-[10px] ${inv.is_posted ? 'text-emerald-400' : 'text-amber-400'}`}>
                         {inv.is_posted ? 'Posted' : 'Draft'}
@@ -545,7 +545,7 @@ const DashboardPage = () => {
                     </div>
                     <div className="text-right flex-shrink-0 ml-2">
                       <p className="font-mono text-xs font-medium">
-                        {inv.currency === 'LBP' ? formatLBP(inv.total_amount || 0) + ' L' : '$' + formatUSD(inv.total_amount || 0)}
+                        {inv.currency === 'LBP' ? formatLBP(inv.total || 0) + ' L' : '$' + formatUSD(inv.total_usd || inv.total || 0)}
                       </p>
                       <span className={`text-[10px] ${inv.is_posted ? 'text-emerald-400' : 'text-amber-400'}`}>
                         {inv.is_posted ? 'Posted' : 'Draft'}
