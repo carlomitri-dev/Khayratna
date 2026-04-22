@@ -56,6 +56,7 @@ import {
   Landmark
 } from 'lucide-react';
 import axios from 'axios';
+import { toast } from 'sonner';
 import { getRoleDisplayName, formatDate } from '../lib/utils';
 import { Textarea } from '../components/ui/textarea';
 import AccountSelector from '../components/selectors/AccountSelector';
@@ -244,7 +245,7 @@ const DocumentTemplateManager = ({ currentOrg, fetchOrganizations }) => {
 };
 
 const SettingsPage = () => {
-  const { user, organizations, currentOrg, fetchOrganizations } = useAuth();
+  const { user, organizations, currentOrg, fetchOrganizations, token } = useAuth();
   const { fiscalYears, fetchFiscalYears, selectedFY } = useFiscalYear();
   const [users, setUsers] = useState([]);
   const [currencies, setCurrencies] = useState([]);
@@ -2456,8 +2457,7 @@ const SettingsPage = () => {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Sales VAT Account</label>
                       <AccountSelector
-                        mode="remote"
-                        fetchUrl={`${API}/accounts`}
+                        fetchUrl="/accounts"
                         fetchParams={{ organization_id: currentOrg?.id }}
                         value={defaultAccounts.sales_vat_account}
                         onChange={(val) => setDefaultAccounts(p => ({ ...p, sales_vat_account: val }))}
@@ -2469,8 +2469,7 @@ const SettingsPage = () => {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Purchase VAT Account</label>
                       <AccountSelector
-                        mode="remote"
-                        fetchUrl={`${API}/accounts`}
+                        fetchUrl="/accounts"
                         fetchParams={{ organization_id: currentOrg?.id }}
                         value={defaultAccounts.purchase_vat_account}
                         onChange={(val) => setDefaultAccounts(p => ({ ...p, purchase_vat_account: val }))}
@@ -2482,8 +2481,7 @@ const SettingsPage = () => {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Sales Account</label>
                       <AccountSelector
-                        mode="remote"
-                        fetchUrl={`${API}/accounts`}
+                        fetchUrl="/accounts"
                         fetchParams={{ organization_id: currentOrg?.id }}
                         value={defaultAccounts.sales_account}
                         onChange={(val) => setDefaultAccounts(p => ({ ...p, sales_account: val }))}
@@ -2494,8 +2492,7 @@ const SettingsPage = () => {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Purchase Account</label>
                       <AccountSelector
-                        mode="remote"
-                        fetchUrl={`${API}/accounts`}
+                        fetchUrl="/accounts"
                         fetchParams={{ organization_id: currentOrg?.id }}
                         value={defaultAccounts.purchase_account}
                         onChange={(val) => setDefaultAccounts(p => ({ ...p, purchase_account: val }))}
@@ -2506,8 +2503,7 @@ const SettingsPage = () => {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Sales Return Account</label>
                       <AccountSelector
-                        mode="remote"
-                        fetchUrl={`${API}/accounts`}
+                        fetchUrl="/accounts"
                         fetchParams={{ organization_id: currentOrg?.id }}
                         value={defaultAccounts.sales_return_account}
                         onChange={(val) => setDefaultAccounts(p => ({ ...p, sales_return_account: val }))}
@@ -2518,8 +2514,7 @@ const SettingsPage = () => {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Purchase Return Account</label>
                       <AccountSelector
-                        mode="remote"
-                        fetchUrl={`${API}/accounts`}
+                        fetchUrl="/accounts"
                         fetchParams={{ organization_id: currentOrg?.id }}
                         value={defaultAccounts.purchase_return_account}
                         onChange={(val) => setDefaultAccounts(p => ({ ...p, purchase_return_account: val }))}
@@ -2530,8 +2525,7 @@ const SettingsPage = () => {
                     <div className="space-y-2 md:col-span-2">
                       <label className="text-sm font-medium">Cash / Bank Account</label>
                       <AccountSelector
-                        mode="remote"
-                        fetchUrl={`${API}/accounts`}
+                        fetchUrl="/accounts"
                         fetchParams={{ organization_id: currentOrg?.id }}
                         value={defaultAccounts.cash_bank_account}
                         onChange={(val) => setDefaultAccounts(p => ({ ...p, cash_bank_account: val }))}

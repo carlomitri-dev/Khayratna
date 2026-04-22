@@ -53,6 +53,7 @@ const SalesInvoicePage = () => {
     { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل' }
   ]);
   const [exchangeRate, setExchangeRate] = useState(89500);
+  const [defaultAccountSettings, setDefaultAccountSettings] = useState({});
   const [lastPrices, setLastPrices] = useState({});
 
   const fetchLastPrice = async (customerId, inventoryItemId, lineIndex) => {
@@ -117,6 +118,15 @@ const SalesInvoicePage = () => {
       console.error('Failed to fetch reference data:', error);
     }
   };
+
+  // Fetch default posting accounts
+  useEffect(() => {
+    if (currentOrg) {
+      axios.get(`${API}/settings/default-accounts?organization_id=${currentOrg.id}`)
+        .then(res => setDefaultAccountSettings(res.data.accounts || {}))
+        .catch(() => {});
+    }
+  }, [currentOrg]);
   
   const fetchInvoices = async (reset = false) => {
     if (reset) setLoading(true);
@@ -254,7 +264,11 @@ const SalesInvoicePage = () => {
   
   const openCreateForm = () => {
     setEditingInvoice(null);
-    setFormData({ ...defaultFormData, organization_id: currentOrg.id });
+    setFormData({
+      ...defaultFormData,
+      organization_id: currentOrg.id,
+      credit_account_id: defaultAccountSettings.sales_account || '',
+    });
     setShowForm(true);
   };
   

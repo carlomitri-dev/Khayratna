@@ -68,6 +68,7 @@ const SalesReturnPage = () => {
   ]);
   const [exchangeRate, setExchangeRate] = useState(89500);
   const [lastPrices, setLastPrices] = useState({});
+  const [defaultAccountSettings, setDefaultAccountSettings] = useState({});
 
   const fetchLastPrice = async (customerId, inventoryItemId, lineIndex) => {
     if (!customerId || !inventoryItemId || !currentOrg?.id) return;
@@ -130,6 +131,15 @@ const SalesReturnPage = () => {
       console.error('Failed to fetch reference data:', error);
     }
   };
+
+  // Fetch default posting accounts
+  useEffect(() => {
+    if (currentOrg) {
+      axios.get(`${API}/settings/default-accounts?organization_id=${currentOrg.id}`)
+        .then(res => setDefaultAccountSettings(res.data.accounts || {}))
+        .catch(() => {});
+    }
+  }, [currentOrg]);
   
   const fetchReturns = async (reset = false) => {
     if (reset) setLoading(true);
@@ -267,7 +277,11 @@ const SalesReturnPage = () => {
   
   const openCreateForm = () => {
     setEditingReturn(null);
-    setFormData({ ...defaultFormData, organization_id: currentOrg.id });
+    setFormData({
+      ...defaultFormData,
+      organization_id: currentOrg.id,
+      debit_account_id: defaultAccountSettings.sales_return_account || '',
+    });
     setShowForm(true);
   };
   

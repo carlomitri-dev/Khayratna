@@ -63,7 +63,8 @@ const PurchaseReturnPage = () => {
     { code: 'LBP', name: 'Lebanese Pound', symbol: 'ل.ل' }
   ]);
   const [exchangeRate, setExchangeRate] = useState(89500);
-  
+  const [defaultAccountSettings, setDefaultAccountSettings] = useState({});
+
   const emptyLine = {
     inventory_item_id: '', item_name: '', item_name_ar: '', barcode: '',
     quantity: 1, unit: 'piece', unit_price: 0, currency: 'USD',
@@ -111,6 +112,15 @@ const PurchaseReturnPage = () => {
       console.error('Failed to fetch reference data:', error);
     }
   };
+
+  // Fetch default posting accounts
+  useEffect(() => {
+    if (currentOrg) {
+      axios.get(`${API}/settings/default-accounts?organization_id=${currentOrg.id}`)
+        .then(res => setDefaultAccountSettings(res.data.accounts || {}))
+        .catch(() => {});
+    }
+  }, [currentOrg]);
   
   const fetchReturns = async (reset = false) => {
     if (reset) setLoading(true);
@@ -217,7 +227,11 @@ const PurchaseReturnPage = () => {
   
   const openCreateForm = () => {
     setEditingReturn(null);
-    setFormData({ ...defaultFormData, organization_id: currentOrg.id });
+    setFormData({
+      ...defaultFormData,
+      organization_id: currentOrg.id,
+      credit_account_id: defaultAccountSettings.purchase_return_account || '',
+    });
     setShowForm(true);
   };
   

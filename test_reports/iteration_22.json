@@ -1,0 +1,48 @@
+{
+  "summary": "Tested Default Posting Accounts P0 fix. Backend fully working (7/7 pytest passing) - GET/PUT /api/settings/default-accounts persists all 7 account keys correctly. Frontend Settings > Default Accounts tab renders all 7 AccountSelector dropdowns. Pre-fill logic is correctly wired in openCreateForm for SalesInvoice/PurchaseInvoice/SalesReturn/PurchaseReturn. UI end-to-end save+pre-fill could not be fully automated due to selector mismatch (see frontend_issues), but code review confirms correct wiring and backend persistence verified via API.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard / Settings (Users tab)", "issues": ["Hydration warnings in console: <span> cannot be child of <tbody> and <tr> cannot be child of <span>. Caused by a dev instrumentation wrapper (<span data-ve-dynamic>) injected around <tr> rows in DashboardPage (line 723) and SettingsPage users table (line 1215). Not a functional bug but pollutes console."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_default_accounts.py",
+    "/app/test_reports/pytest/default_accounts_results.xml"
+  ],
+  "action_items": [
+    "TESTABILITY: In /app/frontend/src/components/selectors/AccountSelector.jsx, destructure `data-testid` from props and spread it onto the PopoverTrigger Button so the data-testid values (da-sales, da-purchase, etc.) reach the DOM. Currently the prop is discarded and dropdowns cannot be targeted by testid. Example: accept `'data-testid': testId` in props and add `data-testid={testId}` on the Button.",
+    "OPTIONAL: Resolve React hydration warnings about <tr>/<span>/<tbody> nesting caused by dev instrumentation wrappers around table rows in DashboardPage.jsx (line 723) and SettingsPage.jsx (line 1215). Not blocking but noisy."
+  ],
+  "critical_code_review_comments": [
+    "Backend /api/settings/default-accounts correctly filters unknown keys and non-string values, enforces super_admin on PUT, returns clean structure on GET. Good implementation.",
+    "SettingsPage.jsx: fetchDefaultAccounts/saveDefaultAccounts correctly use relative /accounts URL in AccountSelector (double-URL bug already fixed), and use auth token properly.",
+    "SalesInvoicePage.jsx line 270 pre-fills credit_account_id from sales_account - correct (class 7 / revenue).",
+    "PurchaseInvoicePage.jsx line 229 pre-fills debit_account_id from purchase_account - correct (class 6 / expense).",
+    "SalesReturnPage.jsx line 283 pre-fills debit_account_id from sales_return_account - correct.",
+    "PurchaseReturnPage.jsx line 233 pre-fills credit_account_id from purchase_return_account - correct.",
+    "AccountSelector.jsx: data-testid prop passed by parent (da-sales, da-sales-vat, etc.) is NOT forwarded to DOM. PopoverTrigger button renders only a hardcoded data-testid='account-selector-trigger'. This blocks parent-specific test-id targeting of individual dropdowns in Default Accounts tab.",
+    "AccountSelector uses role='combobox' on trigger button (not role='button'). Document this for future test authors."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_default_accounts.py"
+  ],
+  "success_rate": {
+    "backend": "100% (7/7 tests passed)",
+    "frontend": "Rendering 100% verified; automated save+pre-fill interaction blocked by AccountSelector testability - code-level verification confirms correctness"
+  },
+  "test_credentials": {
+    "email": "testadmin@test.com",
+    "password": "testadmin123",
+    "org_id": "14a4544d-a2c8-437b-94bf-d9e94b72d2ea"
+  },
+  "seed_data_creation": "None - used existing 3 accounts (41110001, 41140001, 71010001). Tests save defaults then reset to empty at end.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend /api/settings/default-accounts is verified (GET returns {organization_id, accounts}, PUT persists; super_admin enforced). Matar Est org has only 3 accounts (class 4 & 7) — no class-6 purchase account exists so Purchase Invoice pre-fill cannot be end-to-end verified without seeding. AccountSelector component in /app/frontend/src/components/selectors/AccountSelector.jsx discards the data-testid prop (no forwarding) and uses role='combobox'. Use get_by_role('combobox', name='Select Sales Account...') or add forwarding of data-testid to the Button inside AccountSelector for reliable Playwright targeting. Pre-fill logic is correctly wired in all 4 invoice/return page openCreateForm handlers."
+}
