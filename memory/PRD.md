@@ -6,6 +6,7 @@ Comprehensive invoicing and accounting system (Lebanese Accounting) with support
 - Box, Package, and Quantity metrics on items
 - Cross-organization data import with table-level selection, background polling, and date filters
 - Dynamic Default Posting Accounts per organization that auto-populate when creating new invoices/returns
+- Purchase Expense (Landed Cost) linked to purchase invoices with proportional distribution
 
 ## Tech Stack
 - Frontend: React + Shadcn UI
@@ -33,35 +34,50 @@ Comprehensive invoicing and accounting system (Lebanese Accounting) with support
 - Fixed Purchase Invoice VAT logic (is_taxable per line item)
 - Tax checkbox per line item on all invoice/return forms
 - Fixed Pydantic schema for is_taxable on Purchase Invoices/Returns
-- **Default Accounts Settings tab with 7 searchable dropdowns (DONE)**
-- **Auto-population of Default Accounts in invoice/return creation forms (DONE - Apr 22, 2026)**
+- Default Accounts Settings tab with 7 searchable dropdowns (DONE)
+- Auto-population of Default Accounts in invoice/return creation forms (DONE - Apr 22, 2026)
+- **Purchase Expense / Landed Cost feature (DONE - Apr 22, 2026)**
+  - CRUD for purchase expenses linked to purchase invoices
+  - Multiple expenses per invoice allowed
+  - Debit/Credit balance enforcement
+  - Proportional distribution across invoice line items
+  - Journal voucher creation on post
+  - Inventory cost update on post
+  - Unpost with full reversal
 
 ## Architecture
 /app/
 ├── backend/
-│   ├── models/schemas.py
-│   ├── routers/ (accounts, invoices, import_org, etc.)
-│   └── server.py (main API + catch-all routes)
+│   ├── models/schemas.py (PurchaseExpense schemas added)
+│   ├── routers/
+│   │   ├── purchase_expenses.py (NEW: CRUD + post/unpost + distribution)
+│   │   ├── import_org.py
+│   │   └── ... (other routers)
+│   └── server.py
 └── frontend/
     └── src/
-        ├── components/selectors/AccountSelector.jsx
-        ├── pages/SettingsPage.jsx (Default Accounts tab)
-        └── pages/*InvoicePage.jsx, *ReturnPage.jsx
+        ├── components/
+        │   ├── PurchaseExpenseDialog.jsx (NEW: full expense UI)
+        │   └── selectors/AccountSelector.jsx
+        └── pages/
+            ├── PurchaseInvoicePage.jsx (integrated expense button + dialog)
+            └── SettingsPage.jsx (Default Accounts tab)
 
 ## Key API Endpoints
+- GET/POST/PUT/DELETE /api/purchase-expenses - CRUD for purchase expenses
+- GET /api/purchase-expenses/{id}/distribution-preview - Preview cost distribution
+- POST /api/purchase-expenses/{id}/post - Post expense (create voucher, distribute costs, update inventory)
+- POST /api/purchase-expenses/{id}/unpost - Reverse posting
 - GET/PUT /api/settings/default-accounts - Manage default posting accounts
-- GET /api/accounts - List accounts with search/pagination
-- POST /api/import-org/execute - Trigger cross-org import
-- GET /api/import-org/status/{job_id} - Poll import status
 
 ## Default Account Mapping
-- Sales Invoice: credit_account_id ← sales_account
-- Purchase Invoice: debit_account_id ← purchase_account
-- Sales Return: debit_account_id ← sales_return_account
-- Purchase Return: credit_account_id ← purchase_return_account
+- Sales Invoice: credit_account_id <- sales_account
+- Purchase Invoice: debit_account_id <- purchase_account
+- Sales Return: debit_account_id <- sales_return_account
+- Purchase Return: credit_account_id <- purchase_return_account
 
 ## Pending Issues
-- P1: "الرصيد:" balance label incorrect on Print Template (SalesInvoicePrint.jsx)
+- P1: Balance label incorrect on Print Template (SalesInvoicePrint.jsx)
 - P2: Recalculate Balances endpoint for Trial Balance sync
 
 ## Upcoming Tasks
