@@ -483,10 +483,31 @@ async def post_sales_invoice(invoice_id: str, current_user: dict = Depends(get_c
             {'code': vat_customer_code, 'organization_id': invoice['organization_id']}, {'_id': 0}
         )
     
-    # VAT payable account (44270003)
-    vat_payable_account = await db.accounts.find_one(
-        {'code': '44270003', 'organization_id': invoice['organization_id']}, {'_id': 0}
+    # VAT payable account - use default from settings, fallback to 44270003
+    defaults_doc = await db.organization_settings.find_one(
+        {"organization_id": invoice['organization_id'], "type": "default_accounts"}, {"_id": 0}
     )
+    default_accounts = (defaults_doc or {}).get("accounts", {})
+    
+    sales_vat_code = None
+    sales_vat_id = default_accounts.get("sales_vat_account")
+    if sales_vat_id:
+        vat_acc = await db.accounts.find_one({'id': sales_vat_id, 'organization_id': invoice['organization_id']}, {'_id': 0})
+        if vat_acc:
+            sales_vat_code = vat_acc['code']
+            vat_payable_account = vat_acc
+        else:
+            vat_payable_account = await db.accounts.find_one(
+                {'code': '44270003', 'organization_id': invoice['organization_id']}, {'_id': 0}
+            )
+            if vat_payable_account:
+                sales_vat_code = '44270003'
+    else:
+        vat_payable_account = await db.accounts.find_one(
+            {'code': '44270003', 'organization_id': invoice['organization_id']}, {'_id': 0}
+        )
+        if vat_payable_account:
+            sales_vat_code = '44270003'
     
     # Generate voucher number
     year = datetime.now().year
@@ -534,7 +555,7 @@ async def post_sales_invoice(invoice_id: str, current_user: dict = Depends(get_c
     # Line 3: Credit VAT Payable (VAT amount) - if VAT payable account exists
     if vat_payable_account and tax_usd > 0:
         voucher_lines.append({
-            'account_code': '44270003',
+            'account_code': sales_vat_code,
             'account_name': vat_payable_account['name'],
             'description': desc,
             'debit_lbp': 0,
@@ -1063,10 +1084,31 @@ async def post_purchase_invoice(invoice_id: str, current_user: dict = Depends(ge
             {'code': vat_supplier_code, 'organization_id': invoice['organization_id']}, {'_id': 0}
         )
     
-    # VAT input/receivable account (44260006)
-    vat_input_account = await db.accounts.find_one(
-        {'code': '44260006', 'organization_id': invoice['organization_id']}, {'_id': 0}
+    # VAT input/receivable account - use default from settings, fallback to 44260006
+    defaults_doc = await db.organization_settings.find_one(
+        {"organization_id": invoice['organization_id'], "type": "default_accounts"}, {"_id": 0}
     )
+    default_accounts = (defaults_doc or {}).get("accounts", {})
+    
+    purchase_vat_code = None
+    purchase_vat_id = default_accounts.get("purchase_vat_account")
+    if purchase_vat_id:
+        vat_acc = await db.accounts.find_one({'id': purchase_vat_id, 'organization_id': invoice['organization_id']}, {'_id': 0})
+        if vat_acc:
+            purchase_vat_code = vat_acc['code']
+            vat_input_account = vat_acc
+        else:
+            vat_input_account = await db.accounts.find_one(
+                {'code': '44260006', 'organization_id': invoice['organization_id']}, {'_id': 0}
+            )
+            if vat_input_account:
+                purchase_vat_code = '44260006'
+    else:
+        vat_input_account = await db.accounts.find_one(
+            {'code': '44260006', 'organization_id': invoice['organization_id']}, {'_id': 0}
+        )
+        if vat_input_account:
+            purchase_vat_code = '44260006'
     
     # Generate voucher number
     year = datetime.now().year
@@ -1101,7 +1143,7 @@ async def post_purchase_invoice(invoice_id: str, current_user: dict = Depends(ge
     # Line 2: Debit VAT Input/Receivable (VAT amount)
     if vat_input_account and tax_usd > 0:
         voucher_lines.append({
-            'account_code': '44260006',
+            'account_code': purchase_vat_code,
             'account_name': vat_input_account['name'],
             'description': desc,
             'debit_lbp': tax_lbp,
