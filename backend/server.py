@@ -6877,7 +6877,16 @@ async def create_indexes():
         await db.accounts.create_index([("organization_id", 1), ("code", 1), ("is_active", 1)])
         await db.accounts.create_index([("organization_id", 1), ("name", 1)])
         
-        # Inventory indexes
+        # Inventory indexes - drop old sparse index if it exists, replace with partial filter
+        try:
+            existing_indexes = await db.inventory_items.index_information()
+            if 'organization_id_1_item_code_1' in existing_indexes:
+                idx_info = existing_indexes['organization_id_1_item_code_1']
+                if idx_info.get('sparse') and 'partialFilterExpression' not in idx_info:
+                    await db.inventory_items.drop_index('organization_id_1_item_code_1')
+                    logger.info("Dropped old sparse item_code index")
+        except Exception:
+            pass
         await db.inventory_items.create_index([("organization_id", 1), ("item_code", 1)], unique=True, partialFilterExpression={"item_code": {"$type": "string", "$gt": ""}})
         await db.inventory_items.create_index([("organization_id", 1), ("name", 1)])
         await db.inventory_items.create_index([("organization_id", 1), ("category_id", 1)])
