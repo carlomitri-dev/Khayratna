@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Form
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Form, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import FileResponse
 from dotenv import load_dotenv
@@ -6657,6 +6657,58 @@ async def generate_invoice_number(organization_id: str) -> str:
 # NOTE: All sales-invoices and purchase-invoices endpoints are in routers/invoices.py
 
 # NOTE: POS endpoints moved to routers/pos.py
+
+# ================== DEFAULT POSTING ACCOUNTS ==================
+
+DEFAULT_ACCOUNT_KEYS = [
+    "sales_vat_account",
+    "purchase_vat_account",
+    "sales_account",
+    "purchase_account",
+    "sales_return_account",
+    "purchase_return_account",
+    "cash_bank_account",
+]
+
+@api_router.get("/settings/default-accounts")
+async def get_default_accounts(organization_id: str, current_user: dict = Depends(get_current_user)):
+    """Get default posting accounts for an organization."""
+    doc = await db.organization_settings.find_one(
+        {"organization_id": organization_id, "type": "default_accounts"},
+        {"_id": 0}
+    )
+    if not doc:
+        return {"organization_id": organization_id, "accounts": {}}
+    return {"organization_id": organization_id, "accounts": doc.get("accounts", {})}
+
+
+@api_router.put("/settings/default-accounts")
+async def save_default_accounts(data: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    """Save default posting accounts for an organization. Super admin only."""
+    if current_user.get("role") != "super_admin":
+        raise HTTPException(status_code=403, detail="Super admin access required")
+    
+    org_id = data.get("organization_id")
+    accounts = data.get("accounts", {})
+    
+    if not org_id:
+        raise HTTPException(status_code=400, detail="organization_id is required")
+    
+    # Validate keys
+    clean = {}
+    for key in DEFAULT_ACCOUNT_KEYS:
+        val = accounts.get(key)
+        if val and isinstance(val, str):
+            clean[key] = val
+    
+    await db.organization_settings.update_one(
+        {"organization_id": org_id, "type": "default_accounts"},
+        {"$set": {"accounts": clean, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    return {"message": "Default accounts saved", "accounts": clean}
+
+
 
 # ================== ROOT ==================
 

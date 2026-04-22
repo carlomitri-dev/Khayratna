@@ -52,11 +52,13 @@ import {
   Calendar,
   Lock,
   Unlock,
-  AlertCircle
+  AlertCircle,
+  Landmark
 } from 'lucide-react';
 import axios from 'axios';
 import { getRoleDisplayName, formatDate } from '../lib/utils';
 import { Textarea } from '../components/ui/textarea';
+import AccountSelector from '../components/selectors/AccountSelector';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -274,6 +276,19 @@ const SettingsPage = () => {
   const [restoreResult, setRestoreResult] = useState(null);
   const restoreFileRef = useRef(null);
 
+  // Default Posting Accounts state
+  const [defaultAccounts, setDefaultAccounts] = useState({
+    sales_vat_account: '',
+    purchase_vat_account: '',
+    sales_account: '',
+    purchase_account: '',
+    sales_return_account: '',
+    purchase_return_account: '',
+    cash_bank_account: '',
+  });
+  const [defaultAccountsLoading, setDefaultAccountsLoading] = useState(false);
+  const [defaultAccountsSaving, setDefaultAccountsSaving] = useState(false);
+
   // Invoice Template state
   const [invoiceTemplate, setInvoiceTemplate] = useState({
     company_name: '',
@@ -350,6 +365,42 @@ const SettingsPage = () => {
     fetchCurrencies();
     fetchBackupInfo();
   }, [selectedOrgFilter]);
+
+  // Load invoice template when currentOrg changes
+  useEffect(() => {
+    if (currentOrg) {
+      fetchDefaultAccounts();
+    }
+  }, [currentOrg]);
+
+  const fetchDefaultAccounts = async () => {
+    if (!currentOrg) return;
+    setDefaultAccountsLoading(true);
+    try {
+      const res = await axios.get(`${API}/settings/default-accounts?organization_id=${currentOrg.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      const accts = res.data.accounts || {};
+      setDefaultAccounts(prev => ({ ...prev, ...accts }));
+    } catch (err) {
+      console.error('Failed to fetch default accounts:', err);
+    } finally {
+      setDefaultAccountsLoading(false);
+    }
+  };
+
+  const saveDefaultAccounts = async () => {
+    setDefaultAccountsSaving(true);
+    try {
+      await axios.put(`${API}/settings/default-accounts`, {
+        organization_id: currentOrg.id,
+        accounts: defaultAccounts,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Default accounts saved');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to save default accounts');
+    } finally {
+      setDefaultAccountsSaving(false);
+    }
+  };
 
   // Load invoice template when currentOrg changes
   useEffect(() => {
@@ -985,6 +1036,10 @@ const SettingsPage = () => {
           <TabsTrigger value="backup" className="text-xs lg:text-sm">
             <Database className="w-4 h-4 mr-1 lg:mr-2" />
             <span className="hidden sm:inline">Backup</span>
+          </TabsTrigger>
+          <TabsTrigger value="default-accounts" className="text-xs lg:text-sm" data-testid="tab-default-accounts">
+            <Landmark className="w-4 h-4 mr-1 lg:mr-2" />
+            <span className="hidden sm:inline">Default Accounts</span>
           </TabsTrigger>
         </TabsList>
 
@@ -2379,6 +2434,117 @@ const SettingsPage = () => {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Default Posting Accounts */}
+        <TabsContent value="default-accounts" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Landmark className="w-5 h-5" /> Default Posting Accounts
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">Configure default accounts used when posting invoices and returns for {currentOrg?.name || 'this organization'}.</p>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {defaultAccountsLoading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Sales VAT Account</label>
+                      <AccountSelector
+                        mode="remote"
+                        fetchUrl={`${API}/accounts`}
+                        fetchParams={{ organization_id: currentOrg?.id }}
+                        value={defaultAccounts.sales_vat_account}
+                        onChange={(val) => setDefaultAccounts(p => ({ ...p, sales_vat_account: val }))}
+                        placeholder="Select Sales VAT Account..."
+                        data-testid="da-sales-vat"
+                      />
+                      <p className="text-xs text-muted-foreground">e.g. 44270003</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Purchase VAT Account</label>
+                      <AccountSelector
+                        mode="remote"
+                        fetchUrl={`${API}/accounts`}
+                        fetchParams={{ organization_id: currentOrg?.id }}
+                        value={defaultAccounts.purchase_vat_account}
+                        onChange={(val) => setDefaultAccounts(p => ({ ...p, purchase_vat_account: val }))}
+                        placeholder="Select Purchase VAT Account..."
+                        data-testid="da-purchase-vat"
+                      />
+                      <p className="text-xs text-muted-foreground">e.g. 44260003</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Sales Account</label>
+                      <AccountSelector
+                        mode="remote"
+                        fetchUrl={`${API}/accounts`}
+                        fetchParams={{ organization_id: currentOrg?.id }}
+                        value={defaultAccounts.sales_account}
+                        onChange={(val) => setDefaultAccounts(p => ({ ...p, sales_account: val }))}
+                        placeholder="Select Sales Account..."
+                        data-testid="da-sales"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Purchase Account</label>
+                      <AccountSelector
+                        mode="remote"
+                        fetchUrl={`${API}/accounts`}
+                        fetchParams={{ organization_id: currentOrg?.id }}
+                        value={defaultAccounts.purchase_account}
+                        onChange={(val) => setDefaultAccounts(p => ({ ...p, purchase_account: val }))}
+                        placeholder="Select Purchase Account..."
+                        data-testid="da-purchase"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Sales Return Account</label>
+                      <AccountSelector
+                        mode="remote"
+                        fetchUrl={`${API}/accounts`}
+                        fetchParams={{ organization_id: currentOrg?.id }}
+                        value={defaultAccounts.sales_return_account}
+                        onChange={(val) => setDefaultAccounts(p => ({ ...p, sales_return_account: val }))}
+                        placeholder="Select Sales Return Account..."
+                        data-testid="da-sales-return"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Purchase Return Account</label>
+                      <AccountSelector
+                        mode="remote"
+                        fetchUrl={`${API}/accounts`}
+                        fetchParams={{ organization_id: currentOrg?.id }}
+                        value={defaultAccounts.purchase_return_account}
+                        onChange={(val) => setDefaultAccounts(p => ({ ...p, purchase_return_account: val }))}
+                        placeholder="Select Purchase Return Account..."
+                        data-testid="da-purchase-return"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-sm font-medium">Cash / Bank Account</label>
+                      <AccountSelector
+                        mode="remote"
+                        fetchUrl={`${API}/accounts`}
+                        fetchParams={{ organization_id: currentOrg?.id }}
+                        value={defaultAccounts.cash_bank_account}
+                        onChange={(val) => setDefaultAccounts(p => ({ ...p, cash_bank_account: val }))}
+                        placeholder="Select Cash/Bank Account..."
+                        data-testid="da-cash-bank"
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={saveDefaultAccounts} disabled={defaultAccountsSaving} data-testid="save-default-accounts">
+                    {defaultAccountsSaving ? 'Saving...' : 'Save Default Accounts'}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
