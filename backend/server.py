@@ -6878,7 +6878,7 @@ async def create_indexes():
         await db.accounts.create_index([("organization_id", 1), ("name", 1)])
         
         # Inventory indexes
-        await db.inventory_items.create_index([("organization_id", 1), ("item_code", 1)], unique=True, sparse=True)
+        await db.inventory_items.create_index([("organization_id", 1), ("item_code", 1)], unique=True, partialFilterExpression={"item_code": {"$type": "string", "$gt": ""}})
         await db.inventory_items.create_index([("organization_id", 1), ("name", 1)])
         await db.inventory_items.create_index([("organization_id", 1), ("category_id", 1)])
         await db.inventory_items.create_index([("organization_id", 1), ("supplier_id", 1)])
