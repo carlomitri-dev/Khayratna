@@ -398,9 +398,39 @@ async def create_inventory_item(item_data: InventoryItemCreate, current_user: di
         if existing:
             raise HTTPException(status_code=400, detail="Barcode already exists")
     
+    # Auto-generate sequential item_code
+    last_item = await db.inventory_items.find_one(
+        {'organization_id': item_data.organization_id, 'item_code': {'$ne': None}},
+        {'item_code': 1},
+        sort=[('item_code_numeric', -1)]
+    )
+    if not last_item:
+        # Fallback: find max numeric item_code by scanning
+        pipeline = [
+            {'$match': {'organization_id': item_data.organization_id, 'item_code': {'$ne': None, '$ne': ''}}},
+            {'$addFields': {'_num': {'$toInt': {'$ifNull': ['$item_code', '0']}}}},
+            {'$sort': {'_num': -1}},
+            {'$limit': 1}
+        ]
+        results = await db.inventory_items.aggregate(pipeline).to_list(1)
+        if results:
+            try:
+                next_code = str(int(results[0].get('item_code', '0')) + 1)
+            except (ValueError, TypeError):
+                next_code = '1'
+        else:
+            next_code = '1'
+    else:
+        try:
+            next_code = str(int(last_item.get('item_code', '0')) + 1)
+        except (ValueError, TypeError):
+            next_code = '1'
+    
     item_id = str(uuid.uuid4())
     item_doc = {
         'id': item_id,
+        'item_code': next_code,
+        'item_code_numeric': int(next_code),
         'barcode': item_data.barcode,
         'name': item_data.name,
         'name_ar': item_data.name_ar,
@@ -1466,3 +1496,41 @@ async def import_csv_inventory(
         'new_categories': new_categories,
         'errors': errors[:20]
     }
+
+
+
+@router.post("/inventory/backfill-item-codes")
+async def backfill_item_codes(
+    organization_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Assign sequential item_code to all items that don't have one."""
+    if current_user['role'] not in ['super_admin', 'admin']:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    
+    # Find current max item_code
+    pipeline = [
+        {'$match': {'organization_id': organization_id, 'item_code': {'$ne': None, '$exists': True}}},
+        {'$addFields': {'_num': {'$toInt': {'$ifNull': ['$item_code', '0']}}}},
+        {'$sort': {'_num': -1}},
+        {'$limit': 1}
+    ]
+    results = await db.inventory_items.aggregate(pipeline).to_list(1)
+    next_num = int(results[0].get('item_code', '0')) + 1 if results else 1
+    
+    # Find items without item_code
+    items = await db.inventory_items.find(
+        {'organization_id': organization_id, '$or': [{'item_code': None}, {'item_code': ''}, {'item_code': {'$exists': False}}]},
+        {'_id': 0, 'id': 1, 'name': 1}
+    ).sort('created_at', 1).to_list(None)
+    
+    updated = 0
+    for item in items:
+        await db.inventory_items.update_one(
+            {'id': item['id']},
+            {'$set': {'item_code': str(next_num), 'item_code_numeric': next_num}}
+        )
+        next_num += 1
+        updated += 1
+    
+    return {"message": f"Assigned item codes to {updated} items", "updated": updated, "next_code": next_num}

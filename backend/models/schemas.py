@@ -243,6 +243,7 @@ class InventoryBatch(BaseModel):
 class InventoryItemResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
+    item_code: Optional[str] = None
     barcode: Optional[str] = None
     sku: Optional[str] = None
     moh_code: Optional[str] = None  # Ministry of Health code
