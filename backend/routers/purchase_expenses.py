@@ -386,27 +386,39 @@ async def post_purchase_expense(
     # --- 2. Distribute costs and update inventory ---
     distribution = _calculate_distribution(expense, invoice)
     
+    items_updated = 0
+    items_skipped = []
     for dist_item in distribution.get('items', []):
         inv_item_id = dist_item.get('inventory_item_id')
         added_cost = dist_item.get('expense_per_unit_usd', 0)
         if added_cost <= 0:
             continue
         
-        # Try to find inventory item by ID first, then by name
+        # Try to find inventory item by ID first, then by name/barcode
         item = None
         if inv_item_id:
-            item = await db.inventory_items.find_one({'id': inv_item_id}, {'_id': 0})
+            item = await db.inventory_items.find_one({'id': inv_item_id, 'organization_id': org_id}, {'_id': 0})
         
         if not item and dist_item.get('item_name'):
+            item_name = dist_item['item_name'].strip()
+            # Try exact match first
             item = await db.inventory_items.find_one(
-                {'name': dist_item['item_name'], 'organization_id': org_id},
-                {'_id': 0}
+                {'name': item_name, 'organization_id': org_id}, {'_id': 0}
             )
-            if item:
-                inv_item_id = item['id']
-                dist_item['inventory_item_id'] = inv_item_id
+            # Try case-insensitive match
+            if not item:
+                item = await db.inventory_items.find_one(
+                    {'name': {'$regex': f'^{item_name}$', '$options': 'i'}, 'organization_id': org_id}, {'_id': 0}
+                )
+            # Try barcode match
+            if not item and dist_item.get('barcode'):
+                item = await db.inventory_items.find_one(
+                    {'barcode': dist_item['barcode'], 'organization_id': org_id}, {'_id': 0}
+                )
         
         if item:
+            inv_item_id = item['id']
+            dist_item['inventory_item_id'] = inv_item_id
             old_cost = item.get('cost', 0)
             new_cost = old_cost + added_cost
             await db.inventory_items.update_one(
@@ -417,6 +429,9 @@ async def post_purchase_expense(
                     'updated_at': datetime.now(timezone.utc).isoformat()
                 }}
             )
+            items_updated += 1
+        else:
+            items_skipped.append(dist_item.get('item_name', 'Unknown'))
     
     # --- 3. Update expense status ---
     await db.purchase_expenses.update_one(
@@ -435,7 +450,9 @@ async def post_purchase_expense(
         "message": "Purchase expense posted successfully",
         "voucher_id": voucher_id,
         "voucher_number": voucher_number,
-        "distribution": distribution
+        "distribution": distribution,
+        "inventory_updated": items_updated,
+        "inventory_skipped": items_skipped
     }
 
 
@@ -538,6 +555,7 @@ def _calculate_distribution(expense: dict, invoice: dict) -> dict:
             'item_name': line.get('item_name', ''),
             'item_name_ar': line.get('item_name_ar', ''),
             'inventory_item_id': line.get('inventory_item_id'),
+            'barcode': line.get('barcode', ''),
             'quantity': qty,
             'line_value_usd': round(line_value, 4),
             'proportion': round(proportion, 6),

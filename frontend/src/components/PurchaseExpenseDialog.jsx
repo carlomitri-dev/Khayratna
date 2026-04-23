@@ -188,7 +188,14 @@ const PurchaseExpenseDialog = ({ open, onOpenChange, invoice, organizationId, on
     setPosting(true);
     try {
       const res = await axios.post(`${API}/purchase-expenses/${expId}/post`);
-      toast.success(`Posted! Voucher: ${res.data.voucher_number}`);
+      const { voucher_number, inventory_updated = 0, inventory_skipped = [] } = res.data;
+      let msg = `Posted! Voucher: ${voucher_number}. ${inventory_updated} item(s) cost updated.`;
+      if (inventory_skipped.length > 0) {
+        msg += ` Skipped (not found in inventory): ${inventory_skipped.join(', ')}`;
+        toast.warning(msg, { duration: 8000 });
+      } else {
+        toast.success(msg);
+      }
       await fetchExpenses();
       if (onSaved) onSaved();
     } catch (err) {
