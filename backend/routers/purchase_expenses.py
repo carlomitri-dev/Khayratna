@@ -18,6 +18,16 @@ from core.database import db
 router = APIRouter(prefix="/purchase-expenses", tags=["purchase-expenses"])
 
 
+def normalize_date(date_str: str) -> str:
+    """Convert DD-MM-YYYY to YYYY-MM-DD if needed. Pass through YYYY-MM-DD as-is."""
+    if not date_str:
+        return date_str
+    parts = date_str.split('-')
+    if len(parts) == 3 and len(parts[0]) == 2 and len(parts[2]) == 4:
+        return f"{parts[2]}-{parts[1]}-{parts[0]}"
+    return date_str
+
+
 @router.get("", response_model=List[PurchaseExpenseResponse])
 async def get_purchase_expenses(
     organization_id: str,
@@ -114,7 +124,7 @@ async def create_purchase_expense(
         'id': str(uuid.uuid4()),
         'expense_number': expense_number,
         'purchase_invoice_id': data.purchase_invoice_id,
-        'date': data.date,
+        'date': normalize_date(data.date),
         'exchange_rate': data.exchange_rate,
         'debit_lines': [dl_item.model_dump() for dl_item in data.debit_lines],
         'credit_lines': [cl_item.model_dump() for cl_item in data.credit_lines],
@@ -156,7 +166,7 @@ async def update_purchase_expense(
     
     update_data = {}
     if data.date is not None:
-        update_data['date'] = data.date
+        update_data['date'] = normalize_date(data.date)
     if data.exchange_rate is not None:
         update_data['exchange_rate'] = data.exchange_rate
     if data.notes is not None:
@@ -341,7 +351,7 @@ async def post_purchase_expense(
         'id': voucher_id,
         'voucher_number': voucher_number,
         'voucher_type': 'JV',
-        'date': expense['date'],
+        'date': normalize_date(expense['date']),
         'description': desc,
         'reference': expense.get('expense_number', ''),
         'lines': voucher_lines,
@@ -378,14 +388,24 @@ async def post_purchase_expense(
     
     for dist_item in distribution.get('items', []):
         inv_item_id = dist_item.get('inventory_item_id')
-        if not inv_item_id:
-            continue
-        
         added_cost = dist_item.get('expense_per_unit_usd', 0)
         if added_cost <= 0:
             continue
         
-        item = await db.inventory_items.find_one({'id': inv_item_id}, {'_id': 0})
+        # Try to find inventory item by ID first, then by name
+        item = None
+        if inv_item_id:
+            item = await db.inventory_items.find_one({'id': inv_item_id}, {'_id': 0})
+        
+        if not item and dist_item.get('item_name'):
+            item = await db.inventory_items.find_one(
+                {'name': dist_item['item_name'], 'organization_id': org_id},
+                {'_id': 0}
+            )
+            if item:
+                inv_item_id = item['id']
+                dist_item['inventory_item_id'] = inv_item_id
+        
         if item:
             old_cost = item.get('cost', 0)
             new_cost = old_cost + added_cost
@@ -455,18 +475,27 @@ async def unpost_purchase_expense(
     for dist_item in (expense.get('distribution') or []):
         inv_item_id = dist_item.get('inventory_item_id')
         added_cost = dist_item.get('expense_per_unit_usd', 0)
-        if inv_item_id and added_cost > 0:
+        if added_cost <= 0:
+            continue
+        
+        item = None
+        if inv_item_id:
             item = await db.inventory_items.find_one({'id': inv_item_id}, {'_id': 0})
-            if item:
-                old_cost = item.get('cost', 0)
-                new_cost = max(0, old_cost - added_cost)
-                await db.inventory_items.update_one(
-                    {'id': inv_item_id},
-                    {'$set': {
-                        'cost': round(new_cost, 4),
-                        'updated_at': datetime.now(timezone.utc).isoformat()
-                    }}
-                )
+        if not item and dist_item.get('item_name'):
+            item = await db.inventory_items.find_one(
+                {'name': dist_item['item_name'], 'organization_id': org_id}, {'_id': 0}
+            )
+        
+        if item:
+            old_cost = item.get('cost', 0)
+            new_cost = max(0, old_cost - added_cost)
+            await db.inventory_items.update_one(
+                {'id': item['id']},
+                {'$set': {
+                    'cost': round(new_cost, 4),
+                    'updated_at': datetime.now(timezone.utc).isoformat()
+                }}
+            )
     
     await db.purchase_expenses.update_one(
         {'id': expense_id},
