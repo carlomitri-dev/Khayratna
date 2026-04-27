@@ -507,7 +507,7 @@ const VoucherEntryPage = () => {
               <Label className="text-xs lg:text-sm">Date</Label>
               <DateInput
                 value={voucher.date}
-                onChange={(e) => setVoucher({ ...voucher, date: e.target.value })}
+                onChange={(val) => setVoucher({ ...voucher, date: val })}
                 className="text-xs lg:text-sm"
                 data-testid="voucher-date"
               />
