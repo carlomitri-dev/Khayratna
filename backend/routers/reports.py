@@ -148,11 +148,14 @@ async def get_trial_balance(
     fy_id: str = None,
     from_date: str = None,
     to_date: str = None,
+    from_account: str = None,
+    to_account: str = None,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Get trial balance report with optional filtering.
     from_date/to_date take priority over fy_id for date range.
+    from_account/to_account filter by account code range.
     """
     # Determine date range
     date_start = None
@@ -280,6 +283,12 @@ async def get_trial_balance(
         
         # Skip if doesn't match level filter
         if not matches_level(code, level):
+            continue
+        
+        # Skip if outside account code range
+        if from_account and code < from_account:
+            continue
+        if to_account and code > to_account:
             continue
             
         balance_lbp = acc.get('balance_lbp', 0) or 0

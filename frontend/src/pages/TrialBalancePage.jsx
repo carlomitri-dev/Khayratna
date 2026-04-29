@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 import { FileText, Download, Printer, Filter, RefreshCw, AlertTriangle, Plus, Search } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
+import AccountSelector from '../components/selectors/AccountSelector';
 import CompanyHeader from '../components/shared/CompanyHeader';
 import { formatLBP, formatUSD, getNumberClass } from '../lib/utils';
 import { printReport, exportTrialBalanceToCSV } from '../lib/reportUtils';
@@ -31,24 +32,23 @@ const TrialBalancePage = () => {
   const { currentOrg } = useAuth();
   const { selectedFY } = useFiscalYear();
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [level, setLevel] = useState('leaf');
   const [includeZeroBalance, setIncludeZeroBalance] = useState(false);
   const [showCumulative, setShowCumulative] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [fromAccountId, setFromAccountId] = useState('');
+  const [fromAccountCode, setFromAccountCode] = useState('');
+  const [toAccountId, setToAccountId] = useState('');
+  const [toAccountCode, setToAccountCode] = useState('');
   const [checkingCodes, setCheckingCodes] = useState(false);
   const [orphanedCodes, setOrphanedCodes] = useState([]);
   const [showOrphanedDialog, setShowOrphanedDialog] = useState(false);
   const [creatingAccounts, setCreatingAccounts] = useState(false);
 
-  useEffect(() => {
-    if (currentOrg) {
-      fetchTrialBalance();
-    }
-  }, [currentOrg, level, includeZeroBalance, selectedFY]);
-
   const fetchTrialBalance = async () => {
+    if (!currentOrg) return;
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -63,10 +63,13 @@ const TrialBalancePage = () => {
       if (!fromDate && !toDate && selectedFY?.id) {
         params.append('fy_id', selectedFY.id);
       }
+      if (fromAccountCode) params.append('from_account', fromAccountCode);
+      if (toAccountCode) params.append('to_account', toAccountCode);
       const response = await axios.get(`${API}/reports/trial-balance?${params.toString()}`);
       setData(response.data);
     } catch (error) {
       console.error('Failed to fetch trial balance:', error);
+      toast.error('Failed to load trial balance');
     } finally {
       setLoading(false);
     }
@@ -98,7 +101,6 @@ const TrialBalancePage = () => {
       });
       toast.success(res.data.message);
       setShowOrphanedDialog(false);
-      setOrphanedCodes([]);
       fetchTrialBalance();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to create accounts');
@@ -114,6 +116,28 @@ const TrialBalancePage = () => {
   const handleExport = () => {
     if (data && currentOrg) {
       exportTrialBalanceToCSV(data, currentOrg.name.replace(/\s+/g, '_'));
+    }
+  };
+
+  const handleFromAccountSelect = (id) => {
+    setFromAccountId(id);
+    if (id) {
+      axios.get(`${API}/accounts/${id}`).then(res => {
+        setFromAccountCode(res.data.code);
+      }).catch(() => {});
+    } else {
+      setFromAccountCode('');
+    }
+  };
+
+  const handleToAccountSelect = (id) => {
+    setToAccountId(id);
+    if (id) {
+      axios.get(`${API}/accounts/${id}`).then(res => {
+        setToAccountCode(res.data.code);
+      }).catch(() => {});
+    } else {
+      setToAccountCode('');
     }
   };
 
@@ -167,7 +191,8 @@ const TrialBalancePage = () => {
 
       {/* Filters */}
       <Card className="no-print" data-testid="trial-balance-filters">
-        <CardContent className="p-3 lg:p-4">
+        <CardContent className="p-3 lg:p-4 space-y-3">
+          {/* Row 1: Level, toggles, dates, Apply */}
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-muted-foreground" />
@@ -218,9 +243,46 @@ const TrialBalancePage = () => {
               <Label className="text-sm font-medium whitespace-nowrap">To:</Label>
               <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-8 w-[150px] text-xs" data-testid="to-date" />
             </div>
-            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={fetchTrialBalance} disabled={loading} data-testid="apply-date-filter">
-              <Filter className="w-3 h-3 mr-1" /> Apply
+          </div>
+
+          {/* Row 2: Account range + Apply */}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium whitespace-nowrap">From Account:</Label>
+              <div className="w-[220px]">
+                <AccountSelector
+                  fetchUrl="/accounts"
+                  fetchParams={{ organization_id: currentOrg?.id }}
+                  value={fromAccountId}
+                  onChange={handleFromAccountSelect}
+                  placeholder="From account..."
+                  showBalance={false}
+                  data-testid="from-account-selector"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium whitespace-nowrap">To Account:</Label>
+              <div className="w-[220px]">
+                <AccountSelector
+                  fetchUrl="/accounts"
+                  fetchParams={{ organization_id: currentOrg?.id }}
+                  value={toAccountId}
+                  onChange={handleToAccountSelect}
+                  placeholder="To account..."
+                  showBalance={false}
+                  data-testid="to-account-selector"
+                />
+              </div>
+            </div>
+            <Button size="sm" onClick={fetchTrialBalance} disabled={loading} data-testid="apply-date-filter">
+              <Filter className="w-4 h-4 mr-1" /> {loading ? 'Loading...' : 'Apply'}
             </Button>
+            {(fromDate || toDate || fromAccountCode || toAccountCode) && (
+              <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setFromDate(''); setToDate(''); setFromAccountId(''); setFromAccountCode(''); setToAccountId(''); setToAccountCode(''); setData(null); }}>
+                Clear All
+              </Button>
+            )}
             <Button size="sm" variant="outline" className="h-8 text-xs border-orange-500/50 text-orange-400 hover:bg-orange-500/10" onClick={handleCheckCodes} disabled={checkingCodes} data-testid="check-codes-btn">
               <Search className="w-3 h-3 mr-1" /> {checkingCodes ? 'Checking...' : 'Check Codes'}
             </Button>
@@ -235,7 +297,7 @@ const TrialBalancePage = () => {
             <p className="report-subtitle text-sm lg:text-base">Trial Balance Report</p>
             <p className="text-xs text-muted-foreground mt-1">
               As of {(() => { const d = new Date(); return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; })()}
-              {data && ` • ${data.total_accounts_shown || data.accounts?.length || 0} accounts`}
+              {data && ` \u2022 ${data.total_accounts_shown || data.accounts?.length || 0} accounts`}
             </p>
           </div>
         </CardHeader>
@@ -244,7 +306,15 @@ const TrialBalancePage = () => {
             <div className="flex justify-center py-12">
               <div className="spinner" />
             </div>
-          ) : !data || data.accounts.length === 0 ? (
+          ) : !data ? (
+            <div className="text-center py-16">
+              <Filter className="w-16 h-16 mx-auto text-muted-foreground mb-4 opacity-30" />
+              <p className="text-lg text-muted-foreground">Select filters and click "Apply" to load Trial Balance</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Set level, date range, and account range as needed
+              </p>
+            </div>
+          ) : data.accounts.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">No account balances to display</p>
@@ -405,7 +475,7 @@ const TrialBalancePage = () => {
               {data.totals && Math.abs(data.totals.debit_usd - data.totals.credit_usd) > 0.01 && (
                 <div className="p-3 bg-yellow-500/10 border-t border-yellow-500/30">
                   <p className="text-sm text-yellow-400 text-center">
-                    ⚠️ Trial balance is not balanced. Difference: ${formatUSD(Math.abs(data.totals.debit_usd - data.totals.credit_usd))}
+                    Warning: Trial balance is not balanced. Difference: ${formatUSD(Math.abs(data.totals.debit_usd - data.totals.credit_usd))}
                   </p>
                 </div>
               )}
