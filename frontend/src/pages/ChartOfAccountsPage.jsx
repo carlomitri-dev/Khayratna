@@ -77,6 +77,8 @@ const ChartOfAccountsPage = () => {
   const [filterContent, setFilterContent] = useState('');
   const [filterBalance, setFilterBalance] = useState('all'); // all, non-zero, zero
   const [filterCodeLength, setFilterCodeLength] = useState('all'); // all, 2, 4, more
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   useEffect(() => {
     if (currentOrg) {
@@ -96,6 +98,8 @@ const ChartOfAccountsPage = () => {
       });
       if (selectedFY?.id) params.append('fy_id', selectedFY.id);
       if (searchTerm) params.append('search', searchTerm);
+      if (dateFrom) params.append('from_date', dateFrom);
+      if (dateTo) params.append('to_date', dateTo);
       const response = await axios.get(`${API}/accounts?${params.toString()}`);
       const data = response.data;
       const accts = data.accounts || data;
@@ -1050,7 +1054,7 @@ const ChartOfAccountsPage = () => {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-3">
+        <CardContent className="p-3 space-y-2">
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -1073,6 +1077,25 @@ const ChartOfAccountsPage = () => {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          {/* Date range filter */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Label className="text-xs font-medium whitespace-nowrap">From:</Label>
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 w-[150px] text-xs" data-testid="coa-from-date" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs font-medium whitespace-nowrap">To:</Label>
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 w-[150px] text-xs" data-testid="coa-to-date" />
+            </div>
+            <Button size="sm" onClick={() => fetchAccounts(true)} disabled={loading} data-testid="coa-load-btn">
+              <Filter className="w-3 h-3 mr-1" /> Load
+            </Button>
+            {(dateFrom || dateTo) && (
+              <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setDateFrom(''); setDateTo(''); setTimeout(() => fetchAccounts(true), 100); }}>
+                Clear Dates
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1140,10 +1163,11 @@ const ChartOfAccountsPage = () => {
                     <tr>
                       <th className="w-24">Code</th>
                       <th>Account Name</th>
-                      <th>Arabic Name</th>
                       <th>Type</th>
-                      <th className="text-right">Balance (LBP)</th>
-                      <th className="text-right">Balance (USD)</th>
+                      <th className="text-right">Debit (LBP)</th>
+                      <th className="text-right">Credit (LBP)</th>
+                      <th className="text-right">Debit (USD)</th>
+                      <th className="text-right">Credit (USD)</th>
                       <th className="w-28">Actions</th>
                     </tr>
                   </thead>
@@ -1152,10 +1176,19 @@ const ChartOfAccountsPage = () => {
                       <tr key={account.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/80'} hover:bg-blue-50/50 transition-colors`} data-testid={`account-row-${account.code}`}>
                         <td className="font-mono font-medium">{account.code}</td>
                         <td>{account.name}</td>
-                        <td className="text-muted-foreground" dir="rtl">{account.name_ar || '-'}</td>
                         <td><span className="text-xs text-muted-foreground capitalize">{account.account_type}</span></td>
-                        <td className={`number ${getNumberClass(account.balance_lbp)}`}>{formatLBP(account.balance_lbp)}</td>
-                        <td className={`number ${getNumberClass(account.balance_usd)}`}>${formatUSD(account.balance_usd)}</td>
+                        <td className={`number ${(account.debit_lbp || 0) > 0 ? 'text-emerald-500' : 'text-zinc-400'}`}>
+                          {(account.debit_lbp || 0) > 0 ? formatLBP(account.debit_lbp) : '-'}
+                        </td>
+                        <td className={`number ${(account.credit_lbp || 0) > 0 ? 'text-red-400' : 'text-zinc-400'}`}>
+                          {(account.credit_lbp || 0) > 0 ? formatLBP(account.credit_lbp) : '-'}
+                        </td>
+                        <td className={`number ${(account.debit_usd || 0) > 0 ? 'text-emerald-500' : 'text-zinc-400'}`}>
+                          {(account.debit_usd || 0) > 0 ? '$' + formatUSD(account.debit_usd) : '-'}
+                        </td>
+                        <td className={`number ${(account.credit_usd || 0) > 0 ? 'text-red-400' : 'text-zinc-400'}`}>
+                          {(account.credit_usd || 0) > 0 ? '$' + formatUSD(account.credit_usd) : '-'}
+                        </td>
                         <td>
                           <div className="flex gap-1">
                             <Button variant="ghost" size="sm" onClick={() => setLedgerAccount(account)} title="View Ledger">
