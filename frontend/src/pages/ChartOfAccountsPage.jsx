@@ -79,6 +79,8 @@ const ChartOfAccountsPage = () => {
   const [filterCodeLength, setFilterCodeLength] = useState('all'); // all, 2, 4, more
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [sortField, setSortField] = useState(''); // debit_usd, credit_usd, balance_usd
+  const [sortDir, setSortDir] = useState('desc'); // asc, desc
 
   useEffect(() => {
     if (currentOrg) {
@@ -364,7 +366,13 @@ const ChartOfAccountsPage = () => {
     return matchesSearch && matchesClass;
   });
 
-  const groupedAccounts = filteredAccounts.reduce((groups, account) => {
+  const sortedAccounts = sortField ? [...filteredAccounts].sort((a, b) => {
+    const valA = a[sortField] || 0;
+    const valB = b[sortField] || 0;
+    return sortDir === 'asc' ? valA - valB : valB - valA;
+  }) : filteredAccounts;
+
+  const groupedAccounts = sortedAccounts.reduce((groups, account) => {
     const classNum = account.account_class;
     if (!groups[classNum]) {
       groups[classNum] = [];
@@ -372,6 +380,15 @@ const ChartOfAccountsPage = () => {
     groups[classNum].push(account);
     return groups;
   }, {});
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('desc');
+    }
+  };
 
   // Filtered list for the advanced filter dialog
   const advancedFilteredAccounts = accounts.filter(account => {
@@ -1167,9 +1184,15 @@ const ChartOfAccountsPage = () => {
                       <th className="text-right">Debit (LBP)</th>
                       <th className="text-right">Credit (LBP)</th>
                       <th className="text-right">Balance (LBP)</th>
-                      <th className="text-right">Debit (USD)</th>
-                      <th className="text-right">Credit (USD)</th>
-                      <th className="text-right">Balance (USD)</th>
+                      <th className="text-right cursor-pointer select-none hover:text-primary" onClick={() => handleSort('debit_usd')}>
+                        Debit (USD) {sortField === 'debit_usd' ? (sortDir === 'asc' ? '\u2191' : '\u2193') : ''}
+                      </th>
+                      <th className="text-right cursor-pointer select-none hover:text-primary" onClick={() => handleSort('credit_usd')}>
+                        Credit (USD) {sortField === 'credit_usd' ? (sortDir === 'asc' ? '\u2191' : '\u2193') : ''}
+                      </th>
+                      <th className="text-right cursor-pointer select-none hover:text-primary" onClick={() => handleSort('balance_usd')}>
+                        Balance (USD) {sortField === 'balance_usd' ? (sortDir === 'asc' ? '\u2191' : '\u2193') : ''}
+                      </th>
                       <th className="w-28">Actions</th>
                     </tr>
                   </thead>
