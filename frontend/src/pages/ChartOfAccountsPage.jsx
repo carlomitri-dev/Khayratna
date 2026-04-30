@@ -1166,8 +1166,10 @@ const ChartOfAccountsPage = () => {
                       <th>Type</th>
                       <th className="text-right">Debit (LBP)</th>
                       <th className="text-right">Credit (LBP)</th>
+                      <th className="text-right">Balance (LBP)</th>
                       <th className="text-right">Debit (USD)</th>
                       <th className="text-right">Credit (USD)</th>
+                      <th className="text-right">Balance (USD)</th>
                       <th className="w-28">Actions</th>
                     </tr>
                   </thead>
@@ -1183,11 +1185,17 @@ const ChartOfAccountsPage = () => {
                         <td className={`number ${(account.credit_lbp || 0) > 0 ? 'text-red-400' : 'text-zinc-400'}`}>
                           {(account.credit_lbp || 0) > 0 ? formatLBP(account.credit_lbp) : '-'}
                         </td>
+                        <td className={`number font-medium ${getNumberClass(account.balance_lbp)}`}>
+                          {formatLBP(account.balance_lbp)}
+                        </td>
                         <td className={`number ${(account.debit_usd || 0) > 0 ? 'text-emerald-500' : 'text-zinc-400'}`}>
                           {(account.debit_usd || 0) > 0 ? '$' + formatUSD(account.debit_usd) : '-'}
                         </td>
                         <td className={`number ${(account.credit_usd || 0) > 0 ? 'text-red-400' : 'text-zinc-400'}`}>
                           {(account.credit_usd || 0) > 0 ? '$' + formatUSD(account.credit_usd) : '-'}
+                        </td>
+                        <td className={`number font-medium ${getNumberClass(account.balance_usd)}`}>
+                          ${formatUSD(account.balance_usd)}
                         </td>
                         <td>
                           <div className="flex gap-1">
