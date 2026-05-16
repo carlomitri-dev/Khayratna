@@ -528,6 +528,15 @@ const ChartOfAccountsPage = () => {
           <td class="num ${(a.credit_usd||0)>0?'neg':''}">${(a.credit_usd||0)>0?'$'+Number(a.credit_usd).toLocaleString('en-US',{minimumFractionDigits:2}):'-'}</td>
           <td class="num ${(a.balance_usd||0)>0?'pos':(a.balance_usd||0)<0?'neg':''}">${'$'+Number(a.balance_usd||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
         </tr>`).join('')}</tbody>
+        <tfoot><tr style="background:#ddd;font-weight:bold;">
+          <td style="border:1px solid #999;padding:5px 6px;font-size:11px;" colspan="3">GRAND TOTAL (${accs.length} accounts)</td>
+          <td class="num" style="border:1px solid #999;padding:5px 6px;font-size:11px;color:green;">${Number(accs.reduce((s,a)=>s+(a.debit_lbp||0),0)).toLocaleString()}</td>
+          <td class="num" style="border:1px solid #999;padding:5px 6px;font-size:11px;color:red;">${Number(accs.reduce((s,a)=>s+(a.credit_lbp||0),0)).toLocaleString()}</td>
+          <td class="num" style="border:1px solid #999;padding:5px 6px;font-size:11px;">${Number(accs.reduce((s,a)=>s+(a.balance_lbp||0),0)).toLocaleString()}</td>
+          <td class="num" style="border:1px solid #999;padding:5px 6px;font-size:11px;color:green;">$${Number(accs.reduce((s,a)=>s+(a.debit_usd||0),0)).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+          <td class="num" style="border:1px solid #999;padding:5px 6px;font-size:11px;color:red;">$${Number(accs.reduce((s,a)=>s+(a.credit_usd||0),0)).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+          <td class="num" style="border:1px solid #999;padding:5px 6px;font-size:11px;">$${Number(accs.reduce((s,a)=>s+(a.balance_usd||0),0)).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+        </tr></tfoot>
       </table>
       </body></html>`;
     const win = window.open('', '_blank', 'width=1100,height=800');
@@ -536,116 +545,58 @@ const ChartOfAccountsPage = () => {
     setTimeout(() => win.print(), 300);
   };
 
-  const buildListHtml = () => {
+  const handleExportPdf = () => {
     const accs = sortedAccounts;
-    return `
-      <div style="font-family:Arial,sans-serif;font-size:11px;color:#000;padding:15px;">
-        <h2 style="text-align:center;margin-bottom:4px;font-size:16px;">${currentOrg.name} - Chart of Accounts</h2>
-        <p style="text-align:center;color:#666;margin-top:0;font-size:10px;">${accs.length} accounts${codeLenFilter !== 'all' ? ' (Code length: ' + (codeLenFilter === 'gt4' ? '>4' : codeLenFilter) + ' digits)' : ''}${selectedClass !== 'all' ? ' | Class ' + selectedClass : ''}${txnFilter !== 'all' ? ' | ' + (txnFilter === 'with-txn' ? 'With transactions' : 'No transactions') : ''}</p>
-        <table style="width:100%;border-collapse:collapse;margin-top:8px;">
-          <thead><tr style="background:#eee;">
-            <th style="border:1px solid #999;padding:4px 5px;text-align:left;font-size:10px;">Code</th>
-            <th style="border:1px solid #999;padding:4px 5px;text-align:left;font-size:10px;">Account Name</th>
-            <th style="border:1px solid #999;padding:4px 5px;text-align:left;font-size:10px;">Type</th>
-            <th style="border:1px solid #999;padding:4px 5px;text-align:right;font-size:10px;">Db LBP</th>
-            <th style="border:1px solid #999;padding:4px 5px;text-align:right;font-size:10px;">Cr LBP</th>
-            <th style="border:1px solid #999;padding:4px 5px;text-align:right;font-size:10px;">Bal LBP</th>
-            <th style="border:1px solid #999;padding:4px 5px;text-align:right;font-size:10px;">Db USD</th>
-            <th style="border:1px solid #999;padding:4px 5px;text-align:right;font-size:10px;">Cr USD</th>
-            <th style="border:1px solid #999;padding:4px 5px;text-align:right;font-size:10px;">Bal USD</th>
-          </tr></thead>
-          <tbody>${accs.map(a => `<tr>
-            <td style="border:1px solid #ccc;padding:3px 5px;font-family:monospace;font-weight:bold;font-size:10px;">${a.code}</td>
-            <td style="border:1px solid #ccc;padding:3px 5px;font-size:10px;">${a.name}</td>
-            <td style="border:1px solid #ccc;padding:3px 5px;font-size:10px;">${a.account_type || ''}</td>
-            <td style="border:1px solid #ccc;padding:3px 5px;text-align:right;font-family:monospace;font-size:10px;${(a.debit_lbp||0)>0?'color:green;':''}">${(a.debit_lbp||0)>0?Number(a.debit_lbp).toLocaleString():'-'}</td>
-            <td style="border:1px solid #ccc;padding:3px 5px;text-align:right;font-family:monospace;font-size:10px;${(a.credit_lbp||0)>0?'color:red;':''}">${(a.credit_lbp||0)>0?Number(a.credit_lbp).toLocaleString():'-'}</td>
-            <td style="border:1px solid #ccc;padding:3px 5px;text-align:right;font-family:monospace;font-size:10px;${(a.balance_lbp||0)>0?'color:green;':(a.balance_lbp||0)<0?'color:red;':''}">${Number(a.balance_lbp||0).toLocaleString()}</td>
-            <td style="border:1px solid #ccc;padding:3px 5px;text-align:right;font-family:monospace;font-size:10px;${(a.debit_usd||0)>0?'color:green;':''}">${(a.debit_usd||0)>0?'$'+Number(a.debit_usd).toLocaleString('en-US',{minimumFractionDigits:2}):'-'}</td>
-            <td style="border:1px solid #ccc;padding:3px 5px;text-align:right;font-family:monospace;font-size:10px;${(a.credit_usd||0)>0?'color:red;':''}">${(a.credit_usd||0)>0?'$'+Number(a.credit_usd).toLocaleString('en-US',{minimumFractionDigits:2}):'-'}</td>
-            <td style="border:1px solid #ccc;padding:3px 5px;text-align:right;font-family:monospace;font-size:10px;${(a.balance_usd||0)>0?'color:green;':(a.balance_usd||0)<0?'color:red;':''}">${'$'+Number(a.balance_usd||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-          </tr>`).join('')}</tbody>
-        </table>
-      </div>`;
-  };
-
-  const handleExportPdf = async () => {
-    const accs = sortedAccounts;
-    if (accs.length > 2000) {
-      toast.info('Generating PDF for large list, please wait...');
-    }
-    const CHUNK = 80;
-    const pages = [];
-    for (let i = 0; i < accs.length; i += CHUNK) {
-      pages.push(accs.slice(i, i + CHUNK));
-    }
-    const html = `
-      <div style="font-family:Arial,sans-serif;font-size:10px;color:#000;padding:10px;">
-        <h2 style="text-align:center;margin:0 0 2px;font-size:14px;">${currentOrg.name} - Chart of Accounts</h2>
-        <p style="text-align:center;color:#666;margin:0 0 6px;font-size:9px;">${accs.length} accounts | Generated ${new Date().toLocaleDateString()}</p>
-        ${pages.map((chunk, pi) => `
-          ${pi > 0 ? '<div style="page-break-before:always;"></div>' : ''}
-          <table style="width:100%;border-collapse:collapse;">
-            ${pi === 0 ? `<thead><tr style="background:#ddd;">
-              <th style="border:1px solid #999;padding:3px;text-align:left;font-size:9px;">Code</th>
-              <th style="border:1px solid #999;padding:3px;text-align:left;font-size:9px;">Name</th>
-              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Db LBP</th>
-              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Cr LBP</th>
-              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Bal LBP</th>
-              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Db USD</th>
-              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Cr USD</th>
-              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Bal USD</th>
-            </tr></thead>` : `<thead><tr style="background:#ddd;">
-              <th style="border:1px solid #999;padding:3px;text-align:left;font-size:9px;">Code</th>
-              <th style="border:1px solid #999;padding:3px;text-align:left;font-size:9px;">Name</th>
-              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Db LBP</th>
-              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Cr LBP</th>
-              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Bal LBP</th>
-              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Db USD</th>
-              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Cr USD</th>
-              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Bal USD</th>
-            </tr></thead>`}
-            <tbody>${chunk.map(a => `<tr>
-              <td style="border:1px solid #ccc;padding:2px 4px;font-family:monospace;font-size:9px;">${a.code}</td>
-              <td style="border:1px solid #ccc;padding:2px 4px;font-size:9px;">${a.name}</td>
-              <td style="border:1px solid #ccc;padding:2px 4px;text-align:right;font-family:monospace;font-size:9px;">${(a.debit_lbp||0)>0?Number(a.debit_lbp).toLocaleString():'-'}</td>
-              <td style="border:1px solid #ccc;padding:2px 4px;text-align:right;font-family:monospace;font-size:9px;">${(a.credit_lbp||0)>0?Number(a.credit_lbp).toLocaleString():'-'}</td>
-              <td style="border:1px solid #ccc;padding:2px 4px;text-align:right;font-family:monospace;font-size:9px;">${Number(a.balance_lbp||0).toLocaleString()}</td>
-              <td style="border:1px solid #ccc;padding:2px 4px;text-align:right;font-family:monospace;font-size:9px;">${(a.debit_usd||0)>0?'$'+Number(a.debit_usd).toFixed(2):'-'}</td>
-              <td style="border:1px solid #ccc;padding:2px 4px;text-align:right;font-family:monospace;font-size:9px;">${(a.credit_usd||0)>0?'$'+Number(a.credit_usd).toFixed(2):'-'}</td>
-              <td style="border:1px solid #ccc;padding:2px 4px;text-align:right;font-family:monospace;font-size:9px;">$${Number(a.balance_usd||0).toFixed(2)}</td>
-            </tr>`).join('')}</tbody>
-          </table>
-        `).join('')}
-        <table style="width:100%;border-collapse:collapse;margin-top:4px;">
-          <tr style="background:#ccc;font-weight:bold;">
-            <td style="border:1px solid #999;padding:3px;font-size:10px;" colspan="2">GRAND TOTAL</td>
-            <td style="border:1px solid #999;padding:3px;text-align:right;font-family:monospace;font-size:10px;">${Number(accs.reduce((s,a)=>s+(a.debit_lbp||0),0)).toLocaleString()}</td>
-            <td style="border:1px solid #999;padding:3px;text-align:right;font-family:monospace;font-size:10px;">${Number(accs.reduce((s,a)=>s+(a.credit_lbp||0),0)).toLocaleString()}</td>
-            <td style="border:1px solid #999;padding:3px;text-align:right;font-family:monospace;font-size:10px;">${Number(accs.reduce((s,a)=>s+(a.balance_lbp||0),0)).toLocaleString()}</td>
-            <td style="border:1px solid #999;padding:3px;text-align:right;font-family:monospace;font-size:10px;">$${Number(accs.reduce((s,a)=>s+(a.debit_usd||0),0)).toFixed(2)}</td>
-            <td style="border:1px solid #999;padding:3px;text-align:right;font-family:monospace;font-size:10px;">$${Number(accs.reduce((s,a)=>s+(a.credit_usd||0),0)).toFixed(2)}</td>
-            <td style="border:1px solid #999;padding:3px;text-align:right;font-family:monospace;font-size:10px;">$${Number(accs.reduce((s,a)=>s+(a.balance_usd||0),0)).toFixed(2)}</td>
-          </tr>
-        </table>
-      </div>`;
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    document.body.appendChild(container);
-    try {
-      await html2pdf().set({
-        margin: [5, 5, 5, 5],
-        filename: `COA_${currentOrg.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
-        image: { type: 'jpeg', quality: 0.8 },
-        html2canvas: { scale: 1.5, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-      }).from(container.querySelector('div')).save();
-      toast.success('PDF exported successfully');
-    } catch (err) {
-      toast.error('PDF export failed');
-    } finally {
-      document.body.removeChild(container);
-    }
+    const totals = {
+      db_lbp: accs.reduce((s,a)=>s+(a.debit_lbp||0),0),
+      cr_lbp: accs.reduce((s,a)=>s+(a.credit_lbp||0),0),
+      bal_lbp: accs.reduce((s,a)=>s+(a.balance_lbp||0),0),
+      db_usd: accs.reduce((s,a)=>s+(a.debit_usd||0),0),
+      cr_usd: accs.reduce((s,a)=>s+(a.credit_usd||0),0),
+      bal_usd: accs.reduce((s,a)=>s+(a.balance_usd||0),0),
+    };
+    const html = `<html><head><title>COA - ${currentOrg.name}</title>
+      <style>
+        @page { size: landscape; margin: 8mm; }
+        body{font-family:Arial,sans-serif;font-size:9px;color:#000;margin:0;padding:8px;}
+        h2{text-align:center;margin:0 0 2px;font-size:13px;}
+        p.sub{text-align:center;color:#666;margin:0 0 5px;font-size:8px;}
+        table{width:100%;border-collapse:collapse;}
+        th{background:#ddd;border:1px solid #999;padding:3px 4px;text-align:left;font-size:8px;}
+        td{border:1px solid #ccc;padding:2px 4px;font-size:8px;}
+        td.num{text-align:right;font-family:monospace;}
+        .pos{color:green;} .neg{color:red;}
+        .totals td{background:#ddd;font-weight:bold;border:1px solid #999;padding:3px 4px;font-size:9px;}
+      </style></head><body>
+      <h2>${currentOrg.name} - Chart of Accounts</h2>
+      <p class="sub">${accs.length} accounts | Generated ${new Date().toLocaleDateString()}</p>
+      <table>
+        <thead><tr><th>Code</th><th>Name</th><th style="text-align:right">Db LBP</th><th style="text-align:right">Cr LBP</th><th style="text-align:right">Bal LBP</th><th style="text-align:right">Db USD</th><th style="text-align:right">Cr USD</th><th style="text-align:right">Bal USD</th></tr></thead>
+        <tbody>${accs.map(a => `<tr>
+          <td style="font-family:monospace;font-weight:bold;">${a.code}</td>
+          <td>${a.name}</td>
+          <td class="num ${(a.debit_lbp||0)>0?'pos':''}">${(a.debit_lbp||0)>0?Number(a.debit_lbp).toLocaleString():'-'}</td>
+          <td class="num ${(a.credit_lbp||0)>0?'neg':''}">${(a.credit_lbp||0)>0?Number(a.credit_lbp).toLocaleString():'-'}</td>
+          <td class="num ${(a.balance_lbp||0)>0?'pos':(a.balance_lbp||0)<0?'neg':''}">${Number(a.balance_lbp||0).toLocaleString()}</td>
+          <td class="num ${(a.debit_usd||0)>0?'pos':''}">${(a.debit_usd||0)>0?'$'+Number(a.debit_usd).toFixed(2):'-'}</td>
+          <td class="num ${(a.credit_usd||0)>0?'neg':''}">${(a.credit_usd||0)>0?'$'+Number(a.credit_usd).toFixed(2):'-'}</td>
+          <td class="num ${(a.balance_usd||0)>0?'pos':(a.balance_usd||0)<0?'neg':''}">${'$'+Number(a.balance_usd||0).toFixed(2)}</td>
+        </tr>`).join('')}</tbody>
+        <tfoot><tr class="totals">
+          <td colspan="2">GRAND TOTAL (${accs.length})</td>
+          <td class="num pos">${Number(totals.db_lbp).toLocaleString()}</td>
+          <td class="num neg">${Number(totals.cr_lbp).toLocaleString()}</td>
+          <td class="num">${Number(totals.bal_lbp).toLocaleString()}</td>
+          <td class="num pos">$${Number(totals.db_usd).toFixed(2)}</td>
+          <td class="num neg">$${Number(totals.cr_usd).toFixed(2)}</td>
+          <td class="num">$${Number(totals.bal_usd).toFixed(2)}</td>
+        </tr></tfoot>
+      </table>
+      </body></html>`;
+    const win = window.open('', '_blank', 'width=1200,height=800');
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => win.print(), 300);
   };
 
   // Filtered list for the advanced filter dialog
