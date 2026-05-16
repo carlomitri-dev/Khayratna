@@ -506,37 +506,30 @@ const ChartOfAccountsPage = () => {
     const html = `
       <html><head><title>Chart of Accounts</title>
       <style>
-        @page { size: landscape; margin: 5mm; }
+        @page { size: landscape; margin: 10mm; }
         *{box-sizing:border-box;}
-        body{font-family:Arial,sans-serif;font-size:7px;color:#000;margin:0;padding:4px;}
-        h2{text-align:center;margin:0 0 1px;font-size:11px;}
-        p.sub{text-align:center;color:#666;margin:0 0 3px;font-size:7px;}
-        table{width:100%;border-collapse:collapse;table-layout:fixed;}
-        th,td{border:1px solid #aaa;padding:1px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-        th{background:#eee;font-size:7px;text-align:center;}
-        td{font-size:7px;}
-        .code{width:6%;font-family:monospace;font-weight:bold;}
-        .name{width:18%;text-align:left;}
-        .n{width:9.5%;text-align:right;font-family:monospace;}
+        body{font-family:Arial,sans-serif;font-size:14px;color:#000;margin:0;padding:10px;}
+        h2{text-align:center;margin:0 0 4px;font-size:20px;font-weight:bold;}
+        p.sub{text-align:center;color:#555;margin:0 0 8px;font-size:12px;}
+        table{width:100%;border-collapse:collapse;}
+        th{background:#ddd;border:1px solid #999;padding:6px 8px;font-size:14px;font-weight:bold;}
+        td{border:1px solid #bbb;padding:5px 8px;font-size:14px;}
+        .code{font-family:monospace;font-weight:bold;}
+        .n{text-align:right;font-family:monospace;}
         .pos{color:green;} .neg{color:red;}
-        tfoot td{background:#ddd;font-weight:bold;font-size:7px;}
+        tfoot td{background:#ddd;font-weight:bold;font-size:14px;border:1px solid #999;}
       </style></head><body>
       <h2>${currentOrg.name} - Chart of Accounts</h2>
       <p class="sub">${accs.length} accounts${codeLenFilter !== 'all' ? ' | Code: ' + (codeLenFilter === 'gt4' ? '>4' : codeLenFilter) + ' digits' : ''}${selectedClass !== 'all' ? ' | Class ' + selectedClass : ''}</p>
       <table>
-        <colgroup>
-          <col style="width:6%"><col style="width:16%"><col style="width:4%">
-          <col style="width:9.5%"><col style="width:9.5%"><col style="width:9.5%">
-          <col style="width:9.5%"><col style="width:9.5%"><col style="width:9.5%">
-        </colgroup>
         <thead><tr>
-          <th>Code</th><th style="text-align:left">Name</th><th>Type</th>
-          <th>Db LBP</th><th>Cr LBP</th><th>Bal LBP</th>
-          <th>Db USD</th><th>Cr USD</th><th>Bal USD</th>
+          <th style="text-align:left">Code</th><th style="text-align:left">Name</th><th>Type</th>
+          <th style="text-align:right">Db LBP</th><th style="text-align:right">Cr LBP</th><th style="text-align:right">Bal LBP</th>
+          <th style="text-align:right">Db USD</th><th style="text-align:right">Cr USD</th><th style="text-align:right">Bal USD</th>
         </tr></thead>
         <tbody>${accs.map(a => `<tr>
           <td class="code">${a.code}</td>
-          <td class="name">${a.name}</td>
+          <td>${a.name}</td>
           <td style="text-align:center">${a.account_type || ''}</td>
           <td class="n ${(a.debit_lbp||0)>0?'pos':''}">${fmtLbp(a.debit_lbp)}</td>
           <td class="n ${(a.credit_lbp||0)>0?'neg':''}">${fmtLbp(a.credit_lbp)}</td>
@@ -576,37 +569,30 @@ const ChartOfAccountsPage = () => {
     const fmtUsd = (v) => v ? '$' + Number(v).toFixed(2) : '-';
     const html = `<html><head><title>COA - ${currentOrg.name}</title>
       <style>
-        @page { size: landscape; margin: 5mm; }
+        @page { size: landscape; margin: 10mm; }
         *{box-sizing:border-box;}
-        body{font-family:Arial,sans-serif;font-size:7px;color:#000;margin:0;padding:4px;}
-        h2{text-align:center;margin:0 0 1px;font-size:11px;}
-        p.sub{text-align:center;color:#666;margin:0 0 3px;font-size:7px;}
-        table{width:100%;border-collapse:collapse;table-layout:fixed;}
-        th,td{border:1px solid #aaa;padding:1px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-        th{background:#ddd;font-size:7px;text-align:center;}
-        td{font-size:7px;}
-        .code{width:6%;font-family:monospace;font-weight:bold;}
-        .name{width:18%;text-align:left;}
-        .n{width:9.5%;text-align:right;font-family:monospace;}
+        body{font-family:Arial,sans-serif;font-size:14px;color:#000;margin:0;padding:10px;}
+        h2{text-align:center;margin:0 0 4px;font-size:20px;font-weight:bold;}
+        p.sub{text-align:center;color:#555;margin:0 0 8px;font-size:12px;}
+        table{width:100%;border-collapse:collapse;}
+        th{background:#ddd;border:1px solid #999;padding:6px 8px;font-size:14px;font-weight:bold;}
+        td{border:1px solid #bbb;padding:5px 8px;font-size:14px;}
+        .code{font-family:monospace;font-weight:bold;}
+        .n{text-align:right;font-family:monospace;}
         .pos{color:green;} .neg{color:red;}
-        .totals td{background:#ddd;font-weight:bold;font-size:7px;}
+        .totals td{background:#ddd;font-weight:bold;font-size:14px;border:1px solid #999;}
       </style></head><body>
       <h2>${currentOrg.name} - Chart of Accounts</h2>
       <p class="sub">${accs.length} accounts | Generated ${new Date().toLocaleDateString()}</p>
       <table>
-        <colgroup>
-          <col style="width:6%"><col style="width:18%">
-          <col style="width:9.5%"><col style="width:9.5%"><col style="width:9.5%">
-          <col style="width:9.5%"><col style="width:9.5%"><col style="width:9.5%">
-        </colgroup>
         <thead><tr>
-          <th>Code</th><th style="text-align:left">Name</th>
-          <th>Db LBP</th><th>Cr LBP</th><th>Bal LBP</th>
-          <th>Db USD</th><th>Cr USD</th><th>Bal USD</th>
+          <th style="text-align:left">Code</th><th style="text-align:left">Name</th>
+          <th style="text-align:right">Db LBP</th><th style="text-align:right">Cr LBP</th><th style="text-align:right">Bal LBP</th>
+          <th style="text-align:right">Db USD</th><th style="text-align:right">Cr USD</th><th style="text-align:right">Bal USD</th>
         </tr></thead>
         <tbody>${accs.map(a => `<tr>
           <td class="code">${a.code}</td>
-          <td class="name">${a.name}</td>
+          <td>${a.name}</td>
           <td class="n ${(a.debit_lbp||0)>0?'pos':''}">${fmtLbp(a.debit_lbp)}</td>
           <td class="n ${(a.credit_lbp||0)>0?'neg':''}">${fmtLbp(a.credit_lbp)}</td>
           <td class="n ${(a.balance_lbp||0)>0?'pos':(a.balance_lbp||0)<0?'neg':''}">${Number(a.balance_lbp||0).toLocaleString()}</td>
