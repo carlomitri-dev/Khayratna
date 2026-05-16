@@ -563,19 +563,79 @@ const ChartOfAccountsPage = () => {
   };
 
   const handleExportPdf = async () => {
-    const html = buildListHtml();
+    const accs = sortedAccounts;
+    if (accs.length > 2000) {
+      toast.info('Generating PDF for large list, please wait...');
+    }
+    const CHUNK = 80;
+    const pages = [];
+    for (let i = 0; i < accs.length; i += CHUNK) {
+      pages.push(accs.slice(i, i + CHUNK));
+    }
+    const html = `
+      <div style="font-family:Arial,sans-serif;font-size:10px;color:#000;padding:10px;">
+        <h2 style="text-align:center;margin:0 0 2px;font-size:14px;">${currentOrg.name} - Chart of Accounts</h2>
+        <p style="text-align:center;color:#666;margin:0 0 6px;font-size:9px;">${accs.length} accounts | Generated ${new Date().toLocaleDateString()}</p>
+        ${pages.map((chunk, pi) => `
+          ${pi > 0 ? '<div style="page-break-before:always;"></div>' : ''}
+          <table style="width:100%;border-collapse:collapse;">
+            ${pi === 0 ? `<thead><tr style="background:#ddd;">
+              <th style="border:1px solid #999;padding:3px;text-align:left;font-size:9px;">Code</th>
+              <th style="border:1px solid #999;padding:3px;text-align:left;font-size:9px;">Name</th>
+              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Db LBP</th>
+              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Cr LBP</th>
+              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Bal LBP</th>
+              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Db USD</th>
+              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Cr USD</th>
+              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Bal USD</th>
+            </tr></thead>` : `<thead><tr style="background:#ddd;">
+              <th style="border:1px solid #999;padding:3px;text-align:left;font-size:9px;">Code</th>
+              <th style="border:1px solid #999;padding:3px;text-align:left;font-size:9px;">Name</th>
+              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Db LBP</th>
+              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Cr LBP</th>
+              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Bal LBP</th>
+              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Db USD</th>
+              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Cr USD</th>
+              <th style="border:1px solid #999;padding:3px;text-align:right;font-size:9px;">Bal USD</th>
+            </tr></thead>`}
+            <tbody>${chunk.map(a => `<tr>
+              <td style="border:1px solid #ccc;padding:2px 4px;font-family:monospace;font-size:9px;">${a.code}</td>
+              <td style="border:1px solid #ccc;padding:2px 4px;font-size:9px;">${a.name}</td>
+              <td style="border:1px solid #ccc;padding:2px 4px;text-align:right;font-family:monospace;font-size:9px;">${(a.debit_lbp||0)>0?Number(a.debit_lbp).toLocaleString():'-'}</td>
+              <td style="border:1px solid #ccc;padding:2px 4px;text-align:right;font-family:monospace;font-size:9px;">${(a.credit_lbp||0)>0?Number(a.credit_lbp).toLocaleString():'-'}</td>
+              <td style="border:1px solid #ccc;padding:2px 4px;text-align:right;font-family:monospace;font-size:9px;">${Number(a.balance_lbp||0).toLocaleString()}</td>
+              <td style="border:1px solid #ccc;padding:2px 4px;text-align:right;font-family:monospace;font-size:9px;">${(a.debit_usd||0)>0?'$'+Number(a.debit_usd).toFixed(2):'-'}</td>
+              <td style="border:1px solid #ccc;padding:2px 4px;text-align:right;font-family:monospace;font-size:9px;">${(a.credit_usd||0)>0?'$'+Number(a.credit_usd).toFixed(2):'-'}</td>
+              <td style="border:1px solid #ccc;padding:2px 4px;text-align:right;font-family:monospace;font-size:9px;">$${Number(a.balance_usd||0).toFixed(2)}</td>
+            </tr>`).join('')}</tbody>
+          </table>
+        `).join('')}
+        <table style="width:100%;border-collapse:collapse;margin-top:4px;">
+          <tr style="background:#ccc;font-weight:bold;">
+            <td style="border:1px solid #999;padding:3px;font-size:10px;" colspan="2">GRAND TOTAL</td>
+            <td style="border:1px solid #999;padding:3px;text-align:right;font-family:monospace;font-size:10px;">${Number(accs.reduce((s,a)=>s+(a.debit_lbp||0),0)).toLocaleString()}</td>
+            <td style="border:1px solid #999;padding:3px;text-align:right;font-family:monospace;font-size:10px;">${Number(accs.reduce((s,a)=>s+(a.credit_lbp||0),0)).toLocaleString()}</td>
+            <td style="border:1px solid #999;padding:3px;text-align:right;font-family:monospace;font-size:10px;">${Number(accs.reduce((s,a)=>s+(a.balance_lbp||0),0)).toLocaleString()}</td>
+            <td style="border:1px solid #999;padding:3px;text-align:right;font-family:monospace;font-size:10px;">$${Number(accs.reduce((s,a)=>s+(a.debit_usd||0),0)).toFixed(2)}</td>
+            <td style="border:1px solid #999;padding:3px;text-align:right;font-family:monospace;font-size:10px;">$${Number(accs.reduce((s,a)=>s+(a.credit_usd||0),0)).toFixed(2)}</td>
+            <td style="border:1px solid #999;padding:3px;text-align:right;font-family:monospace;font-size:10px;">$${Number(accs.reduce((s,a)=>s+(a.balance_usd||0),0)).toFixed(2)}</td>
+          </tr>
+        </table>
+      </div>`;
     const container = document.createElement('div');
     container.innerHTML = html;
     document.body.appendChild(container);
     try {
       await html2pdf().set({
-        margin: [6, 6, 6, 6],
+        margin: [5, 5, 5, 5],
         filename: `COA_${currentOrg.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true },
+        image: { type: 'jpeg', quality: 0.8 },
+        html2canvas: { scale: 1.5, useCORS: true, logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       }).from(container.querySelector('div')).save();
+      toast.success('PDF exported successfully');
+    } catch (err) {
+      toast.error('PDF export failed');
     } finally {
       document.body.removeChild(container);
     }
@@ -1465,6 +1525,30 @@ const ChartOfAccountsPage = () => {
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr className="bg-muted/50 font-bold border-t-2 border-border">
+                      <td className="px-4 py-2" colSpan={3}>Class {classNum} Totals</td>
+                      <td className="px-4 py-2 text-right font-mono text-emerald-500">
+                        {formatLBP(classAccounts.reduce((s, a) => s + (a.debit_lbp || 0), 0))}
+                      </td>
+                      <td className="px-4 py-2 text-right font-mono text-red-400">
+                        {formatLBP(classAccounts.reduce((s, a) => s + (a.credit_lbp || 0), 0))}
+                      </td>
+                      <td className="px-4 py-2 text-right font-mono">
+                        {formatLBP(classAccounts.reduce((s, a) => s + (a.balance_lbp || 0), 0))}
+                      </td>
+                      <td className="px-4 py-2 text-right font-mono text-emerald-500">
+                        ${formatUSD(classAccounts.reduce((s, a) => s + (a.debit_usd || 0), 0))}
+                      </td>
+                      <td className="px-4 py-2 text-right font-mono text-red-400">
+                        ${formatUSD(classAccounts.reduce((s, a) => s + (a.credit_usd || 0), 0))}
+                      </td>
+                      <td className="px-4 py-2 text-right font-mono">
+                        ${formatUSD(classAccounts.reduce((s, a) => s + (a.balance_usd || 0), 0))}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </CardContent>
             </Card>
@@ -1478,6 +1562,50 @@ const ChartOfAccountsPage = () => {
                 {searchTerm ? 'Try adjusting your search' : accounts.length === 0 ? 'Seed LCOA, import CSV, or add your first account' : 'Add your first account to get started'}
               </p>
             </div>
+          )}
+          
+          {/* Grand Totals */}
+          {filteredAccounts.length > 0 && (
+            <Card className="border-2 border-primary/30">
+              <CardContent className="p-3">
+                <div className="hidden lg:block">
+                  <table className="w-full text-sm">
+                    <tbody>
+                      <tr className="font-bold">
+                        <td className="px-4 py-2 w-24">GRAND</td>
+                        <td className="px-4 py-2">TOTAL ({filteredAccounts.length} accounts)</td>
+                        <td className="px-4 py-2"></td>
+                        <td className="px-4 py-2 text-right font-mono text-emerald-500">
+                          {formatLBP(filteredAccounts.reduce((s, a) => s + (a.debit_lbp || 0), 0))}
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono text-red-400">
+                          {formatLBP(filteredAccounts.reduce((s, a) => s + (a.credit_lbp || 0), 0))}
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono font-bold">
+                          {formatLBP(filteredAccounts.reduce((s, a) => s + (a.balance_lbp || 0), 0))}
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono text-emerald-500">
+                          ${formatUSD(filteredAccounts.reduce((s, a) => s + (a.debit_usd || 0), 0))}
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono text-red-400">
+                          ${formatUSD(filteredAccounts.reduce((s, a) => s + (a.credit_usd || 0), 0))}
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono font-bold">
+                          ${formatUSD(filteredAccounts.reduce((s, a) => s + (a.balance_usd || 0), 0))}
+                        </td>
+                        <td className="w-28"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="lg:hidden grid grid-cols-2 gap-3 text-sm font-bold">
+                  <div><span className="text-xs text-muted-foreground">Total Debit USD</span><p className="font-mono text-emerald-500">${formatUSD(filteredAccounts.reduce((s, a) => s + (a.debit_usd || 0), 0))}</p></div>
+                  <div><span className="text-xs text-muted-foreground">Total Credit USD</span><p className="font-mono text-red-400">${formatUSD(filteredAccounts.reduce((s, a) => s + (a.credit_usd || 0), 0))}</p></div>
+                  <div><span className="text-xs text-muted-foreground">Total Balance USD</span><p className="font-mono">${formatUSD(filteredAccounts.reduce((s, a) => s + (a.balance_usd || 0), 0))}</p></div>
+                  <div><span className="text-xs text-muted-foreground">{filteredAccounts.length} accounts</span></div>
+                </div>
+              </CardContent>
+            </Card>
           )}
           
           {/* Load More */}

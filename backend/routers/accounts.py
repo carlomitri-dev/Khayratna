@@ -255,23 +255,42 @@ async def get_accounts(
             acc['debit_usd'] = bal_usd if bal_usd > 0 else 0
             acc['credit_usd'] = abs(bal_usd) if bal_usd < 0 else 0
     
-    # Calculate parent account balances from children
-    code_balances = {}
+    # Calculate parent account balances AND debit/credit from children
+    code_data = {}
     for acc in accounts:
         code = acc.get('code', '')
-        code_balances[code] = {'lbp': acc.get('balance_lbp', 0) or 0, 'usd': acc.get('balance_usd', 0) or 0}
+        code_data[code] = {
+            'lbp': acc.get('balance_lbp', 0) or 0,
+            'usd': acc.get('balance_usd', 0) or 0,
+            'debit_lbp': acc.get('debit_lbp', 0) or 0,
+            'credit_lbp': acc.get('credit_lbp', 0) or 0,
+            'debit_usd': acc.get('debit_usd', 0) or 0,
+            'credit_usd': acc.get('credit_usd', 0) or 0,
+        }
     
     for acc in accounts:
         code = acc.get('code', '')
         if code and len(code) <= 4:
             child_lbp = 0
             child_usd = 0
-            for other_code, bal in code_balances.items():
+            child_debit_lbp = 0
+            child_credit_lbp = 0
+            child_debit_usd = 0
+            child_credit_usd = 0
+            for other_code, d in code_data.items():
                 if other_code.startswith(code) and len(other_code) > len(code):
-                    child_lbp += bal['lbp']
-                    child_usd += bal['usd']
+                    child_lbp += d['lbp']
+                    child_usd += d['usd']
+                    child_debit_lbp += d['debit_lbp']
+                    child_credit_lbp += d['credit_lbp']
+                    child_debit_usd += d['debit_usd']
+                    child_credit_usd += d['credit_usd']
             acc['balance_lbp'] = child_lbp
             acc['balance_usd'] = child_usd
+            acc['debit_lbp'] = child_debit_lbp
+            acc['credit_lbp'] = child_credit_lbp
+            acc['debit_usd'] = child_debit_usd
+            acc['credit_usd'] = child_credit_usd
     
     return {"accounts": accounts, "total": total}
 
