@@ -501,45 +501,62 @@ const ChartOfAccountsPage = () => {
 
   const handlePrintList = () => {
     const accs = sortedAccounts;
+    const fmtLbp = (v) => v ? Number(v).toLocaleString() : '-';
+    const fmtUsd = (v) => v ? '$' + Number(v).toFixed(2) : '-';
     const html = `
       <html><head><title>Chart of Accounts</title>
       <style>
-        body{font-family:Arial,sans-serif;font-size:12px;color:#000;margin:20px;}
-        h2{text-align:center;margin-bottom:4px;}
-        p.sub{text-align:center;color:#666;margin-top:0;font-size:11px;}
-        table{width:100%;border-collapse:collapse;margin-top:10px;}
-        th{background:#eee;border:1px solid #999;padding:5px 6px;text-align:left;font-size:11px;}
-        td{border:1px solid #ccc;padding:4px 6px;font-size:11px;}
-        td.num{text-align:right;font-family:monospace;}
+        @page { size: landscape; margin: 5mm; }
+        *{box-sizing:border-box;}
+        body{font-family:Arial,sans-serif;font-size:7px;color:#000;margin:0;padding:4px;}
+        h2{text-align:center;margin:0 0 1px;font-size:11px;}
+        p.sub{text-align:center;color:#666;margin:0 0 3px;font-size:7px;}
+        table{width:100%;border-collapse:collapse;table-layout:fixed;}
+        th,td{border:1px solid #aaa;padding:1px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        th{background:#eee;font-size:7px;text-align:center;}
+        td{font-size:7px;}
+        .code{width:6%;font-family:monospace;font-weight:bold;}
+        .name{width:18%;text-align:left;}
+        .n{width:9.5%;text-align:right;font-family:monospace;}
         .pos{color:green;} .neg{color:red;}
+        tfoot td{background:#ddd;font-weight:bold;font-size:7px;}
       </style></head><body>
       <h2>${currentOrg.name} - Chart of Accounts</h2>
-      <p class="sub">${accs.length} accounts${codeLenFilter !== 'all' ? ' (Code length: ' + (codeLenFilter === 'gt4' ? '>4' : codeLenFilter) + ' digits)' : ''}${selectedClass !== 'all' ? ' | Class ' + selectedClass : ''}</p>
+      <p class="sub">${accs.length} accounts${codeLenFilter !== 'all' ? ' | Code: ' + (codeLenFilter === 'gt4' ? '>4' : codeLenFilter) + ' digits' : ''}${selectedClass !== 'all' ? ' | Class ' + selectedClass : ''}</p>
       <table>
-        <thead><tr><th>Code</th><th>Account Name</th><th>Type</th><th>Debit LBP</th><th>Credit LBP</th><th>Balance LBP</th><th>Debit USD</th><th>Credit USD</th><th>Balance USD</th></tr></thead>
+        <colgroup>
+          <col style="width:6%"><col style="width:16%"><col style="width:4%">
+          <col style="width:9.5%"><col style="width:9.5%"><col style="width:9.5%">
+          <col style="width:9.5%"><col style="width:9.5%"><col style="width:9.5%">
+        </colgroup>
+        <thead><tr>
+          <th>Code</th><th style="text-align:left">Name</th><th>Type</th>
+          <th>Db LBP</th><th>Cr LBP</th><th>Bal LBP</th>
+          <th>Db USD</th><th>Cr USD</th><th>Bal USD</th>
+        </tr></thead>
         <tbody>${accs.map(a => `<tr>
-          <td style="font-family:monospace;font-weight:bold;">${a.code}</td>
-          <td>${a.name}</td>
-          <td>${a.account_type || ''}</td>
-          <td class="num ${(a.debit_lbp||0)>0?'pos':''}">${(a.debit_lbp||0)>0?Number(a.debit_lbp).toLocaleString():'-'}</td>
-          <td class="num ${(a.credit_lbp||0)>0?'neg':''}">${(a.credit_lbp||0)>0?Number(a.credit_lbp).toLocaleString():'-'}</td>
-          <td class="num ${(a.balance_lbp||0)>0?'pos':(a.balance_lbp||0)<0?'neg':''}">${Number(a.balance_lbp||0).toLocaleString()}</td>
-          <td class="num ${(a.debit_usd||0)>0?'pos':''}">${(a.debit_usd||0)>0?'$'+Number(a.debit_usd).toLocaleString('en-US',{minimumFractionDigits:2}):'-'}</td>
-          <td class="num ${(a.credit_usd||0)>0?'neg':''}">${(a.credit_usd||0)>0?'$'+Number(a.credit_usd).toLocaleString('en-US',{minimumFractionDigits:2}):'-'}</td>
-          <td class="num ${(a.balance_usd||0)>0?'pos':(a.balance_usd||0)<0?'neg':''}">${'$'+Number(a.balance_usd||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+          <td class="code">${a.code}</td>
+          <td class="name">${a.name}</td>
+          <td style="text-align:center">${a.account_type || ''}</td>
+          <td class="n ${(a.debit_lbp||0)>0?'pos':''}">${fmtLbp(a.debit_lbp)}</td>
+          <td class="n ${(a.credit_lbp||0)>0?'neg':''}">${fmtLbp(a.credit_lbp)}</td>
+          <td class="n ${(a.balance_lbp||0)>0?'pos':(a.balance_lbp||0)<0?'neg':''}">${Number(a.balance_lbp||0).toLocaleString()}</td>
+          <td class="n ${(a.debit_usd||0)>0?'pos':''}">${fmtUsd(a.debit_usd)}</td>
+          <td class="n ${(a.credit_usd||0)>0?'neg':''}">${fmtUsd(a.credit_usd)}</td>
+          <td class="n ${(a.balance_usd||0)>0?'pos':(a.balance_usd||0)<0?'neg':''}">${'$'+Number(a.balance_usd||0).toFixed(2)}</td>
         </tr>`).join('')}</tbody>
-        <tfoot><tr style="background:#ddd;font-weight:bold;">
-          <td style="border:1px solid #999;padding:5px 6px;font-size:11px;" colspan="3">GRAND TOTAL (${accs.length} accounts)</td>
-          <td class="num" style="border:1px solid #999;padding:5px 6px;font-size:11px;color:green;">${Number(accs.reduce((s,a)=>s+(a.debit_lbp||0),0)).toLocaleString()}</td>
-          <td class="num" style="border:1px solid #999;padding:5px 6px;font-size:11px;color:red;">${Number(accs.reduce((s,a)=>s+(a.credit_lbp||0),0)).toLocaleString()}</td>
-          <td class="num" style="border:1px solid #999;padding:5px 6px;font-size:11px;">${Number(accs.reduce((s,a)=>s+(a.balance_lbp||0),0)).toLocaleString()}</td>
-          <td class="num" style="border:1px solid #999;padding:5px 6px;font-size:11px;color:green;">$${Number(accs.reduce((s,a)=>s+(a.debit_usd||0),0)).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-          <td class="num" style="border:1px solid #999;padding:5px 6px;font-size:11px;color:red;">$${Number(accs.reduce((s,a)=>s+(a.credit_usd||0),0)).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-          <td class="num" style="border:1px solid #999;padding:5px 6px;font-size:11px;">$${Number(accs.reduce((s,a)=>s+(a.balance_usd||0),0)).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+        <tfoot><tr>
+          <td colspan="3" style="text-align:right">TOTAL (${accs.length})</td>
+          <td class="n pos">${Number(accs.reduce((s,a)=>s+(a.debit_lbp||0),0)).toLocaleString()}</td>
+          <td class="n neg">${Number(accs.reduce((s,a)=>s+(a.credit_lbp||0),0)).toLocaleString()}</td>
+          <td class="n">${Number(accs.reduce((s,a)=>s+(a.balance_lbp||0),0)).toLocaleString()}</td>
+          <td class="n pos">$${Number(accs.reduce((s,a)=>s+(a.debit_usd||0),0)).toFixed(2)}</td>
+          <td class="n neg">$${Number(accs.reduce((s,a)=>s+(a.credit_usd||0),0)).toFixed(2)}</td>
+          <td class="n">$${Number(accs.reduce((s,a)=>s+(a.balance_usd||0),0)).toFixed(2)}</td>
         </tr></tfoot>
       </table>
       </body></html>`;
-    const win = window.open('', '_blank', 'width=1100,height=800');
+    const win = window.open('', '_blank', 'width=1200,height=800');
     win.document.write(html);
     win.document.close();
     setTimeout(() => win.print(), 300);
@@ -555,41 +572,56 @@ const ChartOfAccountsPage = () => {
       cr_usd: accs.reduce((s,a)=>s+(a.credit_usd||0),0),
       bal_usd: accs.reduce((s,a)=>s+(a.balance_usd||0),0),
     };
+    const fmtLbp = (v) => v ? Number(v).toLocaleString() : '-';
+    const fmtUsd = (v) => v ? '$' + Number(v).toFixed(2) : '-';
     const html = `<html><head><title>COA - ${currentOrg.name}</title>
       <style>
-        @page { size: landscape; margin: 8mm; }
-        body{font-family:Arial,sans-serif;font-size:9px;color:#000;margin:0;padding:8px;}
-        h2{text-align:center;margin:0 0 2px;font-size:13px;}
-        p.sub{text-align:center;color:#666;margin:0 0 5px;font-size:8px;}
-        table{width:100%;border-collapse:collapse;}
-        th{background:#ddd;border:1px solid #999;padding:3px 4px;text-align:left;font-size:8px;}
-        td{border:1px solid #ccc;padding:2px 4px;font-size:8px;}
-        td.num{text-align:right;font-family:monospace;}
+        @page { size: landscape; margin: 5mm; }
+        *{box-sizing:border-box;}
+        body{font-family:Arial,sans-serif;font-size:7px;color:#000;margin:0;padding:4px;}
+        h2{text-align:center;margin:0 0 1px;font-size:11px;}
+        p.sub{text-align:center;color:#666;margin:0 0 3px;font-size:7px;}
+        table{width:100%;border-collapse:collapse;table-layout:fixed;}
+        th,td{border:1px solid #aaa;padding:1px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        th{background:#ddd;font-size:7px;text-align:center;}
+        td{font-size:7px;}
+        .code{width:6%;font-family:monospace;font-weight:bold;}
+        .name{width:18%;text-align:left;}
+        .n{width:9.5%;text-align:right;font-family:monospace;}
         .pos{color:green;} .neg{color:red;}
-        .totals td{background:#ddd;font-weight:bold;border:1px solid #999;padding:3px 4px;font-size:9px;}
+        .totals td{background:#ddd;font-weight:bold;font-size:7px;}
       </style></head><body>
       <h2>${currentOrg.name} - Chart of Accounts</h2>
       <p class="sub">${accs.length} accounts | Generated ${new Date().toLocaleDateString()}</p>
       <table>
-        <thead><tr><th>Code</th><th>Name</th><th style="text-align:right">Db LBP</th><th style="text-align:right">Cr LBP</th><th style="text-align:right">Bal LBP</th><th style="text-align:right">Db USD</th><th style="text-align:right">Cr USD</th><th style="text-align:right">Bal USD</th></tr></thead>
+        <colgroup>
+          <col style="width:6%"><col style="width:18%">
+          <col style="width:9.5%"><col style="width:9.5%"><col style="width:9.5%">
+          <col style="width:9.5%"><col style="width:9.5%"><col style="width:9.5%">
+        </colgroup>
+        <thead><tr>
+          <th>Code</th><th style="text-align:left">Name</th>
+          <th>Db LBP</th><th>Cr LBP</th><th>Bal LBP</th>
+          <th>Db USD</th><th>Cr USD</th><th>Bal USD</th>
+        </tr></thead>
         <tbody>${accs.map(a => `<tr>
-          <td style="font-family:monospace;font-weight:bold;">${a.code}</td>
-          <td>${a.name}</td>
-          <td class="num ${(a.debit_lbp||0)>0?'pos':''}">${(a.debit_lbp||0)>0?Number(a.debit_lbp).toLocaleString():'-'}</td>
-          <td class="num ${(a.credit_lbp||0)>0?'neg':''}">${(a.credit_lbp||0)>0?Number(a.credit_lbp).toLocaleString():'-'}</td>
-          <td class="num ${(a.balance_lbp||0)>0?'pos':(a.balance_lbp||0)<0?'neg':''}">${Number(a.balance_lbp||0).toLocaleString()}</td>
-          <td class="num ${(a.debit_usd||0)>0?'pos':''}">${(a.debit_usd||0)>0?'$'+Number(a.debit_usd).toFixed(2):'-'}</td>
-          <td class="num ${(a.credit_usd||0)>0?'neg':''}">${(a.credit_usd||0)>0?'$'+Number(a.credit_usd).toFixed(2):'-'}</td>
-          <td class="num ${(a.balance_usd||0)>0?'pos':(a.balance_usd||0)<0?'neg':''}">${'$'+Number(a.balance_usd||0).toFixed(2)}</td>
+          <td class="code">${a.code}</td>
+          <td class="name">${a.name}</td>
+          <td class="n ${(a.debit_lbp||0)>0?'pos':''}">${fmtLbp(a.debit_lbp)}</td>
+          <td class="n ${(a.credit_lbp||0)>0?'neg':''}">${fmtLbp(a.credit_lbp)}</td>
+          <td class="n ${(a.balance_lbp||0)>0?'pos':(a.balance_lbp||0)<0?'neg':''}">${Number(a.balance_lbp||0).toLocaleString()}</td>
+          <td class="n ${(a.debit_usd||0)>0?'pos':''}">${fmtUsd(a.debit_usd)}</td>
+          <td class="n ${(a.credit_usd||0)>0?'neg':''}">${fmtUsd(a.credit_usd)}</td>
+          <td class="n ${(a.balance_usd||0)>0?'pos':(a.balance_usd||0)<0?'neg':''}">${'$'+Number(a.balance_usd||0).toFixed(2)}</td>
         </tr>`).join('')}</tbody>
         <tfoot><tr class="totals">
-          <td colspan="2">GRAND TOTAL (${accs.length})</td>
-          <td class="num pos">${Number(totals.db_lbp).toLocaleString()}</td>
-          <td class="num neg">${Number(totals.cr_lbp).toLocaleString()}</td>
-          <td class="num">${Number(totals.bal_lbp).toLocaleString()}</td>
-          <td class="num pos">$${Number(totals.db_usd).toFixed(2)}</td>
-          <td class="num neg">$${Number(totals.cr_usd).toFixed(2)}</td>
-          <td class="num">$${Number(totals.bal_usd).toFixed(2)}</td>
+          <td colspan="2" style="text-align:right">TOTAL (${accs.length})</td>
+          <td class="n pos">${Number(totals.db_lbp).toLocaleString()}</td>
+          <td class="n neg">${Number(totals.cr_lbp).toLocaleString()}</td>
+          <td class="n">${Number(totals.bal_lbp).toLocaleString()}</td>
+          <td class="n pos">$${Number(totals.db_usd).toFixed(2)}</td>
+          <td class="n neg">$${Number(totals.cr_usd).toFixed(2)}</td>
+          <td class="n">$${Number(totals.bal_usd).toFixed(2)}</td>
         </tr></tfoot>
       </table>
       </body></html>`;
