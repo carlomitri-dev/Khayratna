@@ -30,6 +30,7 @@ import axios from 'axios';
 import html2pdf from 'html2pdf.js';
 import { formatLBP, formatUSD, getAccountClassName, getNumberClass } from '../lib/utils';
 import LedgerDialog from '../components/LedgerDialog';
+import AccountSelector from '../components/selectors/AccountSelector';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -89,6 +90,10 @@ const ChartOfAccountsPage = () => {
   const [creatingParents, setCreatingParents] = useState(false);
   const [txnFilter, setTxnFilter] = useState('all'); // all, with-txn, no-txn
   const [loadingAll, setLoadingAll] = useState(false);
+  const [fromAccId, setFromAccId] = useState('');
+  const [fromAccCode, setFromAccCode] = useState('');
+  const [toAccId, setToAccId] = useState('');
+  const [toAccCode, setToAccCode] = useState('');
 
   useEffect(() => {
     if (currentOrg) {
@@ -411,7 +416,9 @@ const ChartOfAccountsPage = () => {
     const matchesTxn = txnFilter === 'all' ||
       (txnFilter === 'with-txn' && hasTxn) ||
       (txnFilter === 'no-txn' && !hasTxn);
-    return matchesSearch && matchesClass && matchesCodeLen && matchesTxn;
+    const matchesFromAcc = !fromAccCode || account.code >= fromAccCode;
+    const matchesToAcc = !toAccCode || account.code <= toAccCode;
+    return matchesSearch && matchesClass && matchesCodeLen && matchesTxn && matchesFromAcc && matchesToAcc;
   });
 
   const sortedAccounts = sortField ? [...filteredAccounts].sort((a, b) => {
@@ -1396,6 +1403,52 @@ const ChartOfAccountsPage = () => {
             <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleExportPdf} disabled={!accounts.length} data-testid="export-pdf-btn">
               <FileDown className="w-3 h-3 mr-1" /> PDF
             </Button>
+          </div>
+          {/* Row 3: Account range */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Label className="text-xs font-medium whitespace-nowrap">From Account:</Label>
+              <div className="w-[200px]">
+                <AccountSelector
+                  fetchUrl="/accounts"
+                  fetchParams={{ organization_id: currentOrg?.id }}
+                  value={fromAccId}
+                  onChange={(id) => {
+                    setFromAccId(id);
+                    if (id) {
+                      axios.get(`${API}/accounts/${id}`).then(r => setFromAccCode(r.data.code)).catch(() => {});
+                    } else { setFromAccCode(''); }
+                  }}
+                  placeholder="From..."
+                  showBalance={false}
+                  data-testid="coa-from-account"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs font-medium whitespace-nowrap">To Account:</Label>
+              <div className="w-[200px]">
+                <AccountSelector
+                  fetchUrl="/accounts"
+                  fetchParams={{ organization_id: currentOrg?.id }}
+                  value={toAccId}
+                  onChange={(id) => {
+                    setToAccId(id);
+                    if (id) {
+                      axios.get(`${API}/accounts/${id}`).then(r => setToAccCode(r.data.code)).catch(() => {});
+                    } else { setToAccCode(''); }
+                  }}
+                  placeholder="To..."
+                  showBalance={false}
+                  data-testid="coa-to-account"
+                />
+              </div>
+            </div>
+            {(fromAccCode || toAccCode) && (
+              <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setFromAccId(''); setFromAccCode(''); setToAccId(''); setToAccCode(''); }}>
+                Clear Range
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
