@@ -27,6 +27,7 @@ import {
   Filter, Printer, WifiOff, RefreshCw
 } from 'lucide-react';
 import axios from 'axios';
+import html2pdf from 'html2pdf.js';
 import { formatLBP, formatUSD, getAccountClassName, getNumberClass } from '../lib/utils';
 import LedgerDialog from '../components/LedgerDialog';
 
@@ -41,7 +42,7 @@ const ChartOfAccountsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
-  const PAGE_SIZE = 200;
+  const PAGE_SIZE = 500;
   const [selectedClass, setSelectedClass] = useState('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [seedDialogOpen, setSeedDialogOpen] = useState(false);
@@ -86,6 +87,8 @@ const ChartOfAccountsPage = () => {
   const [healthData, setHealthData] = useState(null);
   const [healthLoading, setHealthLoading] = useState(false);
   const [creatingParents, setCreatingParents] = useState(false);
+  const [txnFilter, setTxnFilter] = useState('all'); // all, with-txn, no-txn
+  const [loadingAll, setLoadingAll] = useState(false);
 
   useEffect(() => {
     if (currentOrg) {
@@ -133,6 +136,33 @@ const ChartOfAccountsPage = () => {
 
   const handleLoadMore = () => fetchAccounts(false);
   const hasMore = accounts.length < totalCount;
+
+  const handleLoadAll = async () => {
+    setLoadingAll(true);
+    try {
+      const params = new URLSearchParams({ 
+        organization_id: currentOrg.id,
+        skip: 0,
+        limit: 10000
+      });
+      if (selectedFY?.id) params.append('fy_id', selectedFY.id);
+      if (searchTerm) params.append('search', searchTerm);
+      if (dateFrom) params.append('from_date', dateFrom);
+      if (dateTo) params.append('to_date', dateTo);
+      const response = await axios.get(`${API}/accounts?${params.toString()}`);
+      const data = response.data;
+      const accts = data.accounts || data;
+      const total = data.total || (Array.isArray(data) ? data.length : 0);
+      setAccounts(Array.isArray(accts) ? accts : []);
+      setTotalCount(total);
+      setCurrentPage(Math.ceil(total / PAGE_SIZE));
+    } catch (error) {
+      console.error('Failed to load all accounts:', error);
+      toast.error('Failed to load all accounts');
+    } finally {
+      setLoadingAll(false);
+    }
+  };
 
   const handleCreateAccount = async (e) => {
     e.preventDefault();
@@ -375,7 +405,13 @@ const ChartOfAccountsPage = () => {
       (codeLenFilter === '3' && codeLen === 3) ||
       (codeLenFilter === '4' && codeLen === 4) ||
       (codeLenFilter === 'gt4' && codeLen > 4);
-    return matchesSearch && matchesClass && matchesCodeLen;
+    const hasTxn = (account.debit_usd || 0) !== 0 || (account.credit_usd || 0) !== 0 || 
+                   (account.debit_lbp || 0) !== 0 || (account.credit_lbp || 0) !== 0 ||
+                   (account.balance_usd || 0) !== 0 || (account.balance_lbp || 0) !== 0;
+    const matchesTxn = txnFilter === 'all' ||
+      (txnFilter === 'with-txn' && hasTxn) ||
+      (txnFilter === 'no-txn' && !hasTxn);
+    return matchesSearch && matchesClass && matchesCodeLen && matchesTxn;
   });
 
   const sortedAccounts = sortField ? [...filteredAccounts].sort((a, b) => {
@@ -491,6 +527,58 @@ const ChartOfAccountsPage = () => {
     win.document.write(html);
     win.document.close();
     setTimeout(() => win.print(), 300);
+  };
+
+  const buildListHtml = () => {
+    const accs = sortedAccounts;
+    return `
+      <div style="font-family:Arial,sans-serif;font-size:11px;color:#000;padding:15px;">
+        <h2 style="text-align:center;margin-bottom:4px;font-size:16px;">${currentOrg.name} - Chart of Accounts</h2>
+        <p style="text-align:center;color:#666;margin-top:0;font-size:10px;">${accs.length} accounts${codeLenFilter !== 'all' ? ' (Code length: ' + (codeLenFilter === 'gt4' ? '>4' : codeLenFilter) + ' digits)' : ''}${selectedClass !== 'all' ? ' | Class ' + selectedClass : ''}${txnFilter !== 'all' ? ' | ' + (txnFilter === 'with-txn' ? 'With transactions' : 'No transactions') : ''}</p>
+        <table style="width:100%;border-collapse:collapse;margin-top:8px;">
+          <thead><tr style="background:#eee;">
+            <th style="border:1px solid #999;padding:4px 5px;text-align:left;font-size:10px;">Code</th>
+            <th style="border:1px solid #999;padding:4px 5px;text-align:left;font-size:10px;">Account Name</th>
+            <th style="border:1px solid #999;padding:4px 5px;text-align:left;font-size:10px;">Type</th>
+            <th style="border:1px solid #999;padding:4px 5px;text-align:right;font-size:10px;">Db LBP</th>
+            <th style="border:1px solid #999;padding:4px 5px;text-align:right;font-size:10px;">Cr LBP</th>
+            <th style="border:1px solid #999;padding:4px 5px;text-align:right;font-size:10px;">Bal LBP</th>
+            <th style="border:1px solid #999;padding:4px 5px;text-align:right;font-size:10px;">Db USD</th>
+            <th style="border:1px solid #999;padding:4px 5px;text-align:right;font-size:10px;">Cr USD</th>
+            <th style="border:1px solid #999;padding:4px 5px;text-align:right;font-size:10px;">Bal USD</th>
+          </tr></thead>
+          <tbody>${accs.map(a => `<tr>
+            <td style="border:1px solid #ccc;padding:3px 5px;font-family:monospace;font-weight:bold;font-size:10px;">${a.code}</td>
+            <td style="border:1px solid #ccc;padding:3px 5px;font-size:10px;">${a.name}</td>
+            <td style="border:1px solid #ccc;padding:3px 5px;font-size:10px;">${a.account_type || ''}</td>
+            <td style="border:1px solid #ccc;padding:3px 5px;text-align:right;font-family:monospace;font-size:10px;${(a.debit_lbp||0)>0?'color:green;':''}">${(a.debit_lbp||0)>0?Number(a.debit_lbp).toLocaleString():'-'}</td>
+            <td style="border:1px solid #ccc;padding:3px 5px;text-align:right;font-family:monospace;font-size:10px;${(a.credit_lbp||0)>0?'color:red;':''}">${(a.credit_lbp||0)>0?Number(a.credit_lbp).toLocaleString():'-'}</td>
+            <td style="border:1px solid #ccc;padding:3px 5px;text-align:right;font-family:monospace;font-size:10px;${(a.balance_lbp||0)>0?'color:green;':(a.balance_lbp||0)<0?'color:red;':''}">${Number(a.balance_lbp||0).toLocaleString()}</td>
+            <td style="border:1px solid #ccc;padding:3px 5px;text-align:right;font-family:monospace;font-size:10px;${(a.debit_usd||0)>0?'color:green;':''}">${(a.debit_usd||0)>0?'$'+Number(a.debit_usd).toLocaleString('en-US',{minimumFractionDigits:2}):'-'}</td>
+            <td style="border:1px solid #ccc;padding:3px 5px;text-align:right;font-family:monospace;font-size:10px;${(a.credit_usd||0)>0?'color:red;':''}">${(a.credit_usd||0)>0?'$'+Number(a.credit_usd).toLocaleString('en-US',{minimumFractionDigits:2}):'-'}</td>
+            <td style="border:1px solid #ccc;padding:3px 5px;text-align:right;font-family:monospace;font-size:10px;${(a.balance_usd||0)>0?'color:green;':(a.balance_usd||0)<0?'color:red;':''}">${'$'+Number(a.balance_usd||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+  };
+
+  const handleExportPdf = async () => {
+    const html = buildListHtml();
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    document.body.appendChild(container);
+    try {
+      await html2pdf().set({
+        margin: [6, 6, 6, 6],
+        filename: `COA_${currentOrg.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      }).from(container.querySelector('div')).save();
+    } finally {
+      document.body.removeChild(container);
+    }
   };
 
   // Filtered list for the advanced filter dialog
@@ -1210,6 +1298,16 @@ const ChartOfAccountsPage = () => {
                 <SelectItem value="gt4">&gt;4 Digits</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={txnFilter} onValueChange={setTxnFilter}>
+              <SelectTrigger className="w-full sm:w-[150px] text-sm h-9" data-testid="txn-filter">
+                <SelectValue placeholder="Transactions" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Accounts</SelectItem>
+                <SelectItem value="with-txn">With Transactions</SelectItem>
+                <SelectItem value="no-txn">No Transactions</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           {/* Date range filter */}
           <div className="flex flex-wrap items-center gap-3">
@@ -1234,6 +1332,9 @@ const ChartOfAccountsPage = () => {
             </Button>
             <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handlePrintList} disabled={!accounts.length} data-testid="print-list-btn">
               <Printer className="w-3 h-3 mr-1" /> Print List
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleExportPdf} disabled={!accounts.length} data-testid="export-pdf-btn">
+              <FileDown className="w-3 h-3 mr-1" /> PDF
             </Button>
           </div>
         </CardContent>
@@ -1381,9 +1482,12 @@ const ChartOfAccountsPage = () => {
           
           {/* Load More */}
           {hasMore && filteredAccounts.length > 0 && (
-            <div className="text-center py-4">
-              <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={loadingMore}>
+            <div className="text-center py-4 flex justify-center gap-3">
+              <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={loadingMore || loadingAll}>
                 {loadingMore ? 'Loading...' : `Load More (${accounts.length} of ${totalCount})`}
+              </Button>
+              <Button variant="default" size="sm" onClick={handleLoadAll} disabled={loadingMore || loadingAll} data-testid="load-all-btn">
+                {loadingAll ? 'Loading All...' : `Load All ${totalCount}`}
               </Button>
             </div>
           )}
