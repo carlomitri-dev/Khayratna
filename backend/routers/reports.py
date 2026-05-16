@@ -448,6 +448,105 @@ async def create_missing_accounts(
     }
 
 
+@router.get("/reports/coa-health-check")
+async def coa_health_check(
+    organization_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Comprehensive health check: missing parents, unbalanced vouchers, orphaned codes."""
+    
+    # --- Check A: Missing Parent Accounts ---
+    accounts = await db.accounts.find(
+        {'organization_id': organization_id}, {'code': 1, 'name': 1, '_id': 0}
+    ).to_list(None)
+    existing_codes = {acc['code'] for acc in accounts if acc.get('code')}
+    
+    missing_parents = []
+    for code in sorted(existing_codes):
+        code_len = len(code)
+        if code_len <= 1:
+            continue
+        # Determine expected parent length
+        if code_len == 2:
+            parent = code[:1]
+        elif code_len == 3:
+            parent = code[:2]
+        elif code_len == 4:
+            parent = code[:3]
+        else:
+            parent = code[:4]
+        
+        if parent and parent not in existing_codes:
+            missing_parents.append({
+                'child_code': code,
+                'missing_parent_code': parent,
+                'parent_length': len(parent)
+            })
+    
+    # Deduplicate missing parents
+    seen_parents = set()
+    unique_missing = []
+    for mp in missing_parents:
+        if mp['missing_parent_code'] not in seen_parents:
+            seen_parents.add(mp['missing_parent_code'])
+            unique_missing.append(mp)
+    
+    # --- Check B: Unbalanced Historical Vouchers ---
+    pipeline = [
+        {'$match': {'organization_id': organization_id, 'is_posted': True}},
+        {'$unwind': '$lines'},
+        {'$group': {
+            '_id': {'id': '$id', 'number': '$voucher_number', 'date': '$date', 'type': '$voucher_type'},
+            'total_debit_usd': {'$sum': {'$ifNull': ['$lines.debit_usd', 0]}},
+            'total_credit_usd': {'$sum': {'$ifNull': ['$lines.credit_usd', 0]}},
+            'total_debit_lbp': {'$sum': {'$ifNull': ['$lines.debit_lbp', 0]}},
+            'total_credit_lbp': {'$sum': {'$ifNull': ['$lines.credit_lbp', 0]}},
+        }},
+        {'$addFields': {
+            'diff_usd': {'$abs': {'$subtract': ['$total_debit_usd', '$total_credit_usd']}},
+            'diff_lbp': {'$abs': {'$subtract': ['$total_debit_lbp', '$total_credit_lbp']}},
+        }},
+        {'$match': {'$or': [{'diff_usd': {'$gt': 0.01}}, {'diff_lbp': {'$gt': 1}}]}},
+        {'$sort': {'_id.date': -1}},
+        {'$limit': 100}
+    ]
+    unbalanced = []
+    async for r in db.vouchers.aggregate(pipeline):
+        unbalanced.append({
+            'voucher_id': r['_id']['id'],
+            'voucher_number': r['_id']['number'],
+            'date': r['_id']['date'],
+            'voucher_type': r['_id']['type'],
+            'debit_usd': round(r['total_debit_usd'], 2),
+            'credit_usd': round(r['total_credit_usd'], 2),
+            'diff_usd': round(r['diff_usd'], 2),
+            'debit_lbp': round(r['total_debit_lbp'], 2),
+            'credit_lbp': round(r['total_credit_lbp'], 2),
+            'diff_lbp': round(r['diff_lbp'], 2),
+        })
+    
+    # --- Check C: Orphaned Codes (codes in vouchers not in COA) ---
+    v_pipeline = [
+        {'$match': {'organization_id': organization_id, 'is_posted': True}},
+        {'$unwind': '$lines'},
+        {'$group': {'_id': '$lines.account_code'}},
+    ]
+    voucher_codes = set()
+    async for result in db.vouchers.aggregate(v_pipeline):
+        if result['_id']:
+            voucher_codes.add(result['_id'])
+    orphaned_codes = sorted(voucher_codes - existing_codes)
+    
+    return {
+        'missing_parents': unique_missing,
+        'missing_parents_count': len(unique_missing),
+        'unbalanced_vouchers': unbalanced,
+        'unbalanced_count': len(unbalanced),
+        'orphaned_codes': orphaned_codes,
+        'orphaned_count': len(orphaned_codes),
+        'total_accounts': len(existing_codes),
+        'total_voucher_codes': len(voucher_codes),
+    }
 
 # ================== INCOME STATEMENT ==================
 

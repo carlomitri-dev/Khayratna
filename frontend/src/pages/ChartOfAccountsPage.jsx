@@ -81,6 +81,11 @@ const ChartOfAccountsPage = () => {
   const [dateTo, setDateTo] = useState('');
   const [sortField, setSortField] = useState(''); // debit_usd, credit_usd, balance_usd
   const [sortDir, setSortDir] = useState('desc'); // asc, desc
+  const [codeLenFilter, setCodeLenFilter] = useState('all');
+  const [healthCheckOpen, setHealthCheckOpen] = useState(false);
+  const [healthData, setHealthData] = useState(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [creatingParents, setCreatingParents] = useState(false);
 
   useEffect(() => {
     if (currentOrg) {
@@ -363,7 +368,14 @@ const ChartOfAccountsPage = () => {
     const matchesSearch = account.code.includes(searchTerm) || 
                          account.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesClass = selectedClass === 'all' || account.account_class === parseInt(selectedClass);
-    return matchesSearch && matchesClass;
+    const codeLen = account.code.length;
+    const matchesCodeLen = codeLenFilter === 'all' ||
+      (codeLenFilter === '1' && codeLen === 1) ||
+      (codeLenFilter === '2' && codeLen === 2) ||
+      (codeLenFilter === '3' && codeLen === 3) ||
+      (codeLenFilter === '4' && codeLen === 4) ||
+      (codeLenFilter === 'gt4' && codeLen > 4);
+    return matchesSearch && matchesClass && matchesCodeLen;
   });
 
   const sortedAccounts = sortField ? [...filteredAccounts].sort((a, b) => {
@@ -388,6 +400,97 @@ const ChartOfAccountsPage = () => {
       setSortField(field);
       setSortDir('desc');
     }
+  };
+
+  const handleHealthCheck = async () => {
+    setHealthLoading(true);
+    setHealthCheckOpen(true);
+    try {
+      const res = await axios.get(`${API}/reports/coa-health-check?organization_id=${currentOrg.id}`);
+      setHealthData(res.data);
+    } catch (err) {
+      toast.error('Failed to run health check');
+    } finally {
+      setHealthLoading(false);
+    }
+  };
+
+  const handleCreateParents = async () => {
+    if (!healthData?.missing_parents?.length) return;
+    setCreatingParents(true);
+    try {
+      const accs = healthData.missing_parents.map(mp => ({
+        code: mp.missing_parent_code,
+        name: `Parent ${mp.missing_parent_code}`
+      }));
+      await axios.post(`${API}/reports/create-missing-accounts`, {
+        organization_id: currentOrg.id,
+        accounts: accs
+      });
+      toast.success(`Created ${accs.length} parent accounts`);
+      fetchAccounts(true);
+      handleHealthCheck();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to create parent accounts');
+    } finally {
+      setCreatingParents(false);
+    }
+  };
+
+  const handleCreateOrphaned = async () => {
+    if (!healthData?.orphaned_codes?.length) return;
+    setCreatingParents(true);
+    try {
+      const accs = healthData.orphaned_codes.map(code => ({ code, name: `Auto: ${code}` }));
+      await axios.post(`${API}/reports/create-missing-accounts`, {
+        organization_id: currentOrg.id,
+        accounts: accs
+      });
+      toast.success(`Created ${accs.length} missing accounts`);
+      fetchAccounts(true);
+      handleHealthCheck();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to create accounts');
+    } finally {
+      setCreatingParents(false);
+    }
+  };
+
+  const handlePrintList = () => {
+    const accs = sortedAccounts;
+    const html = `
+      <html><head><title>Chart of Accounts</title>
+      <style>
+        body{font-family:Arial,sans-serif;font-size:12px;color:#000;margin:20px;}
+        h2{text-align:center;margin-bottom:4px;}
+        p.sub{text-align:center;color:#666;margin-top:0;font-size:11px;}
+        table{width:100%;border-collapse:collapse;margin-top:10px;}
+        th{background:#eee;border:1px solid #999;padding:5px 6px;text-align:left;font-size:11px;}
+        td{border:1px solid #ccc;padding:4px 6px;font-size:11px;}
+        td.num{text-align:right;font-family:monospace;}
+        .pos{color:green;} .neg{color:red;}
+      </style></head><body>
+      <h2>${currentOrg.name} - Chart of Accounts</h2>
+      <p class="sub">${accs.length} accounts${codeLenFilter !== 'all' ? ' (Code length: ' + (codeLenFilter === 'gt4' ? '>4' : codeLenFilter) + ' digits)' : ''}${selectedClass !== 'all' ? ' | Class ' + selectedClass : ''}</p>
+      <table>
+        <thead><tr><th>Code</th><th>Account Name</th><th>Type</th><th>Debit LBP</th><th>Credit LBP</th><th>Balance LBP</th><th>Debit USD</th><th>Credit USD</th><th>Balance USD</th></tr></thead>
+        <tbody>${accs.map(a => `<tr>
+          <td style="font-family:monospace;font-weight:bold;">${a.code}</td>
+          <td>${a.name}</td>
+          <td>${a.account_type || ''}</td>
+          <td class="num ${(a.debit_lbp||0)>0?'pos':''}">${(a.debit_lbp||0)>0?Number(a.debit_lbp).toLocaleString():'-'}</td>
+          <td class="num ${(a.credit_lbp||0)>0?'neg':''}">${(a.credit_lbp||0)>0?Number(a.credit_lbp).toLocaleString():'-'}</td>
+          <td class="num ${(a.balance_lbp||0)>0?'pos':(a.balance_lbp||0)<0?'neg':''}">${Number(a.balance_lbp||0).toLocaleString()}</td>
+          <td class="num ${(a.debit_usd||0)>0?'pos':''}">${(a.debit_usd||0)>0?'$'+Number(a.debit_usd).toLocaleString('en-US',{minimumFractionDigits:2}):'-'}</td>
+          <td class="num ${(a.credit_usd||0)>0?'neg':''}">${(a.credit_usd||0)>0?'$'+Number(a.credit_usd).toLocaleString('en-US',{minimumFractionDigits:2}):'-'}</td>
+          <td class="num ${(a.balance_usd||0)>0?'pos':(a.balance_usd||0)<0?'neg':''}">${'$'+Number(a.balance_usd||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+      </body></html>`;
+    const win = window.open('', '_blank', 'width=1100,height=800');
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => win.print(), 300);
   };
 
   // Filtered list for the advanced filter dialog
@@ -1094,6 +1197,19 @@ const ChartOfAccountsPage = () => {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={codeLenFilter} onValueChange={setCodeLenFilter}>
+              <SelectTrigger className="w-full sm:w-[130px] text-sm h-9" data-testid="code-len-filter">
+                <SelectValue placeholder="Code length" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Lengths</SelectItem>
+                <SelectItem value="1">1 Digit</SelectItem>
+                <SelectItem value="2">2 Digits</SelectItem>
+                <SelectItem value="3">3 Digits</SelectItem>
+                <SelectItem value="4">4 Digits</SelectItem>
+                <SelectItem value="gt4">&gt;4 Digits</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           {/* Date range filter */}
           <div className="flex flex-wrap items-center gap-3">
@@ -1113,6 +1229,12 @@ const ChartOfAccountsPage = () => {
                 Clear Dates
               </Button>
             )}
+            <Button size="sm" variant="outline" className="h-8 text-xs border-orange-500/50 text-orange-400 hover:bg-orange-500/10" onClick={handleHealthCheck} disabled={healthLoading} data-testid="health-check-btn">
+              <AlertCircle className="w-3 h-3 mr-1" /> {healthLoading ? 'Checking...' : 'Health Check'}
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handlePrintList} disabled={!accounts.length} data-testid="print-list-btn">
+              <Printer className="w-3 h-3 mr-1" /> Print List
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -1305,6 +1427,113 @@ const ChartOfAccountsPage = () => {
         userRole={user?.role}
         fyId={selectedFY?.id}
       />
+
+      {/* Health Check Dialog */}
+      <Dialog open={healthCheckOpen} onOpenChange={setHealthCheckOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-orange-400" />
+              Chart of Accounts Health Check
+            </DialogTitle>
+          </DialogHeader>
+          {healthLoading ? (
+            <div className="flex items-center justify-center py-12"><div className="spinner" /></div>
+          ) : healthData ? (
+            <div className="space-y-6">
+              {/* Missing Parents */}
+              <div>
+                <h3 className="font-semibold text-sm flex items-center gap-2 mb-2">
+                  Missing Parent Accounts
+                  <span className={`text-xs px-2 py-0.5 rounded ${healthData.missing_parents_count > 0 ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                    {healthData.missing_parents_count}
+                  </span>
+                </h3>
+                {healthData.missing_parents_count === 0 ? (
+                  <p className="text-xs text-muted-foreground">All parent accounts exist.</p>
+                ) : (
+                  <>
+                    <div className="border rounded overflow-hidden max-h-[200px] overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-muted/50 sticky top-0"><tr><th className="p-2 text-left">Child Code</th><th className="p-2 text-left">Missing Parent</th><th className="p-2 text-left">Parent Length</th></tr></thead>
+                        <tbody>
+                          {healthData.missing_parents.map((mp, i) => (
+                            <tr key={i} className="border-t"><td className="p-2 font-mono">{mp.child_code}</td><td className="p-2 font-mono font-bold text-red-400">{mp.missing_parent_code}</td><td className="p-2">{mp.parent_length} digit</td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <Button size="sm" className="mt-2" onClick={handleCreateParents} disabled={creatingParents} data-testid="create-parents-btn">
+                      <Plus className="w-3 h-3 mr-1" /> {creatingParents ? 'Creating...' : `Create ${healthData.missing_parents_count} Parent Account(s)`}
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              {/* Unbalanced Vouchers */}
+              <div>
+                <h3 className="font-semibold text-sm flex items-center gap-2 mb-2">
+                  Unbalanced Vouchers
+                  <span className={`text-xs px-2 py-0.5 rounded ${healthData.unbalanced_count > 0 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                    {healthData.unbalanced_count}
+                  </span>
+                </h3>
+                {healthData.unbalanced_count === 0 ? (
+                  <p className="text-xs text-muted-foreground">All posted vouchers are balanced.</p>
+                ) : (
+                  <div className="border rounded overflow-hidden max-h-[250px] overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/50 sticky top-0"><tr><th className="p-2 text-left">Voucher</th><th className="p-2 text-left">Date</th><th className="p-2 text-left">Type</th><th className="p-2 text-right">Debit USD</th><th className="p-2 text-right">Credit USD</th><th className="p-2 text-right text-red-400">Diff USD</th><th className="p-2 text-right text-red-400">Diff LBP</th></tr></thead>
+                      <tbody>
+                        {healthData.unbalanced_vouchers.map((uv, i) => (
+                          <tr key={i} className="border-t">
+                            <td className="p-2 font-mono">{uv.voucher_number}</td>
+                            <td className="p-2">{uv.date}</td>
+                            <td className="p-2">{uv.voucher_type}</td>
+                            <td className="p-2 text-right font-mono">${formatUSD(uv.debit_usd)}</td>
+                            <td className="p-2 text-right font-mono">${formatUSD(uv.credit_usd)}</td>
+                            <td className="p-2 text-right font-mono text-red-400 font-bold">${formatUSD(uv.diff_usd)}</td>
+                            <td className="p-2 text-right font-mono text-red-400">{formatLBP(uv.diff_lbp)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Orphaned Codes */}
+              <div>
+                <h3 className="font-semibold text-sm flex items-center gap-2 mb-2">
+                  Missing Accounts in Vouchers
+                  <span className={`text-xs px-2 py-0.5 rounded ${healthData.orphaned_count > 0 ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                    {healthData.orphaned_count}
+                  </span>
+                </h3>
+                {healthData.orphaned_count === 0 ? (
+                  <p className="text-xs text-muted-foreground">All voucher account codes exist in chart of accounts.</p>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {healthData.orphaned_codes.map(code => (
+                        <span key={code} className="font-mono text-xs px-2 py-1 bg-red-500/10 text-red-400 rounded border border-red-500/20">{code}</span>
+                      ))}
+                    </div>
+                    <Button size="sm" onClick={handleCreateOrphaned} disabled={creatingParents} data-testid="create-orphaned-btn">
+                      <Plus className="w-3 h-3 mr-1" /> {creatingParents ? 'Creating...' : `Create ${healthData.orphaned_count} Missing Account(s)`}
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              {/* Summary */}
+              <div className="p-3 bg-muted/30 rounded text-xs text-muted-foreground">
+                Total accounts: {healthData.total_accounts} | Codes in vouchers: {healthData.total_voucher_codes}
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
